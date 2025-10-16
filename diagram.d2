@@ -1,0 +1,392 @@
+vars: {
+  d2-config: {
+    layout-engine: elk
+    # Terminal theme code
+    theme-id: 3
+  }
+}
+
+
+classes: {
+  person: {
+    style.fill: "#e3f2fd"
+    style.stroke: "#1976d2"
+    style.stroke-width: 2
+  }
+  softwareSystem: {
+    style.fill: "#f3e5f5"
+    style.stroke: "#7b1fa2"
+    style.stroke-width: 2
+  }
+  container: {
+    style.fill: "#e8f5e8"
+    style.stroke: "#388e3c"
+    style.stroke-width: 2
+  }
+  database: {
+    style.fill: "#fff3e0"
+    style.stroke: "#f57c00"
+    style.stroke-width: 2
+  }
+}
+
+Rouvis {
+
+  model {
+
+    // === Legend (Development Phases) ===
+    legend: "Phase Legend" {
+      shape: rectangle
+      note_mvp: "[MVP]  Real-life testing (Weeks 1–8)"
+      note_next: "[NEXT] Next after MVP (Weeks 6–16)"
+      note_later: "[LATER] Nice-to-have / scale"
+      note_tip: "Tip: Search for [MVP] tags to scope the MVP build."
+    }
+
+    user: "Farmer (User)" {
+      shape: person
+      class: person
+    }
+
+    mobile: "[NEXT] Mobile App (ChatKit)" {
+      shape: hexagon
+      class: softwareSystem
+      technology: "Expo React Native + OpenAI ChatKit"
+      description: "Chat-first mobile; camera→Vision; push via LINE/FCM/APNs"
+    }
+
+    web: "[MVP] Web App (ChatKit)" {
+      shape: hexagon
+      class: softwareSystem
+      technology: "Next.js 14 (App Router) + OpenAI ChatKit"
+      description: "Chat-first PWA; evidence cards; admin console"
+      style: {
+        fill: "#ffeb3b"
+        stroke: "#f57c00"
+        stroke-width: 3
+      }
+    }
+
+    edge: "[MVP] API Gateway (Edge)" {
+      shape: hexagon
+      class: softwareSystem
+      technology: "Now: Vercel Edge/Functions • Scale: AWS API Gateway + Lambda/ECS (ap-northeast-1)"
+      description: "Auth (NextAuth/JWT, API Keys) • Rate limit • Idempotency • SSE/WS"
+      style: {
+        fill: "#ffeb3b"
+        stroke: "#f57c00"
+        stroke-width: 3
+      }
+    }
+
+    models: "[MVP] OpenAI Models (ChatGPT-5)" {
+      shape: hexagon
+      class: softwareSystem
+      technology: "Default: chatgpt-5-mini • Escalate: chatgpt-5-pro-vision"
+      style: {
+        fill: "#ffeb3b"
+        stroke: "#f57c00"
+        stroke-width: 3
+      }
+    }
+
+    // Japan-first external providers
+    weather_jp: "[MVP] 気象庁 (JMA) 防災情報API" {
+      shape: hexagon
+      class: softwareSystem
+      technology: "Primary weather/alerts (JP)"
+      description: "Forecasts, warnings, hazard feeds"
+      style: {
+        fill: "#ffeb3b"
+        stroke: "#f57c00"
+        stroke-width: 3
+      }
+    }
+    weather_alt: "[NEXT] OpenWeather / Weathernews Biz" {
+      shape: hexagon
+      class: softwareSystem
+      technology: "Fallback / supplemental"
+    }
+
+    satellite_jp: "[NEXT] Tellus (JAXA/さくら) 衛星API" {
+      shape: hexagon
+      class: softwareSystem
+      technology: "Primary satellite (JP)"
+      description: "S2/L8/9 scenes, NDVI pipelines"
+    }
+    satellite_alt: "[LATER] Sentinel Hub / Google Earth Engine" {
+      shape: hexagon
+      class: softwareSystem
+      technology: "Fallback / analytics"
+    }
+
+    iot_jp: "[NEXT] SORACOM (IoT)" {
+      shape: hexagon
+      class: softwareSystem
+      technology: "Beam/Harvest/Data • LTE-M"
+      description: "Device mgmt, data ingress (JP)"
+    }
+    iot_alt: "[LATER] AWS IoT Core" {
+      shape: hexagon
+      class: softwareSystem
+      technology: "Rules/Topics/Lambda"
+    }
+
+    maps_jp: "[MVP] 国土地理院 (GSI) タイル/標高API" {
+      shape: hexagon
+      class: softwareSystem
+      technology: "Primary maps/elevation (JP)"
+    }
+    maps_alt: "[NEXT] Yahoo!地図 API / Mapbox" {
+      shape: hexagon
+      class: softwareSystem
+      technology: "Geocoding/tiles"
+    }
+
+    notify_jp: "[NEXT] LINE Messaging API" {
+      shape: hexagon
+      class: softwareSystem
+      technology: "Primary notifications (JP)"
+    }
+    notify_alt: "[NEXT] Expo Push / FCM / APNs" {
+      shape: hexagon
+      class: softwareSystem
+      technology: "Cross-platform push"
+    }
+
+    calendar: "[MVP] Calendar/Email" {
+      shape: hexagon
+      class: softwareSystem
+      technology: "Google Calendar • Email: SendGrid → (Scale: AWS SES)"
+    }
+
+    payments_jp: "[NEXT] GMO-PG / SBペイメント" {
+      shape: hexagon
+      class: softwareSystem
+      technology: "Primary subscriptions (JP)"
+    }
+    payments_alt: "[NEXT] Stripe (Japan)" {
+      shape: hexagon
+      class: softwareSystem
+      technology: "Alt gateway"
+    }
+
+    // Core
+    core: "Rouvis Core Platform" {
+      shape: hexagon
+      class: softwareSystem
+
+      mcp: "[MVP] MCP Orchestrator" {
+        shape: rectangle
+        class: container
+        technology: "Agentcore - policy • pudgets • caching • tool permissions"
+        description: "Conversation orchestration; injects knowledge/tools; cost guard"
+        style: {
+          fill: "#ffeb3b"
+          stroke: "#f57c00"
+          stroke-width: 3
+        }
+      }
+
+      router: "[MVP] Model Router" {
+        shape: rectangle
+        class: container
+        technology: "ChatGPT-5 router (mini ↔ pro-vision)"
+        description: "Intent/complexity/vision-based selection + tenant budgets"
+        style: {
+          fill: "#ffeb3b"
+          stroke: "#f57c00"
+          stroke-width: 3
+        }
+      }
+
+      agents: "[MVP→NEXT] AgentKit Workflow Runtime" {
+        shape: rectangle
+        class: container
+        technology: "OpenAI AgentKit"
+        description: "MVP: Planner, Weather, CropCoach, Scheduler • NEXT: VisionDoctor, Compliance, Procurement"
+        style: {
+          fill: "#ffeb3b"
+          stroke: "#f57c00"
+          stroke-width: 3
+        }
+      }
+
+      builder: "[NEXT] Agent Builder" {
+        shape: rectangle
+        class: container
+        technology: "OpenAI AgentKit (visual)"
+        description: "Design & publish workflows → workflowId for ChatKit"
+      }
+
+      evals: "[NEXT] Agent Evals" {
+        shape: rectangle
+        class: container
+        technology: "OpenAI Evals + Trace grading"
+        description: "Datasets (guidebook/frost/pesticide) • CI gates • prompt optimizer"
+      }
+
+      connector: "[MVP] Connector Registry" {
+        shape: rectangle
+        class: container
+        technology: "AgentKit Connectors + MCP Tools"
+        description: "Weather/Maps/Calendar/Email • (NEXT: Satellite/IoT/LINE/Payments)"
+      }
+
+      bus: "[MVP] Command Bus" {
+        shape: rectangle
+        class: container
+        technology: "Now: Upstash Redis Streams • Scale: SQS/SNS or MSK (Kafka)"
+        description: "Intent→Command • retries • DLQ • outbox pattern"
+      }
+
+      activity: "[MVP] Activity Service" {
+        shape: rectangle
+        class: container
+        technology: "Node/TS (tRPC/REST) • CQRS"
+        description: "Log watering/fertilizer/harvest • projections • JA PDF/CSV"
+      }
+
+      fields: "[MVP] Fields/Plots Service" {
+        shape: rectangle
+        class: container
+        technology: "GeoJSON • Turf.js • Mapbox GL / GSI tiles"
+        description: "Boundaries, crops, seasons; area planning"
+      }
+
+      schedule: "[MVP] Scheduler/Notifications" {
+        shape: rectangle
+        class: container
+        technology: "BullMQ (MVP) / Temporal (opt) • Email/Calendar (MVP)"
+        description: "Recurring tasks, reminders, calendar sync"
+      }
+
+      vision: "[NEXT] Vision Service" {
+        shape: rectangle
+        class: container
+        technology: "chatgpt-5-pro-vision • sharp • presigned URLs"
+        description: "Image triage → diagnosis + confidence + playbook"
+      }
+
+      rag: "[MVP] Knowledge/RAG Service" {
+        shape: rectangle
+        class: container
+        technology: "Embeddings • Retrieval • Citations"
+        description: "JP guidebooks/Community ingest → chunks/embeddings → search"
+      }
+
+      procurement: "[LATER] Inventory/Procurement" {
+        shape: rectangle
+        class: container
+        technology: "GMO-PG/SBPS webhooks • Alt: Stripe"
+        description: "Stock, reorder suggestions, cost/ROI cards"
+      }
+
+      compliance: "[NEXT] Compliance/Record" {
+        shape: rectangle
+        class: container
+        technology: "Rule engine • Human-in-the-loop"
+        description: "Chemical guardrails; approvals; audit logs"
+      }
+
+      db: "[MVP] Primary DB" {
+        shape: cylinder
+        class: database
+        technology: "Now: Vercel Postgres • Scale: Amazon Aurora PostgreSQL (ap-northeast-1)"
+        description: "RLS • Event store + projections • Backups"
+      }
+
+      vdb: "[MVP] Vector DB" {
+        shape: cylinder
+        class: database
+        technology: "Now: Pinecone Tokyo • Scale: OpenSearch Serverless / Aurora pgvector"
+        description: "Embeddings + passages; tenant isolation"
+      }
+
+      obj: "[MVP] Object Store" {
+        shape: cylinder
+        class: database
+        technology: "Now: Cloudflare R2 Tokyo • Scale: Amazon S3 (ap-northeast-1)"
+        description: "Images (camera/vision), PDFs, reports"
+      }
+
+      obs: "[MVP] Observability & Billing" {
+        shape: rectangle
+        class: container
+        technology: "OTel + Grafana Cloud • (Scale: CloudWatch/X-Ray) • Usage→Stripe"
+        description: "Traces/logs/metrics • Token/tool metering per tenant"
+      }
+    }
+
+    // Relationships (ChatKit + AgentKit + JP providers)
+    user -> mobile: "chat + images"
+    user -> web: "chat + images"
+    mobile -> edge: "ChatKit SSE/WS"
+    web -> edge: "ChatKit SSE/WS"
+
+    edge -> core.mcp: "auth, rate, idempotency"
+    core.mcp -> core.agents: "invoke AgentKit workflow"
+    core.builder -> core.agents: "publish workflowId"
+    core.evals -> core.agents: "evals/trace grading"
+    core.agents -> core.router: "LLM calls"
+    core.agents -> core.connector: "tools/connectors"
+    core.router -> models
+
+    // JP-first integrations
+    core.connector -> weather_jp
+    core.connector -> weather_alt
+    core.connector -> satellite_jp
+    core.connector -> satellite_alt
+    core.connector -> iot_jp
+    core.connector -> iot_alt
+    core.connector -> maps_jp
+    core.connector -> maps_alt
+    core.connector -> notify_jp
+    core.connector -> notify_alt
+    core.connector -> calendar
+    core.connector -> payments_jp
+    core.connector -> payments_alt
+
+    // Commands to services
+    core.agents -> core.bus: "emit Commands (LOG_ACTIVITY, …)"
+    core.bus -> core.activity
+    core.bus -> core.fields
+    core.bus -> core.schedule
+    core.bus -> core.vision
+    core.bus -> core.rag
+    core.bus -> core.procurement
+    core.bus -> core.compliance
+
+    // Data layer
+    core.activity -> core.db
+    core.fields -> core.db
+    core.schedule -> core.db
+    core.compliance -> core.db
+    core.vision -> core.obj
+    core.rag -> core.vdb
+    core.rag -> core.obj
+
+    // Feedback to chat/orchestrator
+    core.db -> core.mcp: "projections"
+    core.vdb -> core.mcp: "passages + citations"
+    core.obs <- edge: "traces/metrics"
+    core.obs <- core.mcp: "traces/metrics"
+    core.obs <- core.activity: "usage events"
+    core.obs <- core.vision: "usage events"
+  }
+
+  views {
+    systemLandscape: "Landscape" {
+      include *
+      autoLayout: elk
+    }
+    container_core: "Core Containers" {
+      include core.*
+      autoLayout: elk
+    }
+    styles {
+      element.Person { shape: person }
+      element.Database { shape: cylinder }
+    }
+  }
+}
