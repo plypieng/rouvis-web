@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 type StreamEvent =
   | { type: 'meta'; model?: string; reasoning?: string; sessionId?: string }
   | { type: 'chunk'; content?: string }
+  | { type: 'citation'; source?: string; page?: number; confidence?: number; text?: string }
   | { type: 'error'; message?: string }
   | { type: 'done' }
   | Record<string, unknown>;
@@ -12,8 +13,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const backendUrl =
       process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+    
+    // Feature flag: use agents endpoint if enabled
+    const useAgents = process.env.USE_AGENTS === 'true';
+    const endpoint = useAgents ? '/v1/agents/run' : '/v1/chat/stream';
 
-    const upstream = await fetch(`${backendUrl}/v1/chat/stream`, {
+    const upstream = await fetch(`${backendUrl}${endpoint}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -38,6 +43,7 @@ export async function POST(request: NextRequest) {
     const decoder = new TextDecoder();
     let buffer = '';
     let aggregated = '';
+    const citations: any[] = [];
     let model: string | undefined =
       upstream.headers.get('x-session-model') ?? undefined;
     let sessionId: string | undefined =
@@ -65,6 +71,14 @@ export async function POST(request: NextRequest) {
           if (typeof payload.sessionId === 'string') {
             sessionId = payload.sessionId;
           }
+        } else if (payload?.type === 'citation') {
+          // Store citation for later inclusion in response
+          citations.push({
+            source: payload.source || '',
+            page: payload.page,
+            confidence: payload.confidence || 0,
+            text: payload.text,
+          });
         } else if (payload?.type === 'error') {
           const message =
             typeof payload.message === 'string'
@@ -88,6 +102,7 @@ export async function POST(request: NextRequest) {
       response: aggregated.trim(),
       model: model ?? null,
       sessionId: sessionId ?? null,
+      citations: citations.length > 0 ? citations : undefined,
     };
 
     return NextResponse.json(responsePayload);
