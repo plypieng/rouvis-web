@@ -24,25 +24,47 @@ interface WeatherAlert {
 export function WeatherAlertBanner() {
   const t = useTranslations();
   const [alert, setAlert] = useState<WeatherAlert | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // TODO: Fetch from GET /api/weather/alerts or backend JMA integration
-    // For now, show placeholder for demo
+    const fetchWeatherAlerts = async () => {
+      try {
+        const response = await fetch('/api/weather/alerts?area=niigata');
 
-    // Example: Mock frost alert for Niigata
-    const mockAlert: WeatherAlert = {
-      type: 'frost',
-      severity: 'high',
-      message: '今夜2°Cまで冷え込み',
-      location: '長岡',
-      actionRequired: 'コシヒカリの苗を保護してください'
+        if (!response.ok) {
+          console.warn('Failed to fetch weather alerts');
+          setLoading(false);
+          return;
+        }
+
+        const data = await response.json();
+
+        // Only show alerts with medium or high severity
+        const criticalAlerts = data.alerts?.filter(
+          (a: WeatherAlert) => a.severity === 'high' || a.severity === 'medium'
+        );
+
+        // Show the first critical alert (highest priority)
+        if (criticalAlerts && criticalAlerts.length > 0) {
+          setAlert(criticalAlerts[0]);
+        }
+
+        setLoading(false);
+      } catch (error) {
+        console.error('Failed to fetch weather alerts', error);
+        setLoading(false);
+      }
     };
 
-    // Only show alerts when they exist
-    // setAlert(mockAlert);
+    fetchWeatherAlerts();
+
+    // Refresh alerts every 30 minutes
+    const interval = setInterval(fetchWeatherAlerts, 30 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
-  if (!alert) {
+  // Don't render anything while loading or if no alerts
+  if (loading || !alert) {
     return null;
   }
 

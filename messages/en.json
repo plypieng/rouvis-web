@@ -10,5 +10,87 @@
     "analytics": "Analytics",
     "community": "Community",
     "chat": "AI Chat"
+  },
+  "weather": {
+    "today": "Today",
+    "mon": "Mon",
+    "tue": "Tue",
+    "wed": "Wed",
+    "thu": "Thu",
+    "fri": "Fri",
+    "sat": "Sat",
+    "sun": "Sun"
+  },
+  "dashboard": {
+    "location": "Nagaoka, Niigata",
+    "weather_forecast": "Weather Forecast",
+    "five_day_forecast": "5-Day Forecast",
+    "rain_chance": "{percentage}% chance of rain",
+    "no_rain": "No rain expected",
+    "view_detailed_forecast": "View detailed forecast",
+    "crop_recommendations": "Crop Recommendations",
+    "yield_forecast": "Yield Forecast",
+    "view_details": "View Details"
+  },
+  "today": {
+    "advisor_strip": {
+      "title": "Today's Advisory",
+      "view_details": "View Details",
+      "frost_alert": "Frost Watch: {temp}°C Tonight",
+      "kpi_chip": "Water Management: {value}%",
+      "next_task": "Next Task: {task}"
+    },
+    "tasks": {
+      "title": "Today's Tasks",
+      "regenerate": "Regenerate",
+      "none": "No tasks for today",
+      "generate": "Generate Tasks",
+      "field": "Field: {field}",
+      "eta": "Time: {time}",
+      "weather_dependent": "Weather Dependent",
+      "completed": "{done}/{total} Completed",
+      "week_view": "Week View"
+    },
+    "prompts": {
+      "today": "What should I do today?",
+      "today_label": "💬 What should I do?",
+      "weather": "Tell me about this week's weather and what to watch out for",
+      "weather_label": "🌤️ How's the weather?",
+      "frost": "Is frost coming? What should I do for Koshihikari?",
+      "frost_label": "❄️ Frost coming?",
+      "watering": "Should I water today?",
+      "watering_label": "💧 Need watering?"
+    }
+  },
+  "insights": {
+    "weather_and_logistics": "Weather & Logistics",
+    "logistics": "Logistics Status",
+    "cooperative_callouts": "JA Niigata Updates",
+    "latest": "Latest"
+  },
+  "chat": {
+    "greeting": "Hello! I'm your Niigata farming advisor. How can I help you today?",
+    "placeholder": "Ask a question or log an activity...",
+    "tools": {
+      "attach_field": "Field",
+      "attach_photo": "Photo"
+    }
+  },
+  "quick_actions": {
+    "title": "Quick Actions",
+    "log_activity": "Log Activity",
+    "ask": "Ask Question",
+    "take_photo": "Take Photo",
+    "week_plan": "Week Plan",
+    "voice_input": "Voice Input",
+    "voice_help": "You can use voice to log activities or ask questions"
+  },
+  "trust": {
+    "evidence_rail": "Evidence",
+    "badges": {
+      "jma_official": "JMA Official",
+      "agri_center": "Niigata Agricultural Research Center",
+      "ja_niigata": "JA Niigata"
+    }
   }
 }

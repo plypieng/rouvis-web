@@ -62,6 +62,8 @@
     "watering": "Watering",
     "maintenance": "Maintenance",
     "view_full_calendar": "View full calendar",
+    "schedule_activity": "Schedule Activity",
+    "add_activity": "Add Activity",
     "today": "Today",
     "month": "Month",
     "week": "Week"
@@ -144,7 +146,27 @@
     "recent_articles": "Recent Articles",
     "read_more": "Read More",
     "all": "All",
-    "read": "read",
+    "read": "Read",
+    "load_more": "Load More Articles",
+    "category": {
+      "rice": "Rice",
+      "vegetables": "Vegetables",
+      "fruits": "Fruits",
+      "soil": "Soil",
+      "equipment": "Equipment",
+      "climate": "Climate"
+    }
+  },
+  "communities": {
+    "title": "Communities",
+    "search": "Search Articles",
+    "featured": "Featured Articles",
+    "categories": "Categories",
+    "recent": "Recent Articles",
+    "recent_articles": "Recent Articles",
+    "read_more": "Read More",
+    "all": "All",
+    "read": "Read",
     "load_more": "Load More Articles",
     "category": {
       "rice": "Rice",
@@ -161,7 +183,32 @@
     "placeholder": "Ask farming question...",
     "send": "Send",
     "clear": "Clear Chat",
-    "suggested_topics": "Suggested Topics"
+    "greeting": "Hello! I’m your Niigata farm advisor. How can I help today?",
+    "history": "Conversation History",
+    "suggested_topics": "Suggested Topics",
+    "prompts": {
+      "today_label": "💬 What should I do today?",
+      "today": "What should I do today?",
+      "weather_label": "meteor_footprint️ How's the weather?",
+      "weather": "Tell me about this week's weather and what to watch out for",
+      "frost_label": "❄️ Is frost coming?",
+      "frost": "Do you think it's going to get cold? Please tell me about Koshihikari countermeasures",
+      "watering_label": "💧 Do I need to water?",
+      "watering": "Should I water today?"
+    },
+    "tools": {
+      "attach_field": "Field",
+      "attach_photo": "Photo"
+    }
+  },
+  "evidence": {
+    "citation": "Citation",
+    "confidence": "Confidence",
+    "action": "Action",
+    "weather": "Weather Info",
+    "tool_event": "Tool Event",
+    "source": "Source",
+    "sources": "Sources"
   },
   "weather": {
     "today": "Today",
@@ -192,6 +239,158 @@
     "dark_mode": "Dark Mode",
     "light_mode": "Light Mode",
     "export_data": "Export Data",
-    "new_analysis": "New Analysis"
+    "new_analysis": "New Analysis",
+    "optional": "optional",
+    "delete_confirm": "Are you sure you want to delete this item? This action cannot be undone."
+  },
+  "fields": {
+    "title": "Field Management",
+    "add_field": "Add Field",
+    "create_field": "Create Field",
+    "edit_field": "Edit Field",
+    "update_field": "Update Field",
+    "delete_field": "Delete Field",
+    "field_name": "Field Name",
+    "field_name_placeholder": "e.g. North Rice Field",
+    "crop": "Crop",
+    "crop_placeholder": "e.g. Koshihikari Rice",
+    "area": "Area",
+    "geojson": "Boundary Data (GeoJSON)",
+    "upload_geojson": "Upload GeoJSON File",
+    "geojson_help": "Upload a GeoJSON file or enter data directly below",
+    "geojson_placeholder": "Enter GeoJSON boundary data...",
+    "name_required": "Field name is required",
+    "invalid_geojson": "Invalid GeoJSON format",
+    "invalid_geojson_file": "Invalid GeoJSON file",
+    "create_error": "Failed to create field",
+    "update_error": "Failed to update field",
+    "search_placeholder": "Search by field name or crop...",
+    "select": "Select",
+    "cancel": "Cancel",
+    "loading": "Loading...",
+    "no_results": "No results found",
+    "no_fields": "No fields registered",
+    "error_loading": "Failed to load fields",
+    "retry": "Retry",
+    "area_unit": "sqm",
+    "location": "Location",
+    "created": "Created",
+    "last_updated": "Last Updated",
+    "current_crop": "Current Crop",
+    "legend": "Legend",
+    "delete_confirm": "Are you sure you want to delete this field? This action cannot be undone."
+  },
+  "rotation": {
+    "title": "Crop Rotation Planning",
+    "add_plan": "Add Plan",
+    "select_field": "Select a field to view rotation plan",
+    "no_plan": "No plan",
+    "no_plan_current_year": "No plan for current year",
+    "plan_now": "Plan now",
+    "same_crop_warning": "Same crop planted consecutively. Crop rotation recommended.",
+    "change_crop": "Change crop",
+    "rotation_plan": "Rotation Plan",
+    "recommendations": "Recommendations",
+    "benefits_title": "Benefits of Crop Rotation",
+    "benefit_soil_health": "Maintain soil health",
+    "benefit_pest_control": "Prevent pest and disease buildup",
+    "benefit_yield_stability": "Stabilize yields",
+    "benefit_nutrient_balance": "Improve nutrient balance"
+  },
+  "today": {
+    "advisor_strip": {
+      "title": "Now’s Advice",
+      "frost_alert": "Frost tonight ({temp}°C forecast)",
+      "kpi_chip": "Water management {value}%",
+      "next_task": "Next task: {task}",
+      "view_details": "View details"
+    },
+    "tasks": {
+      "title": "Today’s Tasks",
+      "regenerate": "Regenerate",
+      "none": "No tasks yet for today",
+      "generate": "Generate tasks",
+      "completed": "Completed: {done} / {total}",
+      "week_view": "View weekly plan →",
+      "field": "📍 {field}",
+      "eta": "⏱️ {time}",
+      "weather_dependent": "🌤️ Weather dependent"
+    },
+    "prompts": {
+      "intro": "If you have questions, ask anytime",
+      "today": "What should I do today?",
+      "harvest_koshi": "When is Koshihikari harvest timing?",
+      "yield_trend": "Show yield trend for Field A",
+      "frost_tonight": "Is frost a risk tonight?"
+    }
+  },
+  "quick_actions": {
+    "title": "Quick Actions",
+    "log_activity": "Log Activity",
+    "ask": "Ask",
+    "take_photo": "Take Photo",
+    "week_plan": "Week Plan",
+    "voice_input": "Record by Voice",
+    "voice_help": "You can easily record by voice even if your hands are dirty"
+  },
+  "insights": {
+    "weather_and_logistics": "Weather & Logistics",
+    "logistics": "Logistics",
+    "cooperative_callouts": "Cooperative Announcements",
+    "latest": "Latest"
+  },
+  "trust": {
+    "evidence_rail": "Evidence",
+    "badge_label": "Guidebooks",
+    "badges": {
+      "jma_official": "JMA Official",
+      "agri_center": "Niigata Prefectural Agri Tech Center",
+      "ja_niigata": "JA Niigata"
+    }
+  },
+  "weather_alerts": {
+    "frost": "Frost Advisory",
+    "typhoon": "Typhoon Warning",
+    "heavy_rain": "Heavy Rain Warning",
+    "strong_wind": "Strong Wind Advisory",
+    "snow": "Snow Warning",
+    "in": "({location})"
+  },
+  "header": {
+    "logo_alt": "Rouvis logo",
+    "app_name": "Rouvis",
+    "sign_in": "Sign in",
+    "sign_up": "Sign up",
+    "sign_out": "Sign out",
+    "settings": "Settings",
+    "profile": "Profile",
+    "account": "Account",
+    "theme": "Theme",
+    "theme_light": "Light",
+    "theme_dark": "Dark",
+    "theme_system": "System",
+    "language": "Language",
+    "nav": {
+      "dashboard": "Dashboard",
+      "fields": "Fields",
+      "activities": "Activities",
+      "calendar": "Calendar",
+      "chat": "Chat",
+      "more": "More"
+    },
+    "a11y": {
+      "skip_to_content": "Skip to content",
+      "open_menu": "Open menu",
+      "close_menu": "Close menu"
+    }
+  },
+  "footer": {
+    "about": "About",
+    "explore": "Explore",
+    "help": "Help",
+    "more": "More",
+    "rights": "All rights reserved.",
+    "terms": "Terms",
+    "privacy": "Privacy"
   }
 }

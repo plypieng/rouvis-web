@@ -29,7 +29,8 @@ export async function POST(request: Request): Promise<Response> {
     if (!openaiApiKey) {
       return jsonResponse(
         { error: 'Missing OPENAI_API_KEY environment variable' },
-        500
+        500,
+        null
       );
     }
 

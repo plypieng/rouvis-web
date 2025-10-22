@@ -128,35 +128,37 @@ export function WebChatInterface() {
 
   return (
     <>
-      <div className="bg-primary-50 p-4 border-b border-primary-100">
+      {/* Mobile-optimized header */}
+      <div className="bg-primary-50 mobile-spacing border-b border-primary-100">
         <div className="flex items-center">
           <div className="w-10 h-10 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-xl mr-3">
             AI
           </div>
           <div>
-            <h2 className="font-medium">Farming Strategy Assistant</h2>
-            <p className="text-sm text-gray-600">
+            <h2 className="text-mobile-base font-medium">Farming Strategy Assistant</h2>
+            <p className="text-mobile-sm text-gray-600">
               Powered by GPT-4 with agricultural expertise
             </p>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+      {/* Mobile-optimized chat area with smooth scrolling */}
+      <div className="flex-1 overflow-y-auto mobile-scroll p-3 sm:p-4 space-y-4 sm:space-y-6">
         {messages.map(message => (
           <div
             key={message.id}
             className={`flex ${
               message.sender === 'user' ? 'justify-end' : 'justify-start'
-            } mb-4`}
+            } mb-3 sm:mb-4`}
           >
             {message.sender === 'ai' && (
-              <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center mr-2 mt-1">
+              <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center mr-2 mt-1 flex-shrink-0">
                 AI
               </div>
             )}
             <div
-              className={`max-w-[80%] rounded-lg p-4 ${
+              className={`mobile-message-bubble ${
                 message.sender === 'user'
                   ? 'bg-primary-600 text-white'
                   : 'bg-white border border-gray-200'
@@ -167,7 +169,7 @@ export function WebChatInterface() {
                   {message.attachments.map((attachment, index) => (
                     <div
                       key={index}
-                      className="bg-white rounded p-2 border border-gray-200 text-gray-700 text-sm flex items-center mb-2"
+                      className="bg-white rounded p-2 border border-gray-200 text-gray-700 text-mobile-sm flex items-center mb-2"
                     >
                       <span className="mr-2">📎</span>
                       <span>{attachment.name}</span>
@@ -176,9 +178,9 @@ export function WebChatInterface() {
                 </div>
               )}
 
-              <div className="whitespace-pre-wrap">{message.content}</div>
+              <div className="whitespace-pre-wrap text-mobile-sm leading-relaxed">{message.content}</div>
 
-              <div className="text-xs mt-2 opacity-70 text-right">
+              <div className="text-mobile-sm mt-2 opacity-70 text-right">
                 {message.timestamp.toLocaleTimeString([], {
                   hour: '2-digit',
                   minute: '2-digit',
@@ -186,7 +188,7 @@ export function WebChatInterface() {
               </div>
             </div>
             {message.sender === 'user' && (
-              <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center ml-2 mt-1">
+              <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center ml-2 mt-1 flex-shrink-0">
                 You
               </div>
             )}
@@ -194,11 +196,11 @@ export function WebChatInterface() {
         ))}
 
         {isLoading && (
-          <div className="flex justify-start mb-4">
-            <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center mr-2">
+          <div className="flex justify-start mb-3 sm:mb-4">
+            <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center mr-2 flex-shrink-0">
               AI
             </div>
-            <div className="bg-white border border-gray-200 rounded-lg p-4 max-w-[80%]">
+            <div className="bg-white border border-gray-200 rounded-lg mobile-message-bubble">
               <div className="flex space-x-2">
                 <div className="w-3 h-3 bg-gray-300 rounded-full animate-bounce"></div>
                 <div className="w-3 h-3 bg-gray-300 rounded-full animate-bounce delay-100"></div>
@@ -211,16 +213,18 @@ export function WebChatInterface() {
         <div ref={messagesEndRef} />
       </div>
 
-      <form onSubmit={sendMessage} className="p-4 border-t border-gray-200">
-        <div className="flex items-center">
+      {/* Mobile-optimized input area */}
+      <form onSubmit={sendMessage} className="mobile-chat-input">
+        <div className="flex items-end gap-2">
           <button
             type="button"
             onClick={handleAttachClick}
-            className={`p-2 rounded-full ${
+            className={`touch-target rounded-full mobile-tap ${
               isAttaching
                 ? 'bg-primary-100 text-primary-700'
                 : 'hover:bg-gray-100 text-gray-500'
             }`}
+            aria-label="Attach file"
           >
             📎
           </button>
@@ -233,7 +237,7 @@ export function WebChatInterface() {
           />
 
           {isAttaching && (
-            <div className="ml-2 bg-primary-50 text-primary-700 text-sm px-2 py-1 rounded">
+            <div className="bg-primary-50 text-primary-700 text-mobile-sm px-2 py-1 rounded flex-shrink-0">
               File attached
             </div>
           )}
@@ -243,19 +247,23 @@ export function WebChatInterface() {
             value={inputMessage}
             onChange={event => setInputMessage(event.target.value)}
             placeholder="Type a farming question or log here..."
-            className="flex-1 ml-2 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            className="mobile-input flex-1"
             disabled={isLoading}
+            autoComplete="off"
+            autoCapitalize="sentences"
+            autoCorrect="on"
           />
           <button
             type="submit"
             disabled={isLoading || (!isAttaching && !inputMessage.trim())}
-            className={`ml-2 p-3 rounded-lg ${
+            className={`mobile-btn-primary flex-shrink-0 ${
               isLoading || (!isAttaching && !inputMessage.trim())
-                ? 'bg-gray-200 text-gray-400'
-                : 'bg-primary-600 hover:bg-primary-700 text-white'
+                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                : ''
             }`}
+            aria-label="Send message"
           >
-            <span>Send</span>
+            <span className="text-mobile-sm">Send</span>
           </button>
         </div>
       </form>

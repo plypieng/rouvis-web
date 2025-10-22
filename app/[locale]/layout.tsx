@@ -4,7 +4,9 @@ import { NextIntlClientProvider } from 'next-intl';
 import { notFound } from 'next/navigation';
 import getMessages, { locales } from '../../i18n';
 import { BottomNav } from '../../components/BottomNav';
-import LanguageSwitcher from '../../components/LanguageSwitcher';
+// import LanguageSwitcher from '../../components/LanguageSwitcher';
+import Header from '../../components/Header';
+import Footer from '../../components/Footer';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -33,35 +35,34 @@ export default async function RootLayout(props: {
   const { children } = props;
   const params = await props.params;
   const locale = params.locale;
-
+  
   if (!locales.includes(locale)) {
     notFound();
   }
-
+  
   // Get messages for the locale
   const messages = await getMessages(locale);
-
+  
   return (
-    <html lang={locale}>
-      <body className={inter.className}>
-        <NextIntlClientProvider locale={locale} messages={messages}>
-          {/* Full-height layout with padding for bottom nav on mobile */}
-          <div className="h-screen bg-gray-50 flex flex-col">
-            {/* Top Bar - Language Switcher */}
-            <div className="absolute top-4 right-4 z-40">
-              <LanguageSwitcher locale={locale} />
-            </div>
-
-            {/* Main Content - Full height minus bottom nav on mobile */}
-            <main className="flex-1 overflow-auto pb-20 lg:pb-0">
-              {children}
-            </main>
-
-            {/* Bottom Navigation - Mobile Only */}
-            <BottomNav locale={locale} />
-          </div>
-        </NextIntlClientProvider>
-      </body>
-    </html>
+    <NextIntlClientProvider locale={locale} messages={messages}>
+      {/* Full-height layout with mobile optimizations */}
+      <div className={`${inter.className} mobile-viewport bg-gray-50 flex flex-col`} lang={locale}>
+        {/* New sticky header */}
+        <Header locale={locale as any} />
+        
+        {/* Main Content - Full height minus bottom nav on mobile */}
+        <main id="main-content" className="flex-1 overflow-auto mobile-scroll safe-bottom pb-20 lg:pb-0">
+          {children}
+        </main>
+        
+        {/* New Footer */}
+        <Footer locale={locale as any} />
+        
+        {/* Bottom Navigation - Mobile Only - Enhanced */}
+        <div className="mobile-nav-height">
+          <BottomNav locale={locale} />
+        </div>
+      </div>
+    </NextIntlClientProvider>
   );
 }

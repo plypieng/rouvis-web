@@ -1,6 +1,6 @@
 export const i18nConfig = {
-  locales: ['en', 'ja'],
-  defaultLocale: 'en',
+  locales: ['ja', 'en'], // Japanese first for Niigata farmers
+  defaultLocale: 'ja',
   localeDetection: true,
 };
 

@@ -87,7 +87,7 @@ export function TodayTasksCard() {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
           <Clock className="w-5 h-5 text-green-600" />
-          今日のタスク
+          {t('today.tasks.title')}
         </h2>
         <button
           className="text-sm text-green-600 hover:text-green-700 font-medium"
@@ -95,8 +95,9 @@ export function TodayTasksCard() {
             // TODO: Open chat with "今日は何をすればいいですか？"
             console.log('Generate today\'s plan');
           }}
+          aria-label={t('today.tasks.regenerate')}
         >
-          再生成
+          {t('today.tasks.regenerate')}
         </button>
       </div>
 
@@ -111,18 +112,19 @@ export function TodayTasksCard() {
         </div>
       ) : tasks.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
-          <p className="mb-2">今日のタスクはまだありません</p>
+          <p className="mb-2">{t('today.tasks.none')}</p>
           <button
             className="text-green-600 hover:text-green-700 font-medium text-sm"
             onClick={() => {
               // TODO: Trigger task generation
             }}
+            aria-label={t('today.tasks.generate')}
           >
-            タスクを生成
+            {t('today.tasks.generate')}
           </button>
         </div>
       ) : (
-        <ul className="space-y-2">
+        <ul className="space-y-2" aria-live="polite">
           {tasks.map((task) => (
             <li
               key={task.id}
@@ -151,17 +153,17 @@ export function TodayTasksCard() {
                 <div className="flex items-center gap-2 mt-1 text-xs text-gray-600">
                   {task.field && (
                     <span className="bg-white/50 px-2 py-0.5 rounded">
-                      📍 {task.field}
+                      {t('today.tasks.field', { field: task.field })}
                     </span>
                   )}
                   {task.estimatedTime && (
                     <span className="bg-white/50 px-2 py-0.5 rounded">
-                      ⏱️ {task.estimatedTime}
+                      {t('today.tasks.eta', { time: task.estimatedTime })}
                     </span>
                   )}
                   {task.weatherDependent && (
                     <span className="bg-white/50 px-2 py-0.5 rounded">
-                      🌤️ 天候次第
+                      {t('today.tasks.weather_dependent')}
                     </span>
                   )}
                 </div>
@@ -174,7 +176,10 @@ export function TodayTasksCard() {
       {tasks.length > 0 && (
         <div className="mt-4 pt-4 border-t border-gray-200 flex items-center justify-between text-sm">
           <span className="text-gray-600">
-            完了: {tasks.filter((t) => t.completed).length} / {tasks.length}
+            {t('today.tasks.completed', {
+              done: tasks.filter((t) => t.completed).length,
+              total: tasks.length
+            })}
           </span>
           <button
             className="text-green-600 hover:text-green-700 font-medium"
@@ -182,8 +187,9 @@ export function TodayTasksCard() {
               // TODO: Navigate to week view
               console.log('Show week view');
             }}
+            aria-label={t('today.tasks.week_view')}
           >
-            週間予定を見る →
+            {t('today.tasks.week_view')}
           </button>
         </div>
       )}

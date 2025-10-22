@@ -77,6 +77,7 @@ The current prototype covers basic chat/analytics but misses **[MVP]** blocks de
 - ✅ Added **EvidenceCard** component for citations/confidence/action cards
 - ✅ Updated chat page to use ChatKit UI backed by `/api/chatkit/session`
 - ✅ Replaced chat proxy with SSE-aware bridge to `/v1/chat/stream`
+- ✅ **Desktop-first responsive design** with sidebar navigation and multi-panel layouts
 
 **Feature Flags (env)** ✅
 - ✅ AGENTKIT_ENABLED=true (fallback ready)

@@ -20,6 +20,17 @@ export function WeatherForecast() {
   const [forecast, setForecast] = useState<ForecastDay[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Localize English condition strings to JA using i18n keys; pass through JMA's JP text
+  const localizeCondition = (cond: string): string => {
+    const c = (cond || '').toLowerCase();
+    if (c.includes('partly') && c.includes('cloud')) return t('weather.partly_cloudy');
+    if (c.includes('sunny')) return t('weather.sunny');
+    if (c.includes('heavy') && c.includes('rain')) return t('weather.heavy_rain');
+    if (c.includes('rain')) return t('weather.rain');
+    if (c.includes('cloud')) return t('weather.cloudy');
+    return cond; // already localized (e.g., JMA: くもり/晴れ/雨)
+  };
+
   useEffect(() => {
     const fetchWeatherForecast = async () => {
       try {
@@ -55,9 +66,9 @@ export function WeatherForecast() {
 
           return {
             date: day.date,
-            day: dayNames[index] || date.toLocaleDateString('en-US', { weekday: 'short' }),
+            day: dayNames[index] || date.toLocaleDateString('ja-JP', { weekday: 'short' }),
             temperature: day.temperature,
-            condition: day.condition,
+            condition: localizeCondition(day.condition),
             icon: iconMap[day.icon] || '☀️',
             precipitation: day.precipitation,
           };
