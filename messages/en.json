@@ -74,7 +74,23 @@
     "tools": {
       "attach_field": "Field",
       "attach_photo": "Photo"
-    }
+    },
+    "evidence_title": "Supporting Evidence",
+    "evidence_empty": "Citations will appear here when AI provides sources",
+    "confidence": "Confidence",
+    "page": "Page",
+    "view_source": "View Source",
+    "expand": "Show More",
+    "collapse": "Show Less",
+    "citations_count": "{count} items",
+    "high_confidence": "High",
+    "medium_confidence": "Medium",
+    "low_confidence": "Low",
+    "sources_agree": "{count} sources agree",
+    "multiple_sources": "Verified from multiple sources",
+    "guidebook_section": "Section",
+    "guidebook_topic": "Topic",
+    "trust_note": "All recommendations are based on trusted agricultural guidebooks"
   },
   "quick_actions": {
     "title": "Quick Actions",
@@ -91,6 +107,108 @@
       "jma_official": "JMA Official",
       "agri_center": "Niigata Agricultural Research Center",
       "ja_niigata": "JA Niigata"
+    }
+  },
+  "admin": {
+    "dashboard": {
+      "title": "Admin Dashboard",
+      "overview": "System Overview"
+    },
+    "usage": {
+      "title": "Usage Metrics",
+      "description": "Token consumption and API calls",
+      "total_tokens": "Total Tokens",
+      "estimated_cost": "Estimated Cost",
+      "api_calls": "API Calls",
+      "model_breakdown": "Model Breakdown",
+      "avg_tokens_per_request": "Avg Tokens/Request",
+      "input_tokens": "Input Tokens",
+      "output_tokens": "Output Tokens",
+      "total": "Total",
+      "requests": "Requests",
+      "model": "Model",
+      "time_range_7d": "Last 7 Days",
+      "time_range_30d": "Last 30 Days",
+      "refresh": "Refresh",
+      "token_usage_chart": "Token Usage by Model"
+    },
+    "audit_logs": {
+      "title": "Audit Logs",
+      "description": "All agent actions",
+      "search_placeholder": "Search...",
+      "all_actions": "All Actions",
+      "time": "Time",
+      "user": "User",
+      "action": "Action",
+      "resource": "Resource",
+      "details": "Details",
+      "show_details": "Show",
+      "hide_details": "Hide",
+      "export_csv": "Export CSV",
+      "no_logs": "No logs found",
+      "no_matching_logs": "No logs match the current filters",
+      "showing_latest": "Showing latest {count} logs",
+      "total_logs": "{total} total logs ({filtered} shown)"
+    },
+    "users": {
+      "title": "User Management",
+      "description": "Manage farmer accounts"
+    }
+  },
+  "auth": {
+    "signIn": {
+      "title": "Welcome to ROuvis",
+      "subtitle": "Sign in with your Google account to get started",
+      "googleButton": "Continue with Google",
+      "loading": "Signing in...",
+      "error": "Sign in failed. Please try again.",
+      "terms": "By signing in, you agree to our Terms of Service and Privacy Policy."
+    },
+    "onboarding": {
+      "progress": "Step {current} of {total}",
+      "welcome": {
+        "title": "Welcome to ROuvis",
+        "subtitle": "A new way to manage your farm through conversation",
+        "description": "ROuvis helps you manage fields, log activities, and plan harvests by chatting with an AI assistant.",
+        "benefits": {
+          "chat": "Log and discuss work via chat",
+          "weather": "Weather forecasts and suggestions",
+          "knowledge": "Search farming techniques and advice"
+        },
+        "nextButton": "Get Started"
+      },
+      "profile": {
+        "title": "Set Up Your Profile",
+        "subtitle": "Tell us about your farm",
+        "nameLabel": "Your Name",
+        "namePlaceholder": "e.g., Taro Tanaka",
+        "regionLabel": "Region",
+        "regionPlaceholder": "e.g., Niigata Prefecture",
+        "farmSizeLabel": "Farm Size (ha)",
+        "farmSizePlaceholder": "e.g., 2.5",
+        "backButton": "Back",
+        "nextButton": "Next"
+      },
+      "field": {
+        "title": "Create Your First Field",
+        "subtitle": "Register your main field information",
+        "nameLabel": "Field Name",
+        "namePlaceholder": "e.g., Field #1",
+        "areaLabel": "Area (ha)",
+        "areaPlaceholder": "e.g., 1.2",
+        "cropLabel": "Crop",
+        "cropPlaceholder": "e.g., Cabbage",
+        "plantingDateLabel": "Planting Date",
+        "plantingDatePlaceholder": "Select date",
+        "backButton": "Back",
+        "finishButton": "Finish",
+        "submitting": "Creating..."
+      },
+      "success": {
+        "title": "All Set!",
+        "subtitle": "You're ready to start using ROuvis",
+        "dashboardButton": "Go to Dashboard"
+      }
     }
   }
 }

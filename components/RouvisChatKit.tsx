@@ -14,7 +14,9 @@ import { FieldSelector } from './FieldSelector';
 import { TaskSchedulerCard } from './TaskSchedulerCard';
 import { ActivityFeedCard } from './ActivityFeedCard';
 import { EvidenceCard } from './EvidenceCard';
+import { GuidebookEvidenceRail, GuidebookCitation } from './GuidebookEvidenceCard';
 import { AgentStatus, Citation, JMAData, RAGContext, LoadingState, StreamEvent } from '@/types/chat';
+import { ConfidenceIndicator } from './ConfidenceIndicator';
 
 interface Activity {
   id?: string;
@@ -55,6 +57,7 @@ function RouvisChatKitContent({ className }: RouvisChatKitProps) {
   const [agentStatus, setAgentStatus] = useState<AgentStatus | null>(null);
   const [loadingState, setLoadingState] = useState<LoadingState>({ isLoading: false });
   const [citations, setCitations] = useState<Citation[]>([]);
+  const [guidebookCitations, setGuidebookCitations] = useState<GuidebookCitation[]>([]);
   const [jmaData, setJMAData] = useState<JMAData | null>(null);
   const [ragContext, setRAGContext] = useState<RAGContext | null>(null);
 
@@ -72,7 +75,8 @@ function RouvisChatKitContent({ className }: RouvisChatKitProps) {
     result?: any;
   } | null>(null);
 
-  const { control } = useChatKit({
+  // Configure ChatKit with custom server event handler to collect citations/tool events
+  const chatKitConfig: any = {
     api: {
       url: '/api/chatkit',
       domainKey: 'rouvis-local-dev', // Domain key for local development
@@ -157,6 +161,7 @@ function RouvisChatKitContent({ className }: RouvisChatKitProps) {
       setPendingTasks([]);
       // Reset state for new thread
       setCitations([]);
+      setGuidebookCitations([]);
       setJMAData(null);
       setRAGContext(null);
       setAgentStatus(null);
@@ -180,6 +185,7 @@ function RouvisChatKitContent({ className }: RouvisChatKitProps) {
       // Process accumulated stream events for evidence population
       if (streamEvents.length > 0) {
         const extractedCitations: Citation[] = [];
+        const extractedGuidebookCitations: GuidebookCitation[] = [];
         let extractedJMAData: JMAData | null = null;
         let extractedRAGContext: RAGContext | null = null;
 
@@ -187,7 +193,7 @@ function RouvisChatKitContent({ className }: RouvisChatKitProps) {
           // Extract citations from citation events
           if (event.type === 'citation') {
             const citationData = event.data;
-            extractedCitations.push({
+            const citation: Citation = {
               id: citationData.id || `citation-${Date.now()}-${Math.random()}`,
               source: citationData.source || 'Unknown',
               page: citationData.page,
@@ -196,7 +202,20 @@ function RouvisChatKitContent({ className }: RouvisChatKitProps) {
               type: citationData.type || 'general',
               url: citationData.url,
               metadata: citationData.metadata,
-            });
+            };
+            extractedCitations.push(citation);
+
+            // If it's a guidebook citation, also add to guidebook-specific list
+            if (citationData.type === 'guidebook') {
+              extractedGuidebookCitations.push({
+                source: citationData.source || 'Unknown',
+                page: citationData.page || 1,
+                confidence: citationData.confidence || 0.5,
+                excerpt: citationData.text ? citationData.text.substring(0, 200) : '',
+                fullText: citationData.text,
+                metadata: citationData.metadata,
+              });
+            }
           }
 
           // Extract JMA data from tool_result events
@@ -237,7 +256,7 @@ function RouvisChatKitContent({ className }: RouvisChatKitProps) {
                   extractedCitations.push(...r.citations);
                 } else {
                   // Create citation from RAG result itself
-                  extractedCitations.push({
+                  const citation: Citation = {
                     id: r.id || `rag-${Date.now()}-${Math.random()}`,
                     source: r.source || r.guidebook || 'Guidebook',
                     page: r.page,
@@ -245,6 +264,17 @@ function RouvisChatKitContent({ className }: RouvisChatKitProps) {
                     text: r.text || r.excerpt,
                     type: 'guidebook',
                     url: r.url,
+                    metadata: r.metadata,
+                  };
+                  extractedCitations.push(citation);
+
+                  // Also add to guidebook-specific citations
+                  extractedGuidebookCitations.push({
+                    source: r.source || r.guidebook || 'Guidebook',
+                    page: r.page || 1,
+                    confidence: r.confidence || r.score || 0.5,
+                    excerpt: r.excerpt || (r.text ? r.text.substring(0, 200) : ''),
+                    fullText: r.text,
                     metadata: r.metadata,
                   });
                 }
@@ -256,6 +286,10 @@ function RouvisChatKitContent({ className }: RouvisChatKitProps) {
         // Update state with extracted evidence
         if (extractedCitations.length > 0) {
           setCitations(prev => [...prev, ...extractedCitations]);
+        }
+
+        if (extractedGuidebookCitations.length > 0) {
+          setGuidebookCitations(prev => [...prev, ...extractedGuidebookCitations]);
         }
 
         if (extractedJMAData) {
@@ -271,7 +305,27 @@ function RouvisChatKitContent({ className }: RouvisChatKitProps) {
       }
     },
     locale: 'ja',
-  });
+    // Collect raw server events (custom event hook; ignored by lib if unsupported)
+    onEvent: (evt: any) => {
+      try {
+        if (!evt) return;
+        const type = evt.type || evt.event;
+        if (type === 'citation') {
+          const payload = evt.citation || evt.data?.citation || evt.data || {};
+          setStreamEvents((prev) => [...prev, { type: 'citation', data: payload } as any]);
+        } else if (type === 'tool_call_result') {
+          setStreamEvents((prev) => [...prev, { type: 'tool_result', data: evt } as any]);
+        } else if (type === 'tool_call_delta') {
+          const delta = evt.delta || evt.data?.delta || evt.data || {};
+          setStreamEvents((prev) => [...prev, { type: 'tool_call', data: delta } as any]);
+        }
+      } catch (e) {
+        console.warn('onEvent handler error', e);
+      }
+    },
+  };
+
+  const { control } = useChatKit(chatKitConfig);
 
   // Left rail should render only when we actually have content
   const hasLeftRail =
@@ -280,6 +334,12 @@ function RouvisChatKitContent({ className }: RouvisChatKitProps) {
     !!currentToolEvent ||
     !!agentStatus ||
     loadingState.isLoading;
+
+  // Evidence rail should render when we have guidebook citations
+  const hasEvidenceRail = guidebookCitations.length > 0;
+  const avgConfidence = guidebookCitations.length
+    ? Math.round((guidebookCitations.reduce((sum, c) => sum + (c.confidence || 0), 0) / guidebookCitations.length) * 100)
+    : undefined;
 
   return (
     <div className="flex h-full flex-col gap-4 xl:flex-row">
@@ -415,13 +475,28 @@ function RouvisChatKitContent({ className }: RouvisChatKitProps) {
       )}
 
       {/* Main Chat Interface */}
-      <div className="flex-1 min-w-0 min-h-[60vh] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+      <div className={`flex-1 min-w-0 min-h-[60vh] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm ${hasEvidenceRail ? 'xl:max-w-[60%]' : ''}`}>
         <ChatKit control={control} className={className || 'h-full w-full'} />
       </div>
 
-      {/* Evidence Section - Natural format without technical jargon */}
+      {/* Right: Guidebook Evidence Rail (dedicated to citations) */}
+      {hasEvidenceRail && (
+        <div className="hidden xl:block xl:w-[40%] xl:max-w-md xl:flex-shrink-0">
+          {typeof avgConfidence === 'number' && (
+            <div className="mb-3">
+              <ConfidenceIndicator confidence={avgConfidence / 100} />
+            </div>
+          )}
+          <GuidebookEvidenceRail
+            citations={guidebookCitations}
+            className="sticky top-4"
+          />
+        </div>
+      )}
+
+      {/* Legacy Evidence Section - Natural format without technical jargon (shown below on mobile/tablet) */}
       {(citations.length > 0 || jmaData || streamEvents.length > 0) && (
-        <div className="space-y-3 max-h-96 overflow-y-auto animate-fadeIn">
+        <div className="space-y-3 max-h-96 overflow-y-auto animate-fadeIn xl:hidden">
           {citations.length > 0 && (
             <NaturalEvidenceCard citations={citations} showMultipleSourceConfirmation={true} />
           )}
@@ -476,8 +551,6 @@ export function RouvisChatKit({ className }: RouvisChatKitProps) {
     </ErrorBoundary>
   );
 }
-
-
 
 
 

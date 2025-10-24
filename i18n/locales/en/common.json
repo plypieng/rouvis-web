@@ -392,5 +392,61 @@
     "rights": "All rights reserved.",
     "terms": "Terms",
     "privacy": "Privacy"
+  },
+  "auth": {
+    "signIn": {
+      "title": "Welcome to ROuvis",
+      "subtitle": "Sign in with your Google account to get started",
+      "googleButton": "Continue with Google",
+      "loading": "Signing in...",
+      "error": "Sign in failed. Please try again.",
+      "terms": "By signing in, you agree to our Terms of Service and Privacy Policy."
+    },
+    "onboarding": {
+      "progress": "Step {current} of {total}",
+      "welcome": {
+        "title": "Welcome to ROuvis",
+        "subtitle": "A new way to manage your farm through conversation",
+        "description": "ROuvis helps you manage fields, log activities, and plan harvests by chatting with an AI assistant.",
+        "benefits": {
+          "chat": "Log and discuss work via chat",
+          "weather": "Weather forecasts and suggestions",
+          "knowledge": "Search farming techniques and advice"
+        },
+        "nextButton": "Get Started"
+      },
+      "profile": {
+        "title": "Set Up Your Profile",
+        "subtitle": "Tell us about your farm",
+        "nameLabel": "Your Name",
+        "namePlaceholder": "e.g., Taro Tanaka",
+        "regionLabel": "Region",
+        "regionPlaceholder": "e.g., Niigata Prefecture",
+        "farmSizeLabel": "Farm Size (ha)",
+        "farmSizePlaceholder": "e.g., 2.5",
+        "backButton": "Back",
+        "nextButton": "Next"
+      },
+      "field": {
+        "title": "Create Your First Field",
+        "subtitle": "Register your main field information",
+        "nameLabel": "Field Name",
+        "namePlaceholder": "e.g., Field #1",
+        "areaLabel": "Area (ha)",
+        "areaPlaceholder": "e.g., 1.2",
+        "cropLabel": "Crop",
+        "cropPlaceholder": "e.g., Cabbage",
+        "plantingDateLabel": "Planting Date",
+        "plantingDatePlaceholder": "Select date",
+        "backButton": "Back",
+        "finishButton": "Finish",
+        "submitting": "Creating..."
+      },
+      "success": {
+        "title": "All Set!",
+        "subtitle": "You're ready to start using ROuvis",
+        "dashboardButton": "Go to Dashboard"
+      }
+    }
   }
 }

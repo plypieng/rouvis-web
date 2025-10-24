@@ -77,6 +77,7 @@ export function WebChatInterface() {
         response?: string;
         model?: string | null;
         sessionId?: string | null;
+        citations?: Array<{ source: string; page?: number; confidence?: number; text?: string }>;
         error?: string;
       } = await response.json();
 
@@ -97,7 +98,26 @@ export function WebChatInterface() {
         timestamp: new Date(),
       };
 
-      setMessages(prev => [...prev, aiMessage]);
+      const newMessages: ChatMessage[] = [aiMessage];
+
+      // Append citations as a follow-up evidence message (if available)
+      if (Array.isArray(data.citations) && data.citations.length > 0) {
+        const evidenceLines = data.citations.slice(0, 5).map((c) => {
+          const src = c.source || 'Source';
+          const page = typeof c.page === 'number' ? ` p.${c.page}` : '';
+          const conf = typeof c.confidence === 'number' ? ` (conf ${Math.round((c.confidence || 0) * 100)}%)` : '';
+          const excerpt = c.text ? `\n- ${c.text.substring(0, 160)}${c.text.length > 160 ? '…' : ''}` : '';
+          return `• ${src}${page}${conf}${excerpt}`;
+        });
+        newMessages.push({
+          id: `${Date.now() + 2}`,
+          content: `参考資料:\n${evidenceLines.join('\n')}`,
+          sender: 'ai',
+          timestamp: new Date(),
+        });
+      }
+
+      setMessages(prev => [...prev, ...newMessages]);
     } catch (error) {
       console.error('Error sending message', error);
 

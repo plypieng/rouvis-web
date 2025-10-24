@@ -220,6 +220,7 @@ export default function ChatPage() {
                 <>
                   <DashboardCard title={t('chat.ai_assistant') || 'ファームAIアシスタント'}>
                     <div className="min-h-[75vh]">
+                      {/* RouvisChatKit now handles its own evidence rail layout internally */}
                       <RouvisChatKit />
                     </div>
                   </DashboardCard>

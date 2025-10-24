@@ -74,7 +74,23 @@
     "tools": {
       "attach_field": "圃場",
       "attach_photo": "写真"
-    }
+    },
+    "evidence_title": "根拠となる資料",
+    "evidence_empty": "AIが情報源を示す際、ここに表示されます",
+    "confidence": "信頼度",
+    "page": "ページ",
+    "view_source": "出典を見る",
+    "expand": "もっと見る",
+    "collapse": "閉じる",
+    "citations_count": "{count}件",
+    "high_confidence": "高",
+    "medium_confidence": "中",
+    "low_confidence": "低",
+    "sources_agree": "{count}つの情報源が一致しています",
+    "multiple_sources": "複数の情報源から確認中",
+    "guidebook_section": "セクション",
+    "guidebook_topic": "トピック",
+    "trust_note": "すべての推奨は信頼できる農業ガイドブックに基づいています"
   },
   "quick_actions": {
     "title": "クイックアクション",
@@ -91,6 +107,108 @@
       "jma_official": "JMA公式",
       "agri_center": "新潟県農業技術センター",
       "ja_niigata": "JA新潟"
+    }
+  },
+  "admin": {
+    "dashboard": {
+      "title": "管理ダッシュボード",
+      "overview": "システム概要"
+    },
+    "usage": {
+      "title": "使用状況",
+      "description": "トークン消費量とAPI呼び出し数",
+      "total_tokens": "総トークン数",
+      "estimated_cost": "推定コスト",
+      "api_calls": "API呼び出し数",
+      "model_breakdown": "モデル別使用状況",
+      "avg_tokens_per_request": "平均トークン/リクエスト",
+      "input_tokens": "入力トークン",
+      "output_tokens": "出力トークン",
+      "total": "合計",
+      "requests": "リクエスト数",
+      "model": "モデル",
+      "time_range_7d": "過去7日間",
+      "time_range_30d": "過去30日間",
+      "refresh": "更新",
+      "token_usage_chart": "モデル別トークン使用量"
+    },
+    "audit_logs": {
+      "title": "監査ログ",
+      "description": "すべてのエージェントアクション",
+      "search_placeholder": "検索...",
+      "all_actions": "すべてのアクション",
+      "time": "時刻",
+      "user": "ユーザー",
+      "action": "アクション",
+      "resource": "リソース",
+      "details": "詳細",
+      "show_details": "表示",
+      "hide_details": "閉じる",
+      "export_csv": "CSV出力",
+      "no_logs": "ログが見つかりません",
+      "no_matching_logs": "フィルター条件に一致するログが見つかりません",
+      "showing_latest": "最新の{count}件を表示しています",
+      "total_logs": "全{total}件のログ ({filtered}件表示中)"
+    },
+    "users": {
+      "title": "ユーザー管理",
+      "description": "農家アカウントの管理"
+    }
+  },
+  "auth": {
+    "signIn": {
+      "title": "ROuvisへようこそ",
+      "subtitle": "Googleアカウントでログインして始めましょう",
+      "googleButton": "Googleでログイン",
+      "loading": "ログイン中...",
+      "error": "ログインに失敗しました。もう一度お試しください。",
+      "terms": "ログインすることで、利用規約とプライバシーポリシーに同意したものとみなされます。"
+    },
+    "onboarding": {
+      "progress": "ステップ {current} / {total}",
+      "welcome": {
+        "title": "ROuvisへようこそ",
+        "subtitle": "チャットで農作業を管理する新しい体験",
+        "description": "ROuvisはAIアシスタントと会話しながら、圃場管理・作業記録・収穫計画を簡単に行えるサービスです。",
+        "benefits": {
+          "chat": "チャットで作業を記録・相談",
+          "weather": "天気予報と作業提案",
+          "knowledge": "農業技術の検索とアドバイス"
+        },
+        "nextButton": "始める"
+      },
+      "profile": {
+        "title": "プロフィール設定",
+        "subtitle": "あなたの農場について教えてください",
+        "nameLabel": "お名前",
+        "namePlaceholder": "例：田中 太郎",
+        "regionLabel": "地域",
+        "regionPlaceholder": "例：新潟県",
+        "farmSizeLabel": "農地面積（ha）",
+        "farmSizePlaceholder": "例：2.5",
+        "backButton": "戻る",
+        "nextButton": "次へ"
+      },
+      "field": {
+        "title": "最初の圃場を作成",
+        "subtitle": "メインの圃場情報を登録してください",
+        "nameLabel": "圃場名",
+        "namePlaceholder": "例：第一圃場",
+        "areaLabel": "面積（ha）",
+        "areaPlaceholder": "例：1.2",
+        "cropLabel": "作物",
+        "cropPlaceholder": "例：キャベツ",
+        "plantingDateLabel": "定植日",
+        "plantingDatePlaceholder": "日付を選択",
+        "backButton": "戻る",
+        "finishButton": "完了",
+        "submitting": "作成中..."
+      },
+      "success": {
+        "title": "準備完了！",
+        "subtitle": "ROuvisを使い始めることができます",
+        "dashboardButton": "ダッシュボードへ"
+      }
     }
   }
 }

@@ -47,6 +47,7 @@ function upsertThreadItem(thread: ThreadRecord, item: ThreadItemRecord) {
 }
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+const USE_AGENTS = process.env.USE_AGENTS === 'true';
 
 const jsonHeaders = { 'Content-Type': 'application/json' } as const;
 
@@ -369,18 +370,28 @@ async function handleCreateThreadItem(payload: any) {
     updated_at: nowIso,
   });
 
-  // Call ROuvis backend
-  const backendResponse = await fetch(`${BACKEND_URL}/api/v1/chat/stream`, {
+  // Call ROuvis backend (AgentKit vs MCP fallback)
+  const endpoint = USE_AGENTS ? '/api/v1/agents/run' : '/api/v1/chat/stream';
+  const backendResponse = await fetch(`${BACKEND_URL}${endpoint}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'x-user-id': 'demo-user', // TODO: Get from auth
     },
-    body: JSON.stringify({
-      message: userMessage,
-      history: [],
-      ...(thread.sessionId ? { sessionId: thread.sessionId } : {}),
-    }),
+    body: JSON.stringify(
+      USE_AGENTS
+        ? {
+            threadId: threadId,
+            messages: [{ role: 'user', content: userMessage }],
+            sessionId: thread.sessionId,
+            userId: 'demo-user',
+          }
+        : {
+            message: userMessage,
+            history: [],
+            ...(thread.sessionId ? { sessionId: thread.sessionId } : {}),
+          }
+    ),
   });
 
   if (!backendResponse.ok || !backendResponse.body) {
@@ -448,14 +459,14 @@ async function handleCreateThreadItem(payload: any) {
               const data = JSON.parse(dataStr);
 
               // Transform backend events to ChatKit format
-              if (data.type === 'meta') {
+              if (!USE_AGENTS && data.type === 'meta') {
                 if (typeof data.sessionId === 'string' && !thread.sessionId) {
                   thread.sessionId = data.sessionId;
                 }
                 continue;
               }
 
-              if (data.type === 'chunk') {
+              if (!USE_AGENTS && data.type === 'chunk') {
                 accumulatedContent += data.content;
 
                 // Send content delta
@@ -470,7 +481,7 @@ async function handleCreateThreadItem(payload: any) {
                     ],
                   },
                 });
-              } else if (data.type === 'done') {
+              } else if (!USE_AGENTS && data.type === 'done') {
                 // Send completion event
                 enqueueEvent('thread_item.completed', {
                   type: 'thread_item.completed',
@@ -488,7 +499,7 @@ async function handleCreateThreadItem(payload: any) {
                   },
                 });
                 completionSent = true;
-              } else if (data.type === 'error') {
+              } else if (!USE_AGENTS && data.type === 'error') {
                 // Send error event
                 enqueueEvent('error', {
                   type: 'error',
@@ -496,6 +507,42 @@ async function handleCreateThreadItem(payload: any) {
                     message: data.message || 'An error occurred',
                   },
                 });
+              } else if (USE_AGENTS) {
+                // AgentKit normalized events
+                if (data.type === 'content' && data.delta?.content) {
+                  const text = String(data.delta.content);
+                  accumulatedContent += text;
+                  enqueueEvent('thread_item.delta', {
+                    type: 'thread_item.delta',
+                    delta: { content: [{ type: 'output_text', text }] },
+                  });
+                } else if (data.type === 'tool_call_result') {
+                  // Forward tool result and also surface as citation for evidence rails
+                  enqueueEvent('tool_call_result', { type: 'tool_call_result', ...data });
+                  enqueueEvent('citation', { type: 'citation', ...data });
+                } else if (data.type === 'tool_call_delta') {
+                  enqueueEvent('tool_call_delta', { type: 'tool_call_delta', delta: data.delta ?? data });
+                } else if (data.type === 'citation') {
+                  // Pass-through citation event for custom consumers
+                  const payload = data.citation ?? data;
+                  enqueueEvent('citation', { type: 'citation', citation: payload });
+                } else if (data.type === 'error') {
+                  enqueueEvent('error', { type: 'error', error: { message: data.error || 'Agent error' } });
+                } else if (data.type === 'done') {
+                  enqueueEvent('thread_item.completed', {
+                    type: 'thread_item.completed',
+                    thread_item: {
+                      id: threadItemId,
+                      thread_id: threadId,
+                      role: 'assistant',
+                      status: 'completed',
+                      content: [
+                        { type: 'output_text', text: accumulatedContent },
+                      ],
+                    },
+                  });
+                  completionSent = true;
+                }
               }
             } catch (parseError) {
               console.error('Failed to parse SSE data:', parseError);
@@ -555,4 +602,3 @@ async function handleCreateThreadItem(payload: any) {
     },
   });
 }
-

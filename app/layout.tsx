@@ -2,6 +2,7 @@ import "../styles/globals.css";
 import { Inter } from "next/font/google";
 import type { Metadata } from "next";
 import type React from "react";
+import { Providers } from "@/components/Providers";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -45,7 +46,9 @@ export default function RootLayout({
         <script src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js" async />
       </head>
       <body className={`${inter.className} antialiased`}>
-        {children}
+        <Providers session={null}>
+          {children}
+        </Providers>
       </body>
     </html>
   );

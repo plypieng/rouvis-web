@@ -368,5 +368,61 @@
     "rights": "全ての権利を保有します。",
     "terms": "利用規約",
     "privacy": "プライバシー"
+  },
+  "auth": {
+    "signIn": {
+      "title": "ROuvisへようこそ",
+      "subtitle": "Googleアカウントでログインして始めましょう",
+      "googleButton": "Googleでログイン",
+      "loading": "ログイン中...",
+      "error": "ログインに失敗しました。もう一度お試しください。",
+      "terms": "ログインすることで、利用規約とプライバシーポリシーに同意したものとみなされます。"
+    },
+    "onboarding": {
+      "progress": "ステップ {current} / {total}",
+      "welcome": {
+        "title": "ROuvisへようこそ",
+        "subtitle": "チャットで農作業を管理する新しい体験",
+        "description": "ROuvisはAIアシスタントと会話しながら、圃場管理・作業記録・収穫計画を簡単に行えるサービスです。",
+        "benefits": {
+          "chat": "チャットで作業を記録・相談",
+          "weather": "天気予報と作業提案",
+          "knowledge": "農業技術の検索とアドバイス"
+        },
+        "nextButton": "始める"
+      },
+      "profile": {
+        "title": "プロフィール設定",
+        "subtitle": "あなたの農場について教えてください",
+        "nameLabel": "お名前",
+        "namePlaceholder": "例：田中 太郎",
+        "regionLabel": "地域",
+        "regionPlaceholder": "例：新潟県",
+        "farmSizeLabel": "農地面積（ha）",
+        "farmSizePlaceholder": "例：2.5",
+        "backButton": "戻る",
+        "nextButton": "次へ"
+      },
+      "field": {
+        "title": "最初の圃場を作成",
+        "subtitle": "メインの圃場情報を登録してください",
+        "nameLabel": "圃場名",
+        "namePlaceholder": "例：第一圃場",
+        "areaLabel": "面積（ha）",
+        "areaPlaceholder": "例：1.2",
+        "cropLabel": "作物",
+        "cropPlaceholder": "例：キャベツ",
+        "plantingDateLabel": "定植日",
+        "plantingDatePlaceholder": "日付を選択",
+        "backButton": "戻る",
+        "finishButton": "完了",
+        "submitting": "作成中..."
+      },
+      "success": {
+        "title": "準備完了！",
+        "subtitle": "ROuvisを使い始めることができます",
+        "dashboardButton": "ダッシュボードへ"
+      }
+    }
   }
 }
