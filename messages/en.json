@@ -1,0 +1,279 @@
+{
+  "app_name": "Rouvis",
+  "strategic_planning": "Strategic Farm Planning",
+  "farmer": "Farmer",
+  "niigata_japan": "Niigata, Japan",
+  "navigation": {
+    "dashboard": "Dashboard",
+    "planner": "Field Planner",
+    "calendar": "Calendar",
+    "analytics": "Analytics",
+    "community": "Community",
+    "chat": "AI Chat"
+  },
+  "weather": {
+    "today": "Today",
+    "mon": "Mon",
+    "tue": "Tue",
+    "wed": "Wed",
+    "thu": "Thu",
+    "fri": "Fri",
+    "sat": "Sat",
+    "sun": "Sun",
+    "sunny": "Sunny",
+    "partly_cloudy": "Partly Cloudy",
+    "cloudy": "Cloudy",
+    "rain": "Rain",
+    "heavy_rain": "Heavy Rain",
+    "nowcast": "Precipitation Nowcast",
+    "next_hour": "Next Hour",
+    "next_3_hours": "Next 3 Hours",
+    "no_rain": "No Rain",
+    "light_rain": "Light Rain",
+    "moderate_rain": "Moderate Rain",
+    "seven_day_forecast": "7-Day Forecast",
+    "warning_banner": "Weather Warnings & Advisories",
+    "advisory": "Advisory",
+    "warning": "Warning",
+    "emergency": "Emergency Warning",
+    "typhoon_alert": "Typhoon Information",
+    "typhoon_approaching": "Approaching",
+    "typhoon_id": "Typhoon ID",
+    "unnamed_typhoon": "Typhoon",
+    "intensity": "Intensity",
+    "current_position": "Current Position",
+    "affected_areas": "Affected Areas",
+    "view_forecast_track": "View Forecast Track",
+    "typhoon_warning_message": "A typhoon is approaching. Please check the latest weather information and ensure your safety.",
+    "typhoon_safety_reminder": "When a typhoon is approaching, avoid field inspections and stay in a safe location.",
+    "issued_at": "Issued",
+    "show_all_warnings": "Show All Warnings",
+    "more": "more",
+    "current_status": "Current Status",
+    "timeline": "Timeline",
+    "last_updated": "Last Updated",
+    "nowcast_unavailable": "Nowcast information unavailable"
+  },
+  "dashboard": {
+    "location": "Nagaoka, Niigata",
+    "weather_forecast": "Weather Forecast",
+    "five_day_forecast": "5-Day Forecast",
+    "rain_chance": "{percentage}% chance of rain",
+    "no_rain": "No rain expected",
+    "view_detailed_forecast": "View detailed forecast",
+    "crop_recommendations": "Crop Recommendations",
+    "yield_forecast": "Yield Forecast",
+    "view_details": "View Details"
+  },
+  "today": {
+    "advisor_strip": {
+      "title": "Today's Advisory",
+      "view_details": "View Details",
+      "frost_alert": "Frost Watch: {temp}°C Tonight",
+      "kpi_chip": "Water Management: {value}%",
+      "next_task": "Next Task: {task}"
+    },
+    "tasks": {
+      "title": "Today's Tasks",
+      "regenerate": "Regenerate",
+      "none": "No tasks for today",
+      "generate": "Generate Tasks",
+      "field": "Field: {field}",
+      "eta": "Time: {time}",
+      "weather_dependent": "Weather Dependent",
+      "completed": "{done}/{total} Completed",
+      "week_view": "Week View"
+    },
+    "prompts": {
+      "today": "What should I do today?",
+      "today_label": "💬 What should I do?",
+      "weather": "Tell me about this week's weather and what to watch out for",
+      "weather_label": "🌤️ How's the weather?",
+      "frost": "Is frost coming? What should I do for Koshihikari?",
+      "frost_label": "❄️ Frost coming?",
+      "watering": "Should I water today?",
+      "watering_label": "💧 Need watering?"
+    }
+  },
+  "insights": {
+    "weather_and_logistics": "Weather & Logistics",
+    "logistics": "Logistics Status",
+    "cooperative_callouts": "JA Niigata Updates",
+    "latest": "Latest"
+  },
+  "chat": {
+    "greeting": "Hello! I'm your Niigata farming advisor. How can I help you today?",
+    "placeholder": "Ask a question or log an activity...",
+    "tools": {
+      "attach_field": "Field",
+      "attach_photo": "Photo"
+    },
+    "evidence_title": "Supporting Evidence",
+    "evidence_empty": "Citations will appear here when AI provides sources",
+    "confidence": "Confidence",
+    "page": "Page",
+    "view_source": "View Source",
+    "expand": "Show More",
+    "collapse": "Show Less",
+    "citations_count": "{count} items",
+    "high_confidence": "High",
+    "medium_confidence": "Medium",
+    "low_confidence": "Low",
+    "sources_agree": "{count} sources agree",
+    "multiple_sources": "Verified from multiple sources",
+    "guidebook_section": "Section",
+    "guidebook_topic": "Topic",
+    "trust_note": "All recommendations are based on trusted agricultural guidebooks"
+  },
+  "quick_actions": {
+    "title": "Quick Actions",
+    "log_activity": "Log Activity",
+    "ask": "Ask Question",
+    "take_photo": "Take Photo",
+    "week_plan": "Week Plan",
+    "voice_input": "Voice Input",
+    "voice_help": "You can use voice to log activities or ask questions"
+  },
+  "trust": {
+    "evidence_rail": "Evidence",
+    "badges": {
+      "jma_official": "JMA Official",
+      "agri_center": "Niigata Agricultural Research Center",
+      "ja_niigata": "JA Niigata"
+    }
+  },
+  "admin": {
+    "dashboard": {
+      "title": "Admin Dashboard",
+      "overview": "System Overview"
+    },
+    "usage": {
+      "title": "Usage Metrics",
+      "description": "Token consumption and API calls",
+      "total_tokens": "Total Tokens",
+      "estimated_cost": "Estimated Cost",
+      "api_calls": "API Calls",
+      "model_breakdown": "Model Breakdown",
+      "avg_tokens_per_request": "Avg Tokens/Request",
+      "input_tokens": "Input Tokens",
+      "output_tokens": "Output Tokens",
+      "total": "Total",
+      "requests": "Requests",
+      "model": "Model",
+      "time_range_7d": "Last 7 Days",
+      "time_range_30d": "Last 30 Days",
+      "refresh": "Refresh",
+      "token_usage_chart": "Token Usage by Model"
+    },
+    "audit_logs": {
+      "title": "Audit Logs",
+      "description": "All agent actions",
+      "search_placeholder": "Search...",
+      "all_actions": "All Actions",
+      "time": "Time",
+      "user": "User",
+      "action": "Action",
+      "resource": "Resource",
+      "details": "Details",
+      "show_details": "Show",
+      "hide_details": "Hide",
+      "export_csv": "Export CSV",
+      "no_logs": "No logs found",
+      "no_matching_logs": "No logs match the current filters",
+      "showing_latest": "Showing latest {count} logs",
+      "total_logs": "{total} total logs ({filtered} shown)"
+    },
+    "users": {
+      "title": "User Management",
+      "description": "Manage farmer accounts"
+    }
+  },
+  "auth": {
+    "signIn": {
+      "title": "Welcome to ROuvis",
+      "subtitle": "Sign in with your Google account to get started",
+      "googleButton": "Continue with Google",
+      "loading": "Signing in...",
+      "error": "Sign in failed. Please try again.",
+      "terms": "By signing in, you agree to our Terms of Service and Privacy Policy."
+    },
+    "onboarding": {
+      "progress": "Step {current} of {total}",
+      "welcome": {
+        "title": "Welcome to ROuvis",
+        "subtitle": "A new way to manage your farm through conversation",
+        "description": "ROuvis helps you manage fields, log activities, and plan harvests by chatting with an AI assistant.",
+        "benefits": {
+          "chat": "Log and discuss work via chat",
+          "weather": "Weather forecasts and suggestions",
+          "knowledge": "Search farming techniques and advice"
+        },
+        "nextButton": "Get Started"
+      },
+      "profile": {
+        "title": "Set Up Your Profile",
+        "subtitle": "Tell us about your farm",
+        "nameLabel": "Your Name",
+        "namePlaceholder": "e.g., Taro Tanaka",
+        "regionLabel": "Region",
+        "regionPlaceholder": "e.g., Niigata Prefecture",
+        "farmSizeLabel": "Farm Size (ha)",
+        "farmSizePlaceholder": "e.g., 2.5",
+        "backButton": "Back",
+        "nextButton": "Next"
+      },
+      "field": {
+        "title": "Create Your First Field",
+        "subtitle": "Register your main field information",
+        "nameLabel": "Field Name",
+        "namePlaceholder": "e.g., Field #1",
+        "areaLabel": "Area (ha)",
+        "areaPlaceholder": "e.g., 1.2",
+        "cropLabel": "Crop",
+        "cropPlaceholder": "e.g., Cabbage",
+        "plantingDateLabel": "Planting Date",
+        "plantingDatePlaceholder": "Select date",
+        "backButton": "Back",
+        "finishButton": "Finish",
+        "submitting": "Creating..."
+      },
+      "success": {
+        "title": "All Set!",
+        "subtitle": "You're ready to start using ROuvis",
+        "dashboardButton": "Go to Dashboard"
+      }
+    }
+  },
+  "vibe": {
+    "todays_overview": "Today's Overview",
+    "weather_summary": "Weather Summary",
+    "ai_recommendations": "AI Recommendations",
+    "todays_tasks": "Today's Tasks",
+    "weather_work_plan": "6-Day Weather & Work Plan",
+    "field_selector": "Select Field",
+    "work_blocks": "Work Blocks",
+    "field_metadata": "Field Information",
+    "add_work": "Add Work",
+    "no_work_scheduled": "No work scheduled",
+    "morning": "Morning",
+    "afternoon": "Afternoon",
+    "variety": "Variety",
+    "seeding_date": "Seeding Date",
+    "harvest_date": "Harvest Date",
+    "growth_stage": "Growth Stage",
+    "moisture": "Moisture",
+    "leaf_color": "Leaf Color",
+    "notes": "Notes",
+    "view_notes": "View Notes"
+  },
+  "alerts": {
+    "high_temp_warning": "High Temperature Warning: Over {value}°C",
+    "pest_warning": "Pest Warning: {name}",
+    "frost_warning": "Frost Warning: Tonight {temp}°C"
+  },
+  "kpis": {
+    "overall_health": "Overall Health",
+    "water_management": "Water Management Achievement",
+    "yield_forecast": "Yield Forecast"
+  }
+}

@@ -1,0 +1,481 @@
+{
+  "app_name": "Rouvis",
+  "strategic_planning": "Strategic Farm Planning",
+  "farmer": "Farmer",
+  "niigata_japan": "Niigata, Japan",
+  "navigation": {
+    "dashboard": "Dashboard",
+    "planner": "Crop Planner",
+    "calendar": "Calendar",
+    "analytics": "Analytics",
+    "community": "Knowledge Base",
+    "chat": "AI Assistant"
+  },
+  "dashboard": {
+    "title": "Farm Dashboard",
+    "weather_forecast": "天気予報",
+    "five_day_forecast": "5日間の予報",
+    "rain_chance": "降水確率 {percentage}%",
+    "no_rain": "雨の予想はありません",
+    "yield_forecast": "収量予測",
+    "view_details": "詳細を見る",
+    "view_detailed_forecast": "詳細予報を見る",
+    "location": "新潟県"
+  },
+  "planner": {
+    "title": "Crop Layout Planner",
+    "interactive_map": "Interactive Field Map",
+    "select_crops": "Select Crops",
+    "optimization_settings": "Optimization Settings",
+    "generate_plan": "Generate Plan",
+    "save_plan": "Save Plan",
+    "reset": "Reset",
+    "area": "Area",
+    "soil_type": "Soil Type",
+    "sunlight": "Sunlight Exposure",
+    "satellite_view": "Satellite View getUserId",
+    "soil_analysis": "Soil Analysis",
+    "terrain": "Terrain",
+    "add_plot": "Add Plot",
+    "draw_area": "Draw Area",
+    "map_instructions": "Map Instructions",
+    "map_instructions_text": "Drag boundaries to adjust plot sizes. Click on a plot to select it and view/edit crop assignments.",
+    "crop_names": {
+      "rice_field_a": "Rice Field A",
+      "vegetable_garden": "Vegetable Garden",
+      "rice_field_b": "Rice Field B"
+    }
+  },
+  "calendar": {
+    "title": "Crop Calendar",
+    "monthly_view": "Monthly Calendar View",
+    "upcoming_tasks": "Upcoming Tasks",
+    "add_event": "Add Event",
+    "event_type": "Event Type",
+    "planting": "Planting",
+    "harvesting": "Harvesting",
+    "fertilizing": "Fertilizing",
+    "watering": "Watering",
+    "maintenance": "Maintenance",
+    "view_full_calendar": "View full calendar",
+    "schedule_activity": "活動を予定",
+    "add_activity": "活動を追加",
+    "today": "Today",
+    "month": "Month flowing",
+    "week": "Week"
+  },
+  "activities": {
+    "rice_field_irrigation": "Rice Field Irrigation",
+    "apply_organic_fertilizer": "Apply Organic Fertilizer",
+    "harvest_early_vegetables": "Harvest Early Vegetables",
+    "equipment_maintenance": "Equipment Maintenance",
+    "tomorrow": "Tomorrow"
+  },
+  "activity_types": {
+    "watering": "Watering",
+    "fertilizing": "Fertilizing",
+    "harvesting": "Harvesting",
+    "planting": "Planting",
+    "maintenance": "Maintenance"
+  },
+  "locations": {
+    "north_field": "North Field",
+    "vegetable_garden": "Vegetable Garden",
+    "east_plot": "East Plot",
+    "workshop": "Workshop"
+  },
+  "priorities": {
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low"
+  },
+  "seasons": {
+    "spring": "Spring",
+    "summer": "Summer",
+    "fall": "Fall",
+    "winter": "Winter"
+  },
+  "crops": {
+    "match": "match",
+    "planting_window": "Planting Window",
+    "potential_yield": "Potential Yield",
+    "add_to_planning": "Add to planning"
+  },
+  "analytics": {
+    "title": "Farm Analytics",
+    "filter_by": "Filter By",
+    "date_range": "Date Range",
+    "crop_type": "Crop Type",
+    "season": "Season",
+    "annual": "Annual",
+    "seasonal": "Seasonal",
+    "compare": "Compare",
+    "yield_comparison": "Yield Comparison",
+    "cost_revenue": "Cost vs Revenue",
+    "detailed_metrics": "Detailed Metrics",
+    "export_data": "Export Data",
+    "yield_in_tons": "Yield in tons/hectare",
+    "avg_yield": "Avg. Yield",
+    "climate_influence": "Climate data influences crop performance",
+    "current_year_data": "2025 Data",
+    "temperature_c": "Temperature (°C)",
+    "rainfall_mm": "Rainfall (mm)",
+    "humidity_percent": "Humidity (%)"
+  },
+  "metrics": {
+    "crop_yield": "Crop Yield",
+    "profit_margin": "Profit Margin",
+    "current_year": "Current Year",
+    "rice_kg": "Rice (kg)",
+    "vegetables_kg": "Vegetables (kg)",
+    "fruits_kg": "Fruits (kg)",
+    "revenue_yen": "Revenue (¥)",
+    "expenses_yen": "Expenses (¥)",
+    "profit_yen": "Profit (¥)"
+  },
+  "community": {
+    "title": "Knowledge Base",
+    "search": "Search Articles",
+    "featured": "Featured Articles",
+    "categories": "Categories",
+    "recent": "Recent Articles",
+    "recent_articles": "Recent Articles",
+    "read_more": "Read More",
+    "all": "All",
+    "read": "read",
+    "load_more": "Load More Articles",
+    "category": {
+      "rice": "Rice",
+      "vegetables": "Vegetables",
+      "fruits": "Fruits",
+      "soil": "Soil",
+      "equipment": "Equipment",
+      "climate": "Climate"
+    }
+  },
+  "admin": {
+    "title": "管理者ダッシュボード",
+    "audit_logs": "監査ログ",
+    "usage": "使用状況"
+  },
+  "chat": {
+    "title": "AI Assistant",
+    "ai_assistant": "Farm AI Assistant",
+    "placeholder": "質問を入力してください...",
+    "send": "Send",
+    "clear": "Clear Chat",
+    "conversation_history": "会話履歴",
+    "greeting": "こんにちは！今日は何をお手伝いしましょうか？",
+    "suggested_topics": "推奨話題",
+    "high_confidence": "高信頼",
+    "medium_confidence": "中信頼",
+    "low_confidence": "低信頼",
+    "evidence_title": "証拠",
+    "evidence_empty": "証拠がありません",
+    "prompts": {
+      "today_label": "💬 今日は何をすればいいですか?",
+      "today": "今日は何をすればいいですか?",
+      "weather_label": "🌤️ 今日の天気は?",
+      "weather": "今週の天気と注意点を教えてください。",
+      "frost_label": "❄️ 今週、霜の恐れはありますか？対策を教えてください?",
+      "frost": "Do you think it's going to get cold? Please tell me about Koshihikari countermeasures",
+      "watering_label": "💧 今日は灌水した方が良いですか？目安量も教えてください。?",
+      "watering": "今日は灌水した方が良いですか？目安量も教えてください。?"
+    },
+    "tools": {
+      "attach_field": "Field",
+      "attach_photo": "Photo"
+    }
+  },
+  "weather": {
+    "today": "今日",
+    "mon": "月",
+    "tue": "火",
+    "wed": "水",
+    "thu": "木",
+    "fri": "金",
+    "sat": "土",
+    "sun": "日",
+    "partly_cloudy": "晴れ時々くもり",
+    "sunny": "晴れ",
+    "rain": "雨",
+    "heavy_rain": "大雨",
+    "cloudy": "くもり",
+    "emergency": "特別警報",
+    "warning": "警報",
+    "advisory": "注意報",
+    "affected_areas": "影響地域",
+    "issued_at": "発表時刻",
+    "warning_banner": "気象警報",
+    "show_all_warnings": "全ての警報を表示",
+    "more": "件",
+    "seven_day_forecast": "7日間予報",
+    "nowcast_unavailable": "ナウキャストは現在利用できません",
+    "next_3_hours": "今後3時間のプレビュー"
+  },
+  "evidence": {
+    "citation": "出典",
+    "confidence": "確からしさ",
+    "action": "アクション",
+    "weather": "気象情報",
+    "tool_event": "ツール実行",
+    "source": "ソース",
+    "sources": "出典元"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "An error occurred.",
+    "try_again": "Try Again",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "language": "Language",
+    "english": "English",
+    "japanese": "Japanese",
+    "dark_mode": "Dark Mode",
+    "light_mode": "Light Mode",
+    "export_data": "Export Data",
+    "new_analysis": "New Analysis",
+    "optional": "optional",
+    "delete_confirm": "Are you sure you want to delete this item? This action cannot be undone."
+  },
+  "fields": {
+    "title": "Field Management",
+    "add_field": "Add Field",
+    "create_field": "Create Field",
+    "edit_field": "Edit Field",
+    "update_field": "Update Field",
+    "delete_field": "Delete Field",
+    "field_name": "Field Name",
+    "field_name_placeholder": "e.g. North Rice Field",
+    "crop": "Crop",
+    "crop_placeholder": "e.g. Koshihikari Rice",
+    "area": "Area",
+    "geojson": "Boundary Data (GeoJSON)",
+    "upload_geojson": "Upload GeoJSON File",
+    "geojson_help": "Upload a GeoJSON file or enter data directly below",
+    "geojson_placeholder": "Enter GeoJSON boundary data...",
+    "name_required": "Field name is required",
+    "invalid_geojson": "Invalid GeoJSON format",
+    "invalid_geojson_file": "Invalid GeoJSON file",
+    "create_error": "Failed to create field",
+    "update_error": "Failed to update field",
+    "search_placeholder": "Search by field name or crop...",
+    "select": "Select",
+    "cancel": "Cancel",
+    "loading": "Loading...",
+    "no_results": "No results found",
+    "no_fields": "No fields registered",
+    "error_loading": "Failed to load fields",
+    "retry": "Retry",
+    "area_unit": "sqm",
+    "location": "Location",
+    "created": "Created",
+    "last_updated": "Last Updated",
+    "current_crop": "Current Crop",
+    "legend": "Legend",
+    "delete_confirm": "Are you sure you want to delete this field? This action cannot be undone."
+  },
+  "rotation": {
+    "title": "Crop Rotation Planning",
+    "add_plan": "Add Plan",
+    "select_field": "Select a field to view rotation plan",
+    "no_plan": "No plan",
+    "no_plan_current_year": "No plan for current year",
+    "plan_now": "Plan now",
+    "same_crop_warning": "Same crop planted consecutively. Crop rotation recommended.",
+    "change_crop": "Change crop",
+    "rotation_plan": "Rotation Plan",
+    "recommendations": "Recommendations",
+    "benefits_title": "Benefits of Crop Rotation",
+    "benefit_soil_health": "Maintain soil health",
+    "benefit_pest_control": "Prevent pest and disease buildup",
+    "benefit_yield_stability": "Stabilize yields",
+    "benefit_nutrient_balance": "Improve nutrient balance"
+  },
+  "kpis": {
+    "overall_health": "全体健康度",
+    "yield_forecast": "収量予測"
+  },
+  "today": {
+    "advisor_strip": {
+      "title": "今のアドバイス",
+      "frost_alert": "今夜は冷え込み（{temp}℃予想）",
+      "kpi_chip": "水管理達成率 {value}%",
+      "next_task": "次の作業: {task}",
+      "view_details": "詳しく見る"
+    },
+    "tasks": {
+      "title": "今日のタスク",
+      "regenerate": "再生成",
+      "none": "今日のタスクはまだありません",
+      "generate": "タスクを生成",
+      "completed": "完了: {done} / {total}",
+      "week_view": "週間予定を見る →",
+      "field": "📍 {field}",
+      "eta": "⏱️ {time}",
+      "weather_dependent": "🌤️ 天候次第"
+    },
+    "prompts": {
+      "intro": "質問や相談があれば、いつでもどうぞ",
+      "today": "今日は何をすればいいですか？(member_name)",
+      "harvest_koshi": "コシヒカリの収穫時期はいつ頃？",
+      "yield_trend": "A圃場の収量トレンドを見せて",
+      "frost_tonight": "今夜霜の心配はある？"
+    }
+  },
+  "quick_actions": {
+    "title": "クイックアクション",
+    "log_activity": "作業記録",
+    "ask": "質問",
+    "take_photo": "写真を撮る",
+    "week_plan": "週間予定",
+    "voice_input": "音声で記録",
+    "voice_help": "手が汚れていても音声で簡単に記録できます"
+  },
+  "insights": {
+    "weather_and_logistics": "天気と物流",
+    "logistics": "物流",
+    "cooperative_callouts": "協同組合からのお知らせ",
+    "latest": "最新"
+  },
+  "trust": {
+    "evidence_rail": "根拠",
+    "badge_label": "ガイドブック",
+    "badges": {
+      "jma_official": "JMA公式",
+      "agri_center": "新潟県農業技術センター",
+      "ja_niigata": "JA新潟"
+    }
+  },
+  "weather_alerts": {
+    "frost": "霜注意報",
+    "typhoon": "台風警報",
+    "heavy_rain": "大雨警報",
+    "strong_wind": "強風注意報",
+    "snow": "大雪警報",
+    "in": "({location})"
+  },
+  "vibe": {
+    "todays_overview": "今日の概要",
+    "weather_summary": "天気サマリ",
+    "ai_recommendations": "AI推奨事項",
+    "todays_tasks": "今日のタスク",
+    "weather_work_plan": "6日間天気 & 作業計画",
+    "field_selector": "圃場を選択",
+    "work_blocks": "作業ブロック",
+    "field_metadata": "圃場情報",
+    "add_work": "作業を追加",
+    "no_work_scheduled": "予定なし",
+    "morning": "午前",
+    "afternoon": "午後",
+    "evening": "夕方",
+    "variety": "品種",
+    "seeding_date": "播種日",
+    "harvest_date": "収穫予定",
+    "growth_stage": "ステージ",
+    "moisture": "水分",
+    "leaf_color": "葉色",
+    "notes": "メモ",
+    "view_notes": "農業日誌を見る"
+  },
+  "header": {
+    "logo_alt": "Rouvis ロゴ",
+    "app_name": "Rouvis",
+    "sign_in": "ログイン",
+    "sign_up": "新規登録",
+    "sign_out": "ログアウト",
+    "settings": "設定",
+    "profile": "プロフィール",
+    "account": "アカウント",
+    "theme": "テーマ",
+    "theme_light": "ライト",
+    "theme_dark": "ダーク",
+    "theme_system": "システム",
+    "language": "言語",
+    "nav": {
+      "dashboard": "ダッシュボード",
+      "fields": "圃場",
+      "activities": "活動",
+      "calendar": "カレンダー",
+      "chat": "チャット",
+      "more": "もっと見る"
+    },
+    "a11y": {
+      "skip_to_content": "本文へスキップ",
+      "open_menu": "メニューを開く",
+      "close_menu": "メニューを閉じる"
+    }
+  },
+  "footer": {
+    "about": "概要",
+    "explore": "探索",
+    "help": "ヘルプ",
+    "more": "もっと見る",
+    "rights": "全ての権利を保有します。",
+    "terms": "利用規約",
+    "privacy": "プライバシー"
+  },
+  "auth": {
+    "signIn": {
+      "title": "ROuvisへようこそ",
+      "subtitle": "Googleアカウントでログインして始めましょう",
+      "googleButton": "Googleでログイン",
+      "loading": "ログイン中...",
+      "error": "ログインに失敗しました。もう一度お試しください。",
+      "terms": "ログインすることで、利用規約とプライバシーポリシーに同意したものとみなされます。"
+    },
+    "onboarding": {
+      "progress": "ステップ {current} / {total}",
+      "welcome": {
+        "title": "ROuvisへようこそ",
+        "subtitle": "チャットで農作業を管理する新しい体験",
+        "description": "ROuvisはAIアシスタントと会話しながら、圃場管理・作業記録・収穫計画を簡単に行えるサービスです。",
+        "benefits": {
+          "chat": "チャットで作業を記録・相談",
+          "weather": "天気予報と作業提案",
+          "knowledge": "農業技術の検索とアドバイス"
+        },
+        "nextButton": "始める"
+      },
+      "profile": {
+        "title": "プロフィール設定",
+        "subtitle": "あなたの農場について教えてください",
+        "nameLabel": "お名前",
+        "namePlaceholder": "例：田中 太郎",
+        "regionLabel": "地域",
+        "regionPlaceholder": "例：新潟県",
+        "farmSizeLabel": "農地面積（ha）",
+        "farmSizePlaceholder": "例：2.5",
+        "backButton": "戻る",
+        "nextButton": "次へ"
+      },
+      "field": {
+        "title": "最初の圃場を作成",
+        "subtitle": "メインの圃場情報を登録してください",
+        "nameLabel": "圃場名",
+        "namePlaceholder": "例：第一圃場",
+        "areaLabel": "面積（ha）",
+        "areaPlaceholder": "例：1.2",
+        "cropLabel": "作物",
+        "cropPlaceholder": "例：キャベツ",
+        "plantingDateLabel": "定植日",
+        "plantingDatePlaceholder": "日付を選択",
+        "backButton": "戻る",
+        "finishButton": "完了",
+        "submitting": "作成中..."
+      },
+      "success": {
+        "title": "準備完了！",
+        "subtitle": "ROuvisを使い始めることができます",
+        "dashboardButton": "ダッシュボードへ"
+      }
+    }
+  },
+  "alerts": {
+    "high_temp_warning": "高温注意報 {value}℃",
+    "pest_warning": "{name}の害虫発生注意",
+    "frost_warning": "霜注意報 {temp}℃予想"
+  }
+}

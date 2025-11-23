@@ -1,0 +1,317 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 142.1 76.2% 36.3%;
+    --primary-foreground: 355.7 100% 97.3%;
+
+    --secondary: 220 14.3% 75.9%;
+    --secondary-foreground: 220 10% 30%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 142.1 76.2% 36.3%;
+
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 142.1 70.0% 45.3%;
+    --primary-foreground: 144.9 80.4% 10%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 142.1 76.2% 45.3%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Mobile-first responsive utilities */
+@layer utilities {
+  /* Touch-friendly button sizes */
+  .touch-target {
+    @apply min-w-[44px] min-h-[44px];
+  }
+
+  /* Mobile-optimized spacing */
+  .mobile-spacing {
+    @apply px-4 py-3 sm:px-6 sm:py-4;
+  }
+
+  /* Mobile-first text sizes */
+  .text-mobile-sm {
+    @apply text-sm sm:text-base;
+  }
+
+  .text-mobile-base {
+    @apply text-base sm:text-lg;
+  }
+
+  .text-mobile-lg {
+    @apply text-lg sm:text-xl;
+  }
+
+  /* Mobile-optimized containers */
+  .mobile-container {
+    @apply w-full max-w-none px-4 sm:px-6 lg:px-8 sm:max-w-2xl lg:max-w-4xl xl:max-w-6xl mx-auto;
+  }
+
+  /* Mobile keyboard viewport fix */
+  .mobile-viewport {
+    @apply min-h-screen;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Safe area insets for notched devices */
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .safe-left {
+    padding-left: env(safe-area-inset-left);
+  }
+
+  .safe-right {
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* Mobile-optimized focus states */
+  .focus-mobile:focus {
+    @apply outline-none ring-2 ring-primary-500 ring-offset-2;
+  }
+
+  /* Mobile scrolling improvements */
+  .mobile-scroll jScrollPane1 {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .mobile-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Mobile animations */
+  .mobile-tap {
+    @apply active:scale-95 transition-transform duration-75;
+  }
+
+  /* Mobile grid layouts */
+  .mobile-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6;
+  }
+
+  .mobile-grid-2 {
+    @apply grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4;
+  }
+
+  /* Mobile card layouts */
+  .mobile-card {
+    @apply bg-white rounded-lg border border-gray-200 p-4 sm:p-6 shadow-sm;
+  }
+
+  /* Mobile form elements */
+  .mobile-input {
+    @apply w-full px-3 py-3 text-base border border-gray-300 rounded-lg focus-mobile bg-white;
+  }
+
+  /* Mobile button styles */
+  .mobile-btn {
+    @apply touch-target mobile-tap px-4 py-3 text-base font-medium rounded-lg transition-all duration-200;
+  }
+
+  .mobile-btn-primary {
+    @apply mobile-btn bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800;
+  }
+
+  .mobile-btn-secondary {
+    @apply mobile-btn bg-gray-100 text-gray-900 hover:bg-gray-200 active:bg-gray-300;
+  }
+
+  /* Mobile-optimized evidence cards */
+  .mobile-evidence-card {
+    @apply rounded-xl border-2 p-3 sm:p-4 mb-3 transition-all duration-300;
+  }
+
+  /* Mobile chat optimizations */
+  .mobile-chat-input {
+    @apply flex items-end gap-2 p-3 bg-white border-t border-gray-200;
+  }
+
+  .mobile-message-bubble {
+    @apply max-w-[85%] sm:max-w-[80%] lg:max-w-[75%] rounded-lg p-3 sm:p-4;
+  }
+
+  /* Mobile navigation spacing */
+  .mobile-nav-height {
+    height: calc(5rem + env(safe-area-inset-bottom));
+  }
+
+  /* Accessibility improvements for mobile */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .sr-only:focus {
+    position: static;
+    width: auto;
+    height: auto;
+    padding: inherit;
+    margin: inherit;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+  }
+
+  /* High contrast mode support */
+  @media (prefers-contrast: high) {
+    .mobile-btn-primary {
+      border: 2px solid;
+    }
+
+    .mobile-btn-secondary {
+      border: 2px solid;
+      background-color: transparent;
+    }
+  }
+
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    .mobile-tap,
+    .mobile-btn,
+    .mobile-btn-primary,
+    .mobile-btn-secondary {
+      transition: none;
+      transform: none !important;
+    }
+
+    .animate-fadeIn {
+      animation: none;
+    }
+
+    .animate-bounce {
+      animation: none;
+    }
+
+    .animate-spin {
+      animation: none;
+    }
+  }
+
+  /* Focus visible for keyboard navigation */
+  .focus-visible:focus-visible {
+    @apply ring-2 ring-primary-500 ring-offset-2;
+  }
+
+  /* Mobile-specific accessibility */
+  .mobile-accessible {
+    @apply focus-visible;
+  }
+
+  /* Large text support */
+  @media (min-resolution: 2dppx) {
+    .mobile-input,
+    .mobile-btn {
+      font-size: 16px;
+    }
+  }
+}
+
+/* ChatKit full-bleed layout overrides
+   Apply wrapper class "ck-full-bleed" to the ChatKit container on the page.
+   This removes the internal left rail (thread list/sidebar) and forces a 1‑column layout so the chat fills the card. */
+.ck-full-bleed { height: 100%; }
+.ck-full-bleed > div { height: 100% !important; width: 100% !important; }
+.ck-full-bleed > div > div { height: 100% !important; width: 100% !important; max-width: none !important; }
+
+/* Collapse any built-in two-column grid inside ChatKit */
+.ck-full-bleed > div > div {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 0 !important;
+}
+
+/* Hide the first column if present (thread list / sidebar) */
+.ck-full-bleed > div > div > :first-child {
+  display: none !important;
+}
+
+/* Defensive selectors for class-name based internals (if present in this ChatKit build) */
+.ck-full-bleed [class*="Sidebar"],
+.ck-full-bleed [class*="ThreadList"],
+.ck-full-bleed [class*="LeftRail"] {
+  display: none !important;
+}
+.ck-full-bleed [class*="Layout"],
+.ck-full-bleed [class*="Container"] {
+  max-width: none !important;
+  width: 100% !important;
+}
+/* Ensure the main chat area stretches */
+.ck-full-bleed [class*="Main"],
+.ck-full-bleed [class*="Thread"],
+.ck-full-bleed [class*="Chat"] {
+  width: 100% !important;
+  height: 100% !important;
+}

@@ -1,0 +1,279 @@
+{
+  "app_name": "Rouvis",
+  "strategic_planning": "農業戦略計画",
+  "farmer": "農家",
+  "niigata_japan": "新潟、日本",
+  "navigation": {
+    "dashboard": "ダッシュボード",
+    "planner": "畑プランナー",
+    "calendar": "カレンダー",
+    "analytics": "分析",
+    "community": "コミュニティ",
+    "chat": "AIチャット"
+  },
+  "weather": {
+    "today": "今日",
+    "mon": "月",
+    "tue": "火",
+    "wed": "水",
+    "thu": "木",
+    "fri": "金",
+    "sat": "土",
+    "sun": "日",
+    "sunny": "晴れ",
+    "partly_cloudy": "晴れ時々曇り",
+    "cloudy": "曇り",
+    "rain": "雨",
+    "heavy_rain": "大雨",
+    "nowcast": "降水ナウキャスト",
+    "next_hour": "今後1時間",
+    "next_3_hours": "今後3時間のプレビュー",
+    "no_rain": "降水なし",
+    "light_rain": "弱い雨",
+    "moderate_rain": "やや強い雨",
+    "seven_day_forecast": "7日間予報",
+    "warning_banner": "気象警報・注意報",
+    "advisory": "注意報",
+    "warning": "警報",
+    "emergency": "特別警報",
+    "typhoon_alert": "台風情報",
+    "typhoon_approaching": "接近中",
+    "typhoon_id": "台風番号",
+    "unnamed_typhoon": "台風",
+    "intensity": "強度",
+    "current_position": "現在位置",
+    "affected_areas": "対象地域",
+    "view_forecast_track": "予報進路を見る",
+    "typhoon_warning_message": "台風が接近しています。最新の気象情報を確認し、安全を確保してください。",
+    "typhoon_safety_reminder": "台風接近時は、圃場の見回りや作業を控え、安全な場所で待機してください。",
+    "issued_at": "発表",
+    "show_all_warnings": "すべての警報を表示",
+    "more": "件以上",
+    "current_status": "現在の状況",
+    "timeline": "タイムライン",
+    "last_updated": "最終更新",
+    "nowcast_unavailable": "ナウキャスト情報がありません"
+  },
+  "dashboard": {
+    "location": "長岡市、新潟",
+    "weather_forecast": "天気予報",
+    "five_day_forecast": "5日間の予報",
+    "rain_chance": "降水確率 {percentage}%",
+    "no_rain": "降水なし",
+    "view_detailed_forecast": "詳細な予報を見る",
+    "crop_recommendations": "作物の推奨",
+    "yield_forecast": "収量予測",
+    "view_details": "詳細を見る"
+  },
+  "today": {
+    "advisor_strip": {
+      "title": "今日のアドバイス",
+      "view_details": "詳細を見る",
+      "frost_alert": "霜注意報：今夜{temp}°C",
+      "kpi_chip": "水管理達成率：{value}%",
+      "next_task": "次のタスク：{task}"
+    },
+    "tasks": {
+      "title": "今日のタスク",
+      "regenerate": "再生成",
+      "none": "今日のタスクはありません",
+      "generate": "タスクを生成",
+      "field": "圃場：{field}",
+      "eta": "所要時間：{time}",
+      "weather_dependent": "天候依存",
+      "completed": "{done}/{total}完了",
+      "week_view": "週間表示"
+    },
+    "prompts": {
+      "today": "今日は何をすればいいですか？",
+      "today_label": "💬 今日は何をすればいい？",
+      "weather": "今週の天気と気をつけることを教えてください",
+      "weather_label": "🌤️ 天気はどう？",
+      "frost": "冷え込みが来そうですか？コシヒカリの対策を教えてください",
+      "frost_label": "❄️ 霜は来る？",
+      "watering": "今日は水やりをした方がいいですか？",
+      "watering_label": "💧 水やりは必要？"
+    }
+  },
+  "insights": {
+    "weather_and_logistics": "天気と物流",
+    "logistics": "物流状況",
+    "cooperative_callouts": "JA新潟からの連絡",
+    "latest": "最新"
+  },
+  "chat": {
+    "greeting": "こんにちは！新潟の農業アドバイザーです。今日は何をお手伝いしましょうか？",
+    "placeholder": "質問や作業記録を入力してください...",
+    "tools": {
+      "attach_field": "圃場",
+      "attach_photo": "写真"
+    },
+    "evidence_title": "根拠となる資料",
+    "evidence_empty": "AIが情報源を示す際、ここに表示されます",
+    "confidence": "信頼度",
+    "page": "ページ",
+    "view_source": "出典を見る",
+    "expand": "もっと見る",
+    "collapse": "閉じる",
+    "citations_count": "{count}件",
+    "high_confidence": "高",
+    "medium_confidence": "中",
+    "low_confidence": "低",
+    "sources_agree": "{count}つの情報源が一致しています",
+    "multiple_sources": "複数の情報源から確認中",
+    "guidebook_section": "セクション",
+    "guidebook_topic": "トピック",
+    "trust_note": "すべての推奨は信頼できる農業ガイドブックに基づいています"
+  },
+  "quick_actions": {
+    "title": "クイックアクション",
+    "log_activity": "作業を記録",
+    "ask": "質問する",
+    "take_photo": "写真を撮る",
+    "week_plan": "週間計画",
+    "voice_input": "音声で入力",
+    "voice_help": "音声で作業記録や質問ができます"
+  },
+  "trust": {
+    "evidence_rail": "根拠",
+    "badges": {
+      "jma_official": "JMA公式",
+      "agri_center": "新潟県農業技術センター",
+      "ja_niigata": "JA新潟"
+    }
+  },
+  "admin": {
+    "dashboard": {
+      "title": "管理ダッシュボード",
+      "overview": "システム概要"
+    },
+    "usage": {
+      "title": "使用状況",
+      "description": "トークン消費量とAPI呼び出し数",
+      "total_tokens": "総トークン数",
+      "estimated_cost": "推定コスト",
+      "api_calls": "API呼び出し数",
+      "model_breakdown": "モデル別使用状況",
+      "avg_tokens_per_request": "平均トークン/リクエスト",
+      "input_tokens": "入力トークン",
+      "output_tokens": "出力トークン",
+      "total": "合計",
+      "requests": "リクエスト数",
+      "model": "モデル",
+      "time_range_7d": "過去7日間",
+      "time_range_30d": "過去30日間",
+      "refresh": "更新",
+      "token_usage_chart": "モデル別トークン使用量"
+    },
+    "audit_logs": {
+      "title": "監査ログ",
+      "description": "すべてのエージェントアクション",
+      "search_placeholder": "検索...",
+      "all_actions": "すべてのアクション",
+      "time": "時刻",
+      "user": "ユーザー",
+      "action": "アクション",
+      "resource": "リソース",
+      "details": "詳細",
+      "show_details": "表示",
+      "hide_details": "閉じる",
+      "export_csv": "CSV出力",
+      "no_logs": "ログが見つかりません",
+      "no_matching_logs": "フィルター条件に一致するログが見つかりません",
+      "showing_latest": "最新の{count}件を表示しています",
+      "total_logs": "全{total}件のログ ({filtered}件表示中)"
+    },
+    "users": {
+      "title": "ユーザー管理",
+      "description": "農家アカウントの管理"
+    }
+  },
+  "auth": {
+    "signIn": {
+      "title": "ROuvisへようこそ",
+      "subtitle": "Googleアカウントでログインして始めましょう",
+      "googleButton": "Googleでログイン",
+      "loading": "ログイン中...",
+      "error": "ログインに失敗しました。もう一度お試しください。",
+      "terms": "ログインすることで、利用規約とプライバシーポリシーに同意したものとみなされます。"
+    },
+    "onboarding": {
+      "progress": "ステップ {current} / {total}",
+      "welcome": {
+        "title": "ROuvisへようこそ",
+        "subtitle": "チャットで農作業を管理する新しい体験",
+        "description": "ROuvisはAIアシスタントと会話しながら、圃場管理・作業記録・収穫計画を簡単に行えるサービスです。",
+        "benefits": {
+          "chat": "チャットで作業を記録・相談",
+          "weather": "天気予報と作業提案",
+          "knowledge": "農業技術の検索とアドバイス"
+        },
+        "nextButton": "始める"
+      },
+      "profile": {
+        "title": "プロフィール設定",
+        "subtitle": "あなたの農場について教えてください",
+        "nameLabel": "お名前",
+        "namePlaceholder": "例：田中 太郎",
+        "regionLabel": "地域",
+        "regionPlaceholder": "例：新潟県",
+        "farmSizeLabel": "農地面積（ha）",
+        "farmSizePlaceholder": "例：2.5",
+        "backButton": "戻る",
+        "nextButton": "次へ"
+      },
+      "field": {
+        "title": "最初の圃場を作成",
+        "subtitle": "メインの圃場情報を登録してください",
+        "nameLabel": "圃場名",
+        "namePlaceholder": "例：第一圃場",
+        "areaLabel": "面積（ha）",
+        "areaPlaceholder": "例：1.2",
+        "cropLabel": "作物",
+        "cropPlaceholder": "例：キャベツ",
+        "plantingDateLabel": "定植日",
+        "plantingDatePlaceholder": "日付を選択",
+        "backButton": "戻る",
+        "finishButton": "完了",
+        "submitting": "作成中..."
+      },
+      "success": {
+        "title": "準備完了！",
+        "subtitle": "ROuvisを使い始めることができます",
+        "dashboardButton": "ダッシュボードへ"
+      }
+    }
+  },
+  "vibe": {
+    "todays_overview": "今日の概要",
+    "weather_summary": "天気サマリ",
+    "ai_recommendations": "AI推奨事項",
+    "todays_tasks": "今日のタスク",
+    "weather_work_plan": "6日間天気 & 作業計画",
+    "field_selector": "圃場を選択",
+    "work_blocks": "作業ブロック",
+    "field_metadata": "圃場情報",
+    "add_work": "作業を追加",
+    "no_work_scheduled": "予定なし",
+    "morning": "午前",
+    "afternoon": "午後",
+    "variety": "品種",
+    "seeding_date": "播種日",
+    "harvest_date": "収穫予定",
+    "growth_stage": "ステージ",
+    "moisture": "水分",
+    "leaf_color": "葉色",
+    "notes": "メモ",
+    "view_notes": "農業日誌を見る"
+  },
+  "alerts": {
+    "high_temp_warning": "高温注意報: {value}°C超",
+    "pest_warning": "害虫警報: {name}",
+    "frost_warning": "霜注意報: 今夜{temp}°C"
+  },
+  "kpis": {
+    "overall_health": "全体的健康度",
+    "water_management": "水管理達成率",
+    "yield_forecast": "収量予測"
+  }
+}
