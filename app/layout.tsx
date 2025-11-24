@@ -17,7 +17,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         {/* Mobile performance optimizations */}
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes, viewport-fit=cover" />
@@ -90,7 +90,7 @@ export default function RootLayout({
         {/* ChatKit Script */}
         <script src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js" async />
       </head>
-      <body className={`${inter.className} antialiased`}>
+      <body className={`${inter.className} antialiased`} suppressHydrationWarning>
         <Providers session={null}>
           {children}
         </Providers>

@@ -31,7 +31,9 @@ export default async function middleware(request: NextRequest) {
   }
 
   // Check if demo mode is enabled
-  const isDemoMode = process.env.DEMO_MODE === 'true';
+  const isDemoMode =
+    process.env.DEMO_MODE === 'true' ||
+    process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
 
   if (!isDemoMode) {
     // Check authentication
