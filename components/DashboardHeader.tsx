@@ -1,25 +1,47 @@
-import { useTranslations } from 'next-intl';
+import { getTranslations } from 'next-intl/server';
+import { AdvisorStrip } from './AdvisorStrip';
 
-type DashboardHeaderProps = {
-  title: string;
-  subtitle?: string;
-};
+interface WeatherData {
+  location: string;
+  temperature: { max: number; min: number };
+  condition: string;
+  alerts?: string[];
+}
 
-export function DashboardHeader({ title, subtitle }: DashboardHeaderProps) {
-  const t = useTranslations();
+export default async function DashboardHeader({ locale, weather }: { locale: string; weather: WeatherData }) {
+  const t = await getTranslations({ locale, namespace: 'dashboard' });
+
   return (
-    <div className="flex justify-between items-start mb-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
-        {subtitle && <p className="text-gray-500 mt-1">{subtitle}</p>}
-      </div>
-      <div className="flex space-x-2">
-        <button className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
-          {t('common.export_data')}
-        </button>
-        <button className="px-4 py-2 bg-primary-600 rounded-lg text-sm font-medium text-white hover:bg-primary-700">
-          {t('common.new_analysis')}
-        </button>
+    <div className="bg-card border-b border-border mb-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+          {/* Weather Widget - Simplified */}
+          <div className="bg-secondary rounded-xl p-4 border border-border">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">{weather.location}</p>
+                <p className="text-2xl font-semibold text-foreground mt-1">
+                  {weather.temperature.max}°C
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {weather.condition} · 最低 {weather.temperature.min}°C
+                </p>
+              </div>
+              {weather.alerts && weather.alerts.length > 0 && (
+                <span className="text-warning text-sm font-medium">
+                  ⚠ {weather.alerts[0]}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* AI Advisor Strip */}
+          <div className="md:col-span-2">
+            <AdvisorStrip />
+          </div>
+
+        </div>
       </div>
     </div>
   );
