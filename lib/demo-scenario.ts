@@ -43,6 +43,9 @@ export interface DemoField {
   moisture_percent?: number;
   leaf_color?: string;
   notes?: string;
+  polygon?: string;
+  location?: string;
+  color?: string;
 }
 
 export interface DemoActivity {
@@ -91,6 +94,15 @@ const fields: DemoField[] = [
     moisture_percent: 58,
     leaf_color: '濃緑',
     notes: '用水路点検予定（7/25）',
+    // Geospatial Data
+    polygon: JSON.stringify([
+      { lat: 37.42, lng: 138.82 },
+      { lat: 37.43, lng: 138.82 },
+      { lat: 37.43, lng: 138.83 },
+      { lat: 37.42, lng: 138.83 }
+    ]),
+    location: JSON.stringify({ lat: 37.425, lng: 138.825 }),
+    color: '#10B981', // Emerald
   },
   {
     id: FIELD_B_ID,
@@ -104,6 +116,15 @@ const fields: DemoField[] = [
     moisture_percent: 62,
     leaf_color: 'やや淡い',
     notes: '遮光ネット準備済み。連日の猛暑で萎れ傾向。',
+    // Geospatial Data
+    polygon: JSON.stringify([
+      { lat: 37.43, lng: 138.83 },
+      { lat: 37.44, lng: 138.83 },
+      { lat: 37.44, lng: 138.84 },
+      { lat: 37.43, lng: 138.84 }
+    ]),
+    location: JSON.stringify({ lat: 37.435, lng: 138.835 }),
+    color: '#F59E0B', // Amber
   },
   {
     id: 'field-c',
@@ -117,6 +138,15 @@ const fields: DemoField[] = [
     moisture_percent: 70,
     leaf_color: '健康',
     notes: '週末収穫予定（直売所向け）',
+    // Geospatial Data
+    polygon: JSON.stringify([
+      { lat: 37.41, lng: 138.81 },
+      { lat: 37.42, lng: 138.81 },
+      { lat: 37.42, lng: 138.82 },
+      { lat: 37.41, lng: 138.82 }
+    ]),
+    location: JSON.stringify({ lat: 37.415, lng: 138.815 }),
+    color: '#3B82F6', // Blue
   },
 ];
 
@@ -346,7 +376,7 @@ export function updateDemoTask(id: string, updates: Partial<DemoTask>): DemoTask
       ...updates,
       fieldName: updates.fieldName || task.fieldName,
       field_id: updates.field_id || task.field_id,
-      completed: updates.completed ?? updates.status === 'completed' ?? task.completed,
+      completed: updates.completed ?? (updates.status ? updates.status === 'completed' : task.completed),
     };
     return updated;
   });

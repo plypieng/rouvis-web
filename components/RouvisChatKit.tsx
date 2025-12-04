@@ -1,7 +1,7 @@
 'use client';
 
 import { forwardRef, useImperativeHandle, useRef, useEffect, useState, useCallback } from 'react';
-import { Send, Loader2, RefreshCw, Undo2 } from 'lucide-react';
+import { Send, Loader2, RefreshCw, Undo2, Paperclip, X } from 'lucide-react';
 
 export interface RouvisChatKitRef {
   sendMessage: (message: string) => void;
@@ -26,6 +26,7 @@ interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  imageUrl?: string;
   thinkingSteps?: ThinkingStep[];
   source?: string;
   hasError?: boolean;
@@ -37,6 +38,7 @@ interface RouvisChatKitProps {
   projectId?: string;
   initialThreadId?: string;
   onTaskUpdate?: () => void;
+  onDiagnosisComplete?: (result: any) => void;
   density?: 'compact' | 'comfortable';
   growthStage?: string;
 }
@@ -53,7 +55,7 @@ const FRIENDLY_STATUS: Record<string, string> = {
 // Time-aware greetings
 function getGreeting(weather?: { condition?: string }): { main: string; sub: string } {
   const hour = new Date().getHours();
-  
+
   if (hour >= 5 && hour < 10) {
     return { main: 'おはようございます 🌱', sub: '今日も良い一日になりますように' };
   } else if (hour >= 10 && hour < 17) {
@@ -76,7 +78,7 @@ function getQuickSuggestions(growthStage?: string): { label: string; message: st
   if (hour >= 5 && hour < 12) {
     suggestions.push({ label: '今日の予定は？', message: '今日の作業予定を教えて' });
   }
-  
+
   if (growthStage?.toLowerCase().includes('seedling') || growthStage?.includes('育苗')) {
     suggestions.push({ label: '水やり記録', message: '水やりを記録したい' });
   } else if (growthStage?.toLowerCase().includes('harvest') || growthStage?.includes('収穫')) {
@@ -84,9 +86,9 @@ function getQuickSuggestions(growthStage?: string): { label: string; message: st
   } else {
     suggestions.push({ label: '作業を記録', message: '作業を記録したい' });
   }
-  
+
   suggestions.push({ label: '天気', message: '今日の天気は？' });
-  
+
   return suggestions.slice(0, 3);
 }
 
@@ -95,6 +97,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   projectId,
   initialThreadId,
   onTaskUpdate,
+  onDiagnosisComplete,
   density = 'comfortable',
   growthStage,
 }, ref) => {
@@ -105,7 +108,9 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   const [currentStatus, setCurrentStatus] = useState<string>('');
   const [actionConfirmations, setActionConfirmations] = useState<ActionConfirmation[]>([]);
   const [weather, setWeather] = useState<{ condition?: string } | undefined>();
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load chat history on mount
   useEffect(() => {
@@ -147,19 +152,43 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     };
 
     loadHistory();
+    loadHistory();
   }, [threadId, projectId]);
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert('画像サイズは5MB以下にしてください');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSelectedImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+    // Reset input so same file can be selected again if needed
+    e.target.value = '';
+  };
+
+  const handleRemoveImage = () => {
+    setSelectedImage(null);
+  };
+
   const sendMessage = useCallback(async (content: string) => {
-    if (!content.trim() || isLoading) return;
+    if ((!content.trim() && !selectedImage) || isLoading) return;
 
     const userMessage: Message = {
       id: `user-${Date.now()}`,
       role: 'user',
       content: content.trim(),
+      imageUrl: selectedImage || undefined,
     };
 
     setMessages(prev => [...prev, userMessage]);
     setInput('');
+    setSelectedImage(null);
     setIsLoading(true);
     setCurrentStatus('');
 
@@ -176,7 +205,15 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [...messages, userMessage].map(m => ({ role: m.role, content: m.content })),
+          messages: [...messages, userMessage].map(m => ({
+            role: m.role,
+            content: m.imageUrl
+              ? [
+                { type: 'text', text: m.content },
+                { type: 'image_url', image_url: { url: m.imageUrl } }
+              ]
+              : m.content
+          })),
           projectId,
           threadId,
         }),
@@ -248,8 +285,8 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
                 id: `confirm-${Date.now()}`,
                 type: data.action.type,
                 summary: data.action.type === 'task_created' ? '予定に追加しました' :
-                         data.action.type === 'activity_logged' ? '記録しました' :
-                         '更新しました',
+                  data.action.type === 'activity_logged' ? '記録しました' :
+                    '更新しました',
                 undoData: data.action.undoData,
                 expiresAt: Date.now() + 30000,
               };
@@ -270,6 +307,11 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
                 m.id === assistantId ? { ...m, hasError: true } : m
               ));
             }
+
+            // Diagnosis Result
+            if (data.type === 'diagnosis_result') {
+              onDiagnosisComplete?.(data.result);
+            }
           }
         }
       }
@@ -286,7 +328,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
       setIsLoading(false);
       setCurrentStatus('');
     }
-  }, [messages, projectId, threadId, isLoading, onTaskUpdate]);
+  }, [messages, projectId, threadId, isLoading, onTaskUpdate, onDiagnosisComplete]);
 
   const handleRetry = useCallback(() => {
     setMessages(prev => {
@@ -349,16 +391,24 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
             {/* Message Bubble */}
             <div className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div
-                className={`max-w-[85%] px-4 py-3 ${
-                  message.role === 'user'
-                    ? 'bg-primary text-primary-foreground rounded-2xl rounded-tr-md'
-                    : message.hasError
-                      ? 'bg-destructive/10 text-destructive rounded-2xl rounded-tl-md'
-                      : 'bg-secondary text-secondary-foreground rounded-2xl rounded-tl-md'
-                } ${isCompact ? 'text-sm' : 'text-base'}`}
+                className={`max-w-[85%] px-4 py-3 ${message.role === 'user'
+                  ? 'bg-primary text-primary-foreground rounded-2xl rounded-tr-md'
+                  : message.hasError
+                    ? 'bg-destructive/10 text-destructive rounded-2xl rounded-tl-md'
+                    : 'bg-secondary text-secondary-foreground rounded-2xl rounded-tl-md'
+                  } ${isCompact ? 'text-sm' : 'text-base'}`}
               >
+                {message.imageUrl && (
+                  <div className="mb-2">
+                    <img
+                      src={message.imageUrl}
+                      alt="Uploaded"
+                      className="max-w-full rounded-lg max-h-64 object-cover border border-black/10"
+                    />
+                  </div>
+                )}
                 <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
-                
+
                 {/* Retry for errors */}
                 {message.hasError && !isLoading && (
                   <button
@@ -431,20 +481,54 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
           </div>
         )}
 
+        {/* Image Preview */}
+        {selectedImage && (
+          <div className="px-4 pt-3">
+            <div className="relative inline-block">
+              <img
+                src={selectedImage}
+                alt="Preview"
+                className="h-20 w-20 object-cover rounded-lg border border-border"
+              />
+              <button
+                onClick={handleRemoveImage}
+                className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 shadow-sm hover:bg-destructive/90 transition-colors"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Input Form */}
         <form onSubmit={handleSubmit} className="p-4 pt-3">
           <div className="flex items-center gap-2 bg-background rounded-full border border-border p-1 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              accept="image/*"
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="p-2 ml-1 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full transition-colors"
+              disabled={isLoading}
+            >
+              <Paperclip className="w-5 h-5" />
+            </button>
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="メッセージ..."
-              className={`flex-1 bg-transparent border-none px-4 py-2 min-h-[44px] focus:outline-none placeholder:text-muted-foreground ${isCompact ? 'text-sm' : 'text-base'}`}
+              className={`flex-1 bg-transparent border-none px-2 py-2 min-h-[44px] focus:outline-none placeholder:text-muted-foreground ${isCompact ? 'text-sm' : 'text-base'}`}
               disabled={isLoading}
             />
             <button
               type="submit"
-              disabled={isLoading || !input.trim()}
+              disabled={isLoading || (!input.trim() && !selectedImage)}
               className="bg-primary text-primary-foreground rounded-full p-3 min-w-[44px] min-h-[44px] flex items-center justify-center hover:opacity-90 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
             >
               {isLoading ? (

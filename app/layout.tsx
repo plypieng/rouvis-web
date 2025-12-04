@@ -2,6 +2,7 @@ import "../styles/globals.css";
 import { Inter } from "next/font/google";
 import type { Metadata } from "next";
 import type React from "react";
+import Script from "next/script";
 import { Providers } from "@/components/Providers";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -88,7 +89,10 @@ export default function RootLayout({
         />
 
         {/* ChatKit Script */}
-        <script src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js" async />
+        <Script
+          src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js"
+          strategy="afterInteractive"
+        />
       </head>
       <body className={`${inter.className} antialiased`} suppressHydrationWarning>
         <Providers session={null}>

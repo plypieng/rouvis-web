@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   LineChart,
@@ -15,42 +15,36 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
-// Mock data for demonstration
-const seasonalData = [
-  { month: 'Jan', rice: 0, vegetables: 120, fruits: 50 },
-  { month: 'Feb', rice: 0, vegetables: 180, fruits: 40 },
-  { month: 'Mar', rice: 0, vegetables: 250, fruits: 30 },
-  { month: 'Apr', rice: 100, vegetables: 300, fruits: 20 },
-  { month: 'May', rice: 350, vegetables: 270, fruits: 10 },
-  { month: 'Jun', rice: 650, vegetables: 200, fruits: 30 },
-  { month: 'Jul', rice: 950, vegetables: 150, fruits: 90 },
-  { month: 'Aug', rice: 1200, vegetables: 100, fruits: 160 },
-  { month: 'Sep', rice: 850, vegetables: 80, fruits: 220 },
-  { month: 'Oct', rice: 400, vegetables: 120, fruits: 180 },
-  { month: 'Nov', rice: 0, vegetables: 160, fruits: 100 },
-  { month: 'Dec', rice: 0, vegetables: 140, fruits: 60 },
-];
-
-const profitData = [
-  { month: 'Jan', revenue: 5200, expenses: 3800, profit: 1400 },
-  { month: 'Feb', revenue: 6100, expenses: 4100, profit: 2000 },
-  { month: 'Mar', revenue: 7500, expenses: 4700, profit: 2800 },
-  { month: 'Apr', revenue: 9200, expenses: 5300, profit: 3900 },
-  { month: 'May', revenue: 10800, expenses: 6200, profit: 4600 },
-  { month: 'Jun', revenue: 12500, expenses: 7100, profit: 5400 },
-  { month: 'Jul', revenue: 15000, expenses: 8400, profit: 6600 },
-  { month: 'Aug', revenue: 16700, expenses: 9200, profit: 7500 },
-  { month: 'Sep', revenue: 14300, expenses: 8100, profit: 6200 },
-  { month: 'Oct', revenue: 11900, expenses: 6800, profit: 5100 },
-  { month: 'Nov', revenue: 9600, expenses: 5900, profit: 3700 },
-  { month: 'Dec', revenue: 7800, expenses: 4900, profit: 2900 },
-];
-
 type ChartType = 'yield' | 'profit';
 
 export function FarmMetricsChart() {
   const t = useTranslations();
   const [activeChart, setActiveChart] = useState<ChartType>('yield');
+  const [seasonalData, setSeasonalData] = useState<any[]>([]);
+  const [profitData, setProfitData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await fetch('/api/v1/analytics/financial');
+        if (res.ok) {
+          const data = await res.json();
+          setSeasonalData(data.seasonal || []);
+          setProfitData(data.profit || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch financial analytics:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  if (loading) {
+    return <div className="h-96 flex items-center justify-center">Loading...</div>;
+  }
 
   return (
     <div className="h-96">
@@ -58,21 +52,19 @@ export function FarmMetricsChart() {
         <div className="flex space-x-4">
           <button
             onClick={() => setActiveChart('yield')}
-            className={`px-4 py-2 text-sm font-medium rounded-lg ${
-              activeChart === 'yield'
-                ? 'bg-primary-50 text-primary-700'
-                : 'bg-white text-gray-600 hover:bg-gray-50'
-            }`}
+            className={`px-4 py-2 text-sm font-medium rounded-lg ${activeChart === 'yield'
+              ? 'bg-primary-50 text-primary-700'
+              : 'bg-white text-gray-600 hover:bg-gray-50'
+              }`}
           >
             {t('metrics.crop_yield')}
           </button>
           <button
             onClick={() => setActiveChart('profit')}
-            className={`px-4 py-2 text-sm font-medium rounded-lg ${
-              activeChart === 'profit'
-                ? 'bg-primary-50 text-primary-700'
-                : 'bg-white text-gray-600 hover:bg-gray-50'
-            }`}
+            className={`px-4 py-2 text-sm font-medium rounded-lg ${activeChart === 'profit'
+              ? 'bg-primary-50 text-primary-700'
+              : 'bg-white text-gray-600 hover:bg-gray-50'
+              }`}
           >
             {t('metrics.profit_margin')}
           </button>

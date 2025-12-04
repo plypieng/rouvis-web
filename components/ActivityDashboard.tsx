@@ -68,53 +68,45 @@ export function ActivityDashboard({
     setError(null);
 
     try {
-      // Fetch activities
+      // 1. Fetch fields first to allow mapping
+      let loadedFields: Field[] = [];
+      const fieldsResponse = await fetch('/api/v1/fields');
+      if (fieldsResponse.ok) {
+        const fieldsData = await fieldsResponse.json();
+        loadedFields = fieldsData.fields || [];
+        setFields(loadedFields);
+      }
+
+      // 2. Fetch activities
       const activitiesResponse = await fetch('/api/v1/activities');
       if (activitiesResponse.ok) {
         const activitiesData = await activitiesResponse.json();
-        setActivities(activitiesData.activities || []);
+        const parsedActivities = (activitiesData.activities || []).map((activity: any) => ({
+          ...activity,
+          timestamp: new Date(activity.timestamp),
+          fieldName: activity.fieldName || loadedFields.find(f => f.id === activity.fieldId)?.name
+        }));
+        setActivities(parsedActivities);
       }
 
-      // Fetch tasks - Note: tasks API might not exist yet, so we'll handle gracefully
+      // 3. Fetch tasks
       try {
         const tasksResponse = await fetch('/api/v1/tasks');
         if (tasksResponse.ok) {
           const tasksData = await tasksResponse.json();
-          setTasks(tasksData.tasks || []);
+          const parsedTasks = (tasksData.tasks || []).map((task: any) => ({
+            ...task,
+            dueAt: new Date(task.dueAt),
+            fieldName: task.fieldName || loadedFields.find(f => f.id === task.fieldId)?.name
+          }));
+          setTasks(parsedTasks);
+        } else {
+          console.error('Failed to fetch tasks:', tasksResponse.statusText);
         }
       } catch (taskError) {
-        // Mock tasks data for now
-        setTasks([
-          {
-            id: 'task-1',
-            title: 'コシヒカリの水やり',
-            description: '朝の水やりを実施',
-            dueAt: new Date(Date.now() + 2 * 60 * 60 * 1000), // 2 hours from now
-            fieldId: 'field-1',
-            fieldName: 'A圃場',
-            priority: 'high',
-            status: 'pending',
-          },
-          {
-            id: 'task-2',
-            title: '肥料投入の確認',
-            description: '有機肥料の効果を確認',
-            dueAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // tomorrow
-            fieldId: 'field-2',
-            fieldName: 'B圃場',
-            priority: 'medium',
-            status: 'scheduled',
-          },
-        ]);
-        console.warn('Tasks API not available yet:', taskError);
+        console.error('Error fetching tasks:', taskError);
       }
 
-      // Fetch fields
-      const fieldsResponse = await fetch('/api/v1/fields');
-      if (fieldsResponse.ok) {
-        const fieldsData = await fieldsResponse.json();
-        setFields(fieldsData.fields || []);
-      }
     } catch (err) {
       console.error('Failed to fetch dashboard data:', err);
       setError('データの読み込みに失敗しました');
@@ -138,6 +130,10 @@ export function ActivityDashboard({
     const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
     return tasks
       .filter(task => task.dueAt >= now && task.dueAt <= nextWeek && task.status === 'pending')
+      .map(task => ({
+        ...task,
+        fieldName: task.fieldName || fields.find(f => f.id === task.fieldId)?.name
+      }))
       .sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime())
       .slice(0, 5);
   };

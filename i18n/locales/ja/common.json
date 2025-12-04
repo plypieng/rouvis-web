@@ -20,7 +20,23 @@
     "yield_forecast": "収量予測",
     "view_details": "詳細を見る",
     "view_detailed_forecast": "詳細予報を見る",
-    "location": "新潟県"
+    "location": "新潟県",
+    "last_activity": "前回の作業",
+    "next_task": "次の予定",
+    "no_record": "記録なし",
+    "no_plan": "予定なし",
+    "not_set": "未設定",
+    "status_healthy": "順調",
+    "status_completed": "完了",
+    "days": "Days",
+    "create_project": "プロジェクト作成",
+    "create_new_project": "新規プロジェクト作成",
+    "my_projects": "マイプロジェクト",
+    "projects_subtitle": "あなたのプロジェクト一覧",
+    "today_focus": "今日のフォーカス",
+    "all_caught_up": "すべてのタスクが完了しました",
+    "tasks_remaining": "件の残りタスク",
+    "overdue": "期限切れ"
   },
   "planner": {
     "title": "Crop Layout Planner",
@@ -47,22 +63,241 @@
     }
   },
   "calendar": {
-    "title": "Crop Calendar",
-    "monthly_view": "Monthly Calendar View",
-    "upcoming_tasks": "Upcoming Tasks",
-    "add_event": "Add Event",
-    "event_type": "Event Type",
-    "planting": "Planting",
-    "harvesting": "Harvesting",
-    "fertilizing": "Fertilizing",
-    "watering": "Watering",
-    "maintenance": "Maintenance",
-    "view_full_calendar": "View full calendar",
+    "title": "カレンダー",
+    "monthly_view": "月間カレンダー",
+    "upcoming_tasks": "今後のタスク",
+    "add_event": "イベントを追加",
+    "event_type": "イベントタイプ",
+    "planting": "定植",
+    "harvesting": "収穫",
+    "fertilizing": "施肥",
+    "watering": "灌水",
+    "maintenance": "管理作業",
+    "view_full_calendar": "フルカレンダーを見る",
     "schedule_activity": "活動を予定",
     "add_activity": "活動を追加",
-    "today": "Today",
-    "month": "Month flowing",
-    "week": "Week"
+    "today": "今日",
+    "month": "月",
+    "week": "週",
+    "day": "日",
+    "prev": "前へ",
+    "next": "次へ"
+  },
+  "projects": {
+    "title": "プロジェクト",
+    "create_new": "新規プロジェクト作成",
+    "list_title": "プロジェクト一覧",
+    "no_projects": "プロジェクトがまだありません。新しいプロジェクトを作成して始めましょう。",
+    "edit": "編集",
+    "delete": "削除",
+    "archive": "アーカイブ",
+    "unarchive": "復元",
+    "save": "保存",
+    "cancel": "キャンセル",
+    "saving": "保存中...",
+    "back_to_projects": "プロジェクト一覧に戻る",
+    "ai_reschedule_alert": "AIスケジュール調整：チャットコンテキストを開きます（準備中）",
+    "add_task_alert": "タスク追加機能は準備中です！",
+    "archive_failed": "アーカイブに失敗しました",
+    "unarchive_failed": "復元に失敗しました",
+    "update_failed": "更新に失敗しました",
+    "days_label": "日目",
+    "stage_label": "ステージ",
+    "placeholder_variety": "例：桃太郎",
+    "placeholder_notes": "メモや特記事項",
+    "archiving_progress": "アーカイブ中...",
+    "undo_button": "元に戻す",
+    "edit_project": "プロジェクトを編集",
+    "project_name": "プロジェクト名",
+    "variety": "品種",
+    "target_harvest_date": "収穫予定日",
+    "notes": "メモ",
+    "confirm_archive_title": "プロジェクトをアーカイブ",
+    "confirm_archive_message": "「{name}」をアーカイブしますか？",
+    "confirm_archive_description": "アーカイブしたプロジェクトはダッシュボードに表示されませんが、いつでも復元できます。",
+    "archived_success": "「{name}」をアーカイブしました",
+    "unarchived_success": "「{name}」を復元しました",
+    "updated_success": "プロジェクトを更新しました",
+    "undo": "元に戻す",
+    "show_archived": "アーカイブを表示",
+    "hide_archived": "アーカイブを非表示",
+    "archived_badge": "アーカイブ済み",
+    "validation": {
+      "name_required": "プロジェクト名は必須です",
+      "name_too_long": "プロジェクト名は100文字以内で入力してください"
+    },
+    "calendar": {
+      "view_month": "月表示",
+      "view_year": "年表示",
+      "ask_ai_reschedule": "AIに相談・変更",
+      "todays_focus": "今日の作業",
+      "tasks_for_date": "この日の作業",
+      "no_tasks_for_date": "予定されている作業はありません",
+      "add_memo": "メモ・作業を追加",
+      "start_date": "開始日",
+      "harvest_date": "収穫予定日",
+      "task_pending": "タスク（未完了）",
+      "task_completed": "タスク（完了）",
+      "today": "今日"
+    },
+    "task_create": {
+      "title": "タスクを作成",
+      "task_title": "タイトル",
+      "description": "詳細",
+      "priority": "優先度",
+      "due_date": "期限",
+      "create": "作成",
+      "cancel": "キャンセル",
+      "creating": "作成中...",
+      "success": "タスクを作成しました",
+      "error": "作成に失敗しました"
+    },
+    "insights_panel": {
+      "title": "AI栽培アドバイス",
+      "weather_impact": "天候の影響",
+      "stage_advice": "栽培ステージ",
+      "priority_tasks": "優先タスク",
+      "ask_ai": "AIに質問する",
+      "close_chat": "閉じる"
+    },
+    "create": {
+      "title": "新規プロジェクト作成",
+      "wizard": {
+        "title": "どうやって始めますか？",
+        "step1_title": "作物を選択",
+        "step2_title": "圃場を選択",
+        "step3_title": "AIがスケジュールを作成中...",
+        "step4_title": "スケジュールを確認",
+        "scan_seed_bag": "種袋をスキャン",
+        "scan_description": "AIが種袋の裏面を読み取り、最適な作付け計画を提案します。",
+        "manual_entry": "手動で入力",
+        "manual_description": "自分で詳細を入力してプロジェクトを作成します。",
+        "upload_instruction": "種袋の裏面（栽培カレンダー）の写真をアップロードしてください",
+        "analyzing": "AIが種袋を解析中...",
+        "analyzing_crop": "作物を分析中",
+        "checking_weather": "天気予報を確認中",
+        "reviewing_projects": "他のプロジェクトを確認中",
+        "generating_tasks": "タスクを生成中",
+        "confirm_details": "内容を確認",
+        "retake": "撮り直す",
+        "days_to_harvest": "収穫まで {days} 日",
+        "field_selector": "圃場を選択",
+        "create_new_field": "新しい圃場を作成",
+        "rotation_insight": "前作: {lastCrop}。{crop}は良い輪作です！",
+        "total_tasks": "合計 {count} タスク",
+        "estimated_hours": "推定 {hours} 時間",
+        "weather_dependent": "天候依存",
+        "edit_task": "編集",
+        "delete_task": "削除",
+        "save_template": "テンプレートとして保存",
+        "create_project": "プロジェクトを作成",
+        "next": "次へ",
+        "back": "戻る"
+      },
+      "name_label": "プロジェクト名",
+      "name_placeholder": "例：夏トウモロコシ 2024",
+      "crop_label": "作物",
+      "crop_placeholder": "例：トウモロコシ",
+      "variety_label": "品種（任意）",
+      "variety_placeholder": "例：ゴールドラッシュ",
+      "start_date_label": "開始日",
+      "target_harvest_date_label": "収穫目標日（任意）",
+      "notes_label": "メモ（任意）",
+      "notes_placeholder": "詳細を入力...",
+      "ai_suggest_button": "AI提案（作物名から自動入力）",
+      "submit_button": "プロジェクトを作成",
+      "creating": "作成中...",
+      "cancel": "キャンセル",
+      "success": "プロジェクトを作成しました",
+      "error": "プロジェクトの作成に失敗しました"
+    },
+    "typeSelection": {
+      "title": "どんなプロジェクトを作りますか？",
+      "newPlant": "新しく植える",
+      "newPlantDesc": "これから植付けを始める作物のプロジェクト",
+      "alreadyPlanted": "すでに植えた",
+      "alreadyPlantedDesc": "すでに圃場にある作物を記録・管理する"
+    },
+    "plantingHistory": {
+      "title": "いつ植えましたか？",
+      "description": "植付け時期を教えてください。AIが生育ステージを計算します。",
+      "exactDate": "正確な日付",
+      "selectDate": "日付を選択",
+      "or": "または",
+      "approximate": "だいたいの時期",
+      "selectApproximate": "選択してください",
+      "oneWeekAgo": "1週間前",
+      "oneMonthAgo": "1ヶ月前",
+      "twoMonthsAgo": "2ヶ月前",
+      "threeMonthsAgo": "3ヶ月前",
+      "confirmDate": "決定",
+      "uploadPhoto": "植物の写真を撮る",
+      "photoHelp": "AIが生育ステージを自動判定します（準備中）",
+      "askAI": "AIに質問してもらう",
+      "askAIHelp": "簡単な質問に答えて時期を特定します",
+      "back": "戻る"
+    },
+    "conversational": {
+      "intro": "大丈夫です！いくつか質問させてください",
+      "flowers": "今、花は咲いていますか？",
+      "leaves": "葉っぱは何枚くらいありますか？",
+      "height": "背丈はどのくらいですか？"
+    },
+    "timeline": {
+      "visualization": "タイムライン",
+      "past": "完了",
+      "pastWarning": "以下は標準的な作業として記録されています。実際に行っていない作業は削除できます。",
+      "currentWeek": "今週のタスク（優先）",
+      "future": "予定",
+      "youAreHere": "あなたはここ！",
+      "removeTask": "この作業は削除",
+      "growth_journey": "栽培タイムライン",
+      "week": "第{week}週",
+      "current": "今週"
+    },
+    "detail": {
+      "status": "ステータス",
+      "crop": "作物",
+      "variety": "品種",
+      "start_date": "開始日",
+      "target_harvest_date": "収穫目標",
+      "tasks": "タスク",
+      "activities": "活動記録",
+      "no_tasks": "タスクがありません",
+      "no_activities": "活動記録がありません"
+    },
+    "agent_onboarding": {
+      "welcome_title": "{crop}プロジェクトへようこそ！",
+      "welcome_message": "プロジェクトが作成されました。AIエージェントが、あなたの植付け日と現地の気象条件に合わせて、最適なスケジュールを提案します。",
+      "generate_schedule": "AIスケジュールを生成",
+      "generating": "エージェントを呼び出し中...",
+      "customize_manually": "手動で設定する"
+    },
+    "header": {
+      "days_remaining": "残り {days} 日",
+      "stage": "ステージ",
+      "seedling": "育苗期",
+      "vegetative": "栄養成長期",
+      "flowering": "開花期",
+      "harvest": "収穫期",
+      "tillering": "分げつ期",
+      "heading": "出穂期",
+      "ripening": "登熟期"
+    },
+    "tasks": {
+      "todays_focus": "今日の作業",
+      "upcoming": "今後の予定",
+      "all_caught_up": "今日の作業は完了です！",
+      "great_job": "順調に進んでいます。",
+      "high_priority": "優先",
+      "due": "期限: {date}"
+    },
+    "companion": {
+      "title": "クロップコンパニオン",
+      "online": "オンライン & 監視中",
+      "ask_placeholder": "質問や報告を入力...",
+      "send": "送信"
+    }
   },
   "activities": {
     "rice_field_irrigation": "Rice Field Irrigation",
@@ -477,5 +712,102 @@
     "high_temp_warning": "高温注意報 {value}℃",
     "pest_warning": "{name}の害虫発生注意",
     "frost_warning": "霜注意報 {temp}℃予想"
+  },
+  "pages": {
+    "today": {
+      "title": "今日",
+      "empty": "今日のタスクはまだありません",
+      "cta": {
+        "ask_ai": "AIに相談",
+        "regenerate": "再生成"
+      },
+      "advisor": {
+        "title": "今のアドバイス"
+      },
+      "tasks": {
+        "title": "今日のタスク"
+      }
+    },
+    "week": {
+      "title": "今週",
+      "empty": "今週の予定はありません",
+      "cta": {
+        "add": "タスクを追加"
+      }
+    },
+    "records": {
+      "title": "記録",
+      "empty": "記録はまだありません",
+      "cta": {
+        "new": "新規記録"
+      }
+    },
+    "knowledge": {
+      "title": "知識",
+      "empty": "該当する記事は見つかりませんでした"
+    },
+    "settings": {
+      "title": "設定",
+      "desc": "言語とテーマを管理します",
+      "language_section": "言語設定",
+      "select_language": "表示言語を選択",
+      "theme_section": "テーマ設定",
+      "theme_light": "ライト",
+      "theme_dark": "ダーク",
+      "theme_system": "システム",
+      "notifications_section": "通知設定",
+      "email_alerts": "メールアラート",
+      "email_alerts_desc": "重要なアラートをメールで受け取る",
+      "weekly_report": "週間レポート",
+      "weekly_report_desc": "週ごとの活動まとめを受け取る"
+    },
+    "profile": {
+      "title": "プロフィール",
+      "save": "変更を保存",
+      "no_name": "名前未設定",
+      "account_settings": "アカウント設定",
+      "email_notifications": "メール通知",
+      "email_notifications_desc": "重要なアラートやタスクの通知を受け取る",
+      "sign_out": "ログアウト"
+    },
+    "account": {
+      "title": "アカウント",
+      "save": "保存"
+    },
+    "auth": {
+      "signin": {
+        "title": "ログイン",
+        "cta": "続ける"
+      },
+      "signup": {
+        "title": "新規登録",
+        "cta": "アカウントを作成"
+      }
+    }
+  },
+  "landing": {
+    "hero": {
+      "title": "農業の未来を、その手に。",
+      "subtitle": "AIパートナーと共に、確かな判断と効率的な管理を。新潟の次世代ファーマーのためのプラットフォーム。",
+      "cta_start": "無料で始める",
+      "cta_login": "ログイン"
+    },
+    "features": {
+      "doctor": {
+        "title": "プラントドクター",
+        "desc": "写真を撮るだけで、病害虫を即座に診断。専門家レベルのアドバイスがいつでも手元に。"
+      },
+      "knowledge": {
+        "title": "生きた知識ベース",
+        "desc": "地域の知恵と最新のデータが融合。あなたの圃場に最適な栽培方法を学習し続けます。"
+      },
+      "planning": {
+        "title": "精密な計画管理",
+        "desc": "天候や生育状況に合わせて、最適な作業スケジュールを自動提案。無理のない計画を。"
+      }
+    },
+    "footer": {
+      "copyright": "© 2025 Rouvis. All rights reserved."
+    }
   }
 }

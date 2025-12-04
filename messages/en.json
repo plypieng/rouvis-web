@@ -275,5 +275,69 @@
     "overall_health": "Overall Health",
     "water_management": "Water Management Achievement",
     "yield_forecast": "Yield Forecast"
+  },
+  "projects": {
+    "title": "Projects",
+    "create_new": "Create New Project",
+    "list_title": "Projects List",
+    "no_projects": "No projects yet. Create a new project to get started.",
+    "create": {
+      "title": "Create New Project",
+      "wizard": {
+        "title": "How would you like to start?",
+        "scan_seed_bag": "Scan Seed Bag",
+        "scan_description": "AI reads the seed bag and suggests the best plan.",
+        "manual_entry": "Manual Entry",
+        "manual_description": "Enter details manually to create a project.",
+        "upload_instruction": "Upload a photo of the back of the seed bag (cultivation calendar)",
+        "analyzing": "AI is analyzing the seed bag...",
+        "confirm_details": "Confirm Details",
+        "retake": "Retake"
+      },
+      "name_label": "Project Name",
+      "name_placeholder": "e.g., Summer Corn 2024",
+      "crop_label": "Crop",
+      "crop_placeholder": "e.g., Corn",
+      "variety_label": "Variety (Optional)",
+      "variety_placeholder": "e.g., Gold Rush",
+      "start_date_label": "Start Date",
+      "target_harvest_date_label": "Target Harvest Date (Optional)",
+      "notes_label": "Notes (Optional)",
+      "notes_placeholder": "Enter details...",
+      "ai_suggest_button": "AI Suggestion (Auto-fill from Crop)",
+      "submit_button": "Create Project",
+      "creating": "Creating...",
+      "cancel": "Cancel",
+      "success": "Project created successfully",
+      "error": "Failed to create project"
+    },
+    "detail": {
+      "status": "Status",
+      "crop": "Crop",
+      "variety": "Variety",
+      "start_date": "Start Date",
+      "target_harvest_date": "Target Harvest Date",
+      "tasks": "Tasks",
+      "activities": "Activities",
+      "no_tasks": "No tasks",
+      "no_activities": "No activities"
+    },
+    "insights_panel": {
+      "title": "AI Cultivation Advice",
+      "weather_impact": "Weather Impact",
+      "stage_advice": "Growth Stage",
+      "priority_tasks": "Priority Tasks",
+      "ask_ai": "Ask AI",
+      "close_chat": "Close"
+    }
+  },
+  "calendar": {
+    "title": "Calendar",
+    "today": "Today",
+    "month": "Month",
+    "week": "Week",
+    "day": "Day",
+    "prev": "Previous",
+    "next": "Next"
   }
 }

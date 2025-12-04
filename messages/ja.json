@@ -63,7 +63,21 @@
     "view_detailed_forecast": "詳細な予報を見る",
     "crop_recommendations": "作物の推奨",
     "yield_forecast": "収量予測",
-    "view_details": "詳細を見る"
+    "view_details": "詳細を見る",
+    "last_activity": "前回の作業",
+    "next_task": "次の予定",
+    "no_record": "記録なし",
+    "no_plan": "予定なし",
+    "not_set": "未設定",
+    "status_healthy": "順調",
+    "status_completed": "完了",
+    "days": "Days",
+    "create_project": "プロジェクト作成",
+    "create_new_project": "新規プロジェクト作成",
+    "my_projects": "マイプロジェクト",
+    "projects_subtitle": "あなたのプロジェクト一覧",
+    "today_focus": "今日のフォーカス",
+    "all_caught_up": "すべてのタスクが完了しました"
   },
   "today": {
     "advisor_strip": {
@@ -275,5 +289,69 @@
     "overall_health": "全体的健康度",
     "water_management": "水管理達成率",
     "yield_forecast": "収量予測"
+  },
+  "projects": {
+    "title": "プロジェクト",
+    "create_new": "新規プロジェクト作成",
+    "list_title": "プロジェクト一覧",
+    "no_projects": "プロジェクトがまだありません。新しいプロジェクトを作成して始めましょう。",
+    "create": {
+      "title": "新規プロジェクト作成",
+      "wizard": {
+        "title": "どうやって始めますか？",
+        "scan_seed_bag": "種袋をスキャン",
+        "scan_description": "AIが種袋の裏面を読み取り、最適な作付け計画を提案します。",
+        "manual_entry": "手動で入力",
+        "manual_description": "自分で詳細を入力してプロジェクトを作成します。",
+        "upload_instruction": "種袋の裏面（栽培カレンダー）の写真をアップロードしてください",
+        "analyzing": "AIが種袋を解析中...",
+        "confirm_details": "内容を確認",
+        "retake": "撮り直す"
+      },
+      "name_label": "プロジェクト名",
+      "name_placeholder": "例：夏トウモロコシ 2024",
+      "crop_label": "作物",
+      "crop_placeholder": "例：トウモロコシ",
+      "variety_label": "品種（任意）",
+      "variety_placeholder": "例：ゴールドラッシュ",
+      "start_date_label": "開始日",
+      "target_harvest_date_label": "収穫目標日（任意）",
+      "notes_label": "メモ（任意）",
+      "notes_placeholder": "詳細を入力...",
+      "ai_suggest_button": "AI提案（作物名から自動入力）",
+      "submit_button": "プロジェクトを作成",
+      "creating": "作成中...",
+      "cancel": "キャンセル",
+      "success": "プロジェクトを作成しました",
+      "error": "プロジェクトの作成に失敗しました"
+    },
+    "detail": {
+      "status": "ステータス",
+      "crop": "作物",
+      "variety": "品種",
+      "start_date": "開始日",
+      "target_harvest_date": "収穫目標",
+      "tasks": "タスク",
+      "activities": "活動記録",
+      "no_tasks": "タスクがありません",
+      "no_activities": "活動記録がありません"
+    },
+    "insights_panel": {
+      "title": "AI栽培アドバイス",
+      "weather_impact": "天候の影響",
+      "stage_advice": "栽培ステージ",
+      "priority_tasks": "優先タスク",
+      "ask_ai": "AIに質問する",
+      "close_chat": "閉じる"
+    }
+  },
+  "calendar": {
+    "title": "カレンダー",
+    "today": "今日",
+    "month": "月",
+    "week": "週",
+    "day": "日",
+    "prev": "前へ",
+    "next": "次へ"
   }
 }

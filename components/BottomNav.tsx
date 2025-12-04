@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Home, Calendar, TrendingUp, Book } from 'lucide-react';
+import { Home, Users, Store, Menu, Map as MapIcon } from 'lucide-react';
 
 /**
  * Bottom Navigation - Mobile-first, thumb-zone optimized
@@ -14,14 +14,21 @@ import { Home, Calendar, TrendingUp, Book } from 'lucide-react';
  * - Icons with labels (not just icons)
  * - Works with gloves
  *
- * Navigation Structure (simplified from sidebar):
+ * Navigation Structure (Farmer-First Operational UX):
  * - 今日 (Today): Home/Chat view
- * - 今週 (Week): Calendar/Planning
- * - 記録 (History): Analytics/Activity log
- * - 知識 (Knowledge): Community/Guidebooks
+ * - マップ (Map): Field Map
+ * - チーム (Team): Members/Experts
+ * - 市場 (Market): Sales/Inventory
+ * - メニュー (Menu): Planning/Records/Knowledge
  */
-export function BottomNav({ locale }: { locale: string }) {
+export function BottomNav({ locale, user }: { locale: string; user?: any }) {
   const pathname = usePathname();
+
+  // Hide bottom nav on landing page for unauthenticated users
+  const isLandingPage = pathname === `/${locale}` || pathname === '/';
+  if (!user && isLandingPage) {
+    return null;
+  }
 
   const isActive = (path: string) => {
     if (path === `/${locale}`) {
@@ -39,31 +46,38 @@ export function BottomNav({ locale }: { locale: string }) {
       description: 'Today view',
     },
     {
-      id: 'week',
-      label: '今週',
-      icon: Calendar,
-      href: `/${locale}/calendar`,
-      description: 'Week planning',
+      id: 'map',
+      label: 'マップ',
+      icon: MapIcon,
+      href: `/${locale}/map`,
+      description: 'Field Map',
     },
     {
-      id: 'history',
-      label: '記録',
-      icon: TrendingUp,
-      href: `/${locale}/analytics`,
-      description: 'Activity history',
+      id: 'team',
+      label: 'チーム',
+      icon: Users,
+      href: `/${locale}/team`,
+      description: 'Team & Experts',
     },
     {
-      id: 'knowledge',
-      label: '知識',
-      icon: Book,
-      href: `/${locale}/community`,
-      description: 'Knowledge base',
+      id: 'market',
+      label: '市場',
+      icon: Store,
+      href: `/${locale}/market`,
+      description: 'Market & Sales',
+    },
+    {
+      id: 'menu',
+      label: 'メニュー',
+      icon: Menu,
+      href: `/${locale}/menu`,
+      description: 'More options',
     },
   ];
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-gray-200 shadow-2xl z-50 lg:hidden"
+      className="fixed bottom-4 left-4 right-4 bg-white/90 backdrop-blur-md border border-white/20 shadow-glass rounded-2xl z-50 lg:hidden animate-slideIn"
       role="navigation"
       aria-label="メインナビゲーション"
     >
@@ -80,10 +94,9 @@ export function BottomNav({ locale }: { locale: string }) {
                 flex flex-col items-center justify-center gap-1
                 min-w-[72px] min-h-[64px] rounded-lg
                 transition-all duration-200
-                ${
-                  active
-                    ? 'bg-green-50 text-green-700 font-semibold'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                ${active
+                  ? 'bg-primary/10 text-primary font-semibold'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
                 }
                 active:scale-95
               `}
@@ -96,7 +109,7 @@ export function BottomNav({ locale }: { locale: string }) {
               />
               <span className="text-xs font-medium">{item.label}</span>
               {active && (
-                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-1 bg-green-600 rounded-t-full" />
+                <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-12 h-1 bg-primary rounded-full" />
               )}
             </Link>
           );

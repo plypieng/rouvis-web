@@ -13,7 +13,7 @@ const intlMiddleware = createMiddleware({
 });
 
 // Public routes that don't require authentication
-const publicRoutes = ['/login', '/api/auth'];
+const publicRoutes = ['/login', '/signup', '/api/auth'];
 
 // Export a custom middleware function to handle auth + i18n
 export default async function middleware(request: NextRequest) {
@@ -37,11 +37,13 @@ export default async function middleware(request: NextRequest) {
 
   if (!isDemoMode) {
     // Check authentication
-    const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+    const token = await getToken({ req: request as any, secret: process.env.NEXTAUTH_SECRET });
 
     // Extract the path without locale prefix for route checking
-    const pathWithoutLocale = pathname.replace(/^\/(ja|en)/, '');
-    const isPublicRoute = publicRoutes.some(route => pathWithoutLocale.startsWith(route));
+    let pathWithoutLocale = pathname.replace(/^\/(ja|en)/, '');
+    if (pathWithoutLocale === '') pathWithoutLocale = '/';
+
+    const isPublicRoute = publicRoutes.some(route => pathWithoutLocale.startsWith(route)) || pathWithoutLocale === '/';
 
     // Redirect to login if not authenticated and trying to access protected route
     if (!token && !isPublicRoute) {
@@ -57,10 +59,10 @@ export default async function middleware(request: NextRequest) {
   }
 
   // Use next-intl middleware for all other paths
-  return intlMiddleware(request);
+  return intlMiddleware(request as any);
 }
 
 export const config = {
   // Apply middleware to all paths except static files, api routes, etc.
-  matcher: ['/((?!api|_next|.*\\..*).*)'] 
+  matcher: ['/((?!api|_next|.*\\..*).*)']
 };

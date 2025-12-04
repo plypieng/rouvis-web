@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   LineChart,
@@ -20,48 +20,43 @@ import {
 } from 'recharts';
 import { DashboardCard } from './DashboardCard';
 
-// Mock data for yield analytics
-const yieldTrendData = [
-  { month: 'Jan', rice: 4.2, vegetables: 3.1, fruits: 2.5, target: 4.0 },
-  { month: 'Feb', rice: 4.5, vegetables: 3.4, fruits: 2.7, target: 4.2 },
-  { month: 'Mar', rice: 4.1, vegetables: 3.7, fruits: 3.0, target: 4.1 },
-  { month: 'Apr', rice: 4.7, vegetables: 3.9, fruits: 3.2, target: 4.3 },
-  { month: 'May', rice: 5.0, vegetables: 4.2, fruits: 3.5, target: 4.5 },
-  { month: 'Jun', rice: 5.3, vegetables: 4.5, fruits: 3.8, target: 4.8 },
-  { month: 'Jul', rice: 5.1, vegetables: 4.3, fruits: 3.6, target: 4.6 },
-  { month: 'Aug', rice: 4.8, vegetables: 4.0, fruits: 3.3, target: 4.4 },
-  { month: 'Sep', rice: 4.6, vegetables: 3.8, fruits: 3.1, target: 4.2 },
-  { month: 'Oct', rice: 4.4, vegetables: 3.6, fruits: 2.9, target: 4.0 },
-  { month: 'Nov', rice: 4.2, vegetables: 3.4, fruits: 2.7, target: 3.8 },
-  { month: 'Dec', rice: 4.0, vegetables: 3.2, fruits: 2.5, target: 3.6 },
-];
-
-const yieldVariabilityData = [
-  { crop: 'Rice', min: 3.8, max: 5.5, avg: 4.6, target: 5.0 },
-  { crop: 'Tomatoes', min: 65, max: 85, avg: 75, target: 80 },
-  { crop: 'Cucumbers', min: 55, max: 75, avg: 65, target: 70 },
-  { crop: 'Edamame', min: 8.5, max: 12.5, avg: 10.5, target: 11.0 },
-  { crop: 'Sweet Potatoes', min: 28, max: 38, avg: 33, target: 35 },
-];
-
-const yieldFactorsData = [
-  { factor: 'Soil Quality', impact: 85, correlation: 0.78 },
-  { factor: 'Irrigation', impact: 72, correlation: 0.65 },
-  { factor: 'Fertilization', impact: 68, correlation: 0.62 },
-  { factor: 'Weather', impact: 91, correlation: 0.84 },
-  { factor: 'Pest Control', impact: 45, correlation: 0.38 },
-  { factor: 'Timing', impact: 78, correlation: 0.71 },
-];
-
 export function YieldAnalytics() {
   const t = useTranslations();
   const [selectedCrop, setSelectedCrop] = useState('all');
   const [timeRange, setTimeRange] = useState('12months');
   const [chartType, setChartType] = useState<'trend' | 'comparison' | 'factors'>('trend');
 
+  const [trendData, setTrendData] = useState<any[]>([]);
+  const [variabilityData, setVariabilityData] = useState<any[]>([]);
+  const [factorsData, setFactorsData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await fetch('/api/v1/analytics/yield');
+        if (res.ok) {
+          const data = await res.json();
+          setTrendData(data.trend || []);
+          setVariabilityData(data.comparison || []);
+          setFactorsData(data.factors || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch yield analytics:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  if (loading) {
+    return <div className="h-96 flex items-center justify-center">Loading...</div>;
+  }
+
   const renderTrendChart = () => (
     <ResponsiveContainer width="100%" height="100%">
-      <AreaChart data={yieldTrendData}>
+      <AreaChart data={trendData}>
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis dataKey="month" />
         <YAxis />
@@ -108,7 +103,7 @@ export function YieldAnalytics() {
 
   const renderComparisonChart = () => (
     <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={yieldVariabilityData}>
+      <BarChart data={variabilityData}>
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis dataKey="crop" />
         <YAxis />
@@ -130,7 +125,7 @@ export function YieldAnalytics() {
 
   const renderFactorsChart = () => (
     <ResponsiveContainer width="100%" height="100%">
-      <ScatterChart data={yieldFactorsData}>
+      <ScatterChart data={factorsData}>
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis
           type="number"
@@ -217,8 +212,8 @@ export function YieldAnalytics() {
       {/* Main Chart */}
       <DashboardCard title={
         chartType === 'trend' ? t('analytics.yield_trends') :
-        chartType === 'comparison' ? t('analytics.yield_comparison') :
-        t('analytics.yield_factors_analysis')
+          chartType === 'comparison' ? t('analytics.yield_comparison') :
+            t('analytics.yield_factors_analysis')
       }>
         <div className="h-96">
           {chartType === 'trend' && renderTrendChart()}
@@ -304,7 +299,7 @@ export function YieldAnalytics() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {yieldVariabilityData.map((crop, index) => (
+              {variabilityData.map((crop: any, index: number) => (
                 <tr key={index}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     {crop.crop}
@@ -316,11 +311,10 @@ export function YieldAnalytics() {
                     {crop.target} {crop.crop === 'Rice' ? 'tons/ha' : 'tons/ha'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span className={`px-2 py-1 text-xs rounded-full ${
-                      (crop.avg / crop.target) >= 0.95 ? 'bg-green-100 text-green-800' :
+                    <span className={`px-2 py-1 text-xs rounded-full ${(crop.avg / crop.target) >= 0.95 ? 'bg-green-100 text-green-800' :
                       (crop.avg / crop.target) >= 0.85 ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
+                        'bg-red-100 text-red-800'
+                      }`}>
                       {Math.round((crop.avg / crop.target) * 100)}%
                     </span>
                   </td>

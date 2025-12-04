@@ -4,65 +4,74 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Warmer, organic background (Earth-50) */
+    --background: 36 20% 98%;
+    /* Softer, deep brown-grey foreground */
+    --foreground: 20 10% 20%;
 
+    /* White cards with subtle warmth */
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 20 10% 20%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 20 10% 20%;
 
-    --primary: 142.1 76.2% 36.3%;
-    --primary-foreground: 355.7 100% 97.3%;
+    /* Vibrant but natural green */
+    --primary: 142 76% 36%;
+    --primary-foreground: 355 100% 98%;
 
-    --secondary: 220 14.3% 75.9%;
-    --secondary-foreground: 220 10% 30%;
+    /* Warm grey secondary */
+    --secondary: 30 10% 96%;
+    --secondary-foreground: 20 10% 20%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /* Soft muted tones */
+    --muted: 30 15% 96%;
+    --muted-foreground: 25 5% 45%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 30 15% 96%;
+    --accent-foreground: 20 10% 20%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 142.1 76.2% 36.3%;
+    /* Warm border */
+    --border: 30 10% 90%;
+    --input: 30 10% 90%;
+    --ring: 142 76% 36%;
 
-    --radius: 0.5rem;
+    --radius: 1rem;
+    /* More rounded, friendly corners */
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    /* Deep organic dark mode */
+    --background: 20 10% 10%;
+    --foreground: 30 10% 98%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 20 10% 12%;
+    --card-foreground: 30 10% 98%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 20 10% 12%;
+    --popover-foreground: 30 10% 98%;
 
-    --primary: 142.1 70.0% 45.3%;
-    --primary-foreground: 144.9 80.4% 10%;
+    --primary: 142 70% 45%;
+    --primary-foreground: 145 80% 10%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 20 10% 16%;
+    --secondary-foreground: 30 10% 98%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 20 10% 16%;
+    --muted-foreground: 30 10% 65%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 20 10% 16%;
+    --accent-foreground: 30 10% 98%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 30 10% 98%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 142.1 76.2% 45.3%;
+    --border: 20 10% 16%;
+    --input: 20 10% 16%;
+    --ring: 142 76% 45%;
   }
 }
 
@@ -70,13 +79,38 @@
   * {
     @apply border-border;
   }
+
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-heading font-semibold tracking-tight;
   }
 }
 
-/* Mobile-first responsive utilities */
 @layer utilities {
+  .glass-panel {
+    @apply bg-white/80 dark:bg-black/50 backdrop-blur-md border border-white/20 shadow-glass;
+  }
+
+  .organic-border {
+    @apply border-border/50;
+  }
+
+  .soft-shadow {
+    @apply shadow-soft hover:shadow-soft-lg transition-shadow duration-300;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
   /* Touch-friendly button sizes */
   .touch-target {
     @apply min-w-[44px] min-h-[44px];
@@ -238,6 +272,7 @@
 
   /* Reduced motion support */
   @media (prefers-reduced-motion: reduce) {
+
     .mobile-tap,
     .mobile-btn,
     .mobile-btn-primary,
@@ -271,6 +306,7 @@
 
   /* Large text support */
   @media (min-resolution: 2dppx) {
+
     .mobile-input,
     .mobile-btn {
       font-size: 16px;
@@ -281,19 +317,30 @@
 /* ChatKit full-bleed layout overrides
    Apply wrapper class "ck-full-bleed" to the ChatKit container on the page.
    This removes the internal left rail (thread list/sidebar) and forces a 1‑column layout so the chat fills the card. */
-.ck-full-bleed { height: 100%; }
-.ck-full-bleed > div { height: 100% !important; width: 100% !important; }
-.ck-full-bleed > div > div { height: 100% !important; width: 100% !important; max-width: none !important; }
+.ck-full-bleed {
+  height: 100%;
+}
+
+.ck-full-bleed>div {
+  height: 100% !important;
+  width: 100% !important;
+}
+
+.ck-full-bleed>div>div {
+  height: 100% !important;
+  width: 100% !important;
+  max-width: none !important;
+}
 
 /* Collapse any built-in two-column grid inside ChatKit */
-.ck-full-bleed > div > div {
+.ck-full-bleed>div>div {
   display: grid !important;
   grid-template-columns: 1fr !important;
   gap: 0 !important;
 }
 
 /* Hide the first column if present (thread list / sidebar) */
-.ck-full-bleed > div > div > :first-child {
+.ck-full-bleed>div>div> :first-child {
   display: none !important;
 }
 
@@ -303,11 +350,13 @@
 .ck-full-bleed [class*="LeftRail"] {
   display: none !important;
 }
+
 .ck-full-bleed [class*="Layout"],
 .ck-full-bleed [class*="Container"] {
   max-width: none !important;
   width: 100% !important;
 }
+
 /* Ensure the main chat area stretches */
 .ck-full-bleed [class*="Main"],
 .ck-full-bleed [class*="Thread"],

@@ -26,13 +26,14 @@ interface Task {
 
 interface CalendarViewProps {
   tasks?: Task[];
+  locale: string;
 }
 
-export function CalendarView({ tasks = [] }: CalendarViewProps) {
+export function CalendarView({ tasks = [], locale }: CalendarViewProps) {
   const t = useTranslations();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<'month' | 'week'>('month');
-  
+
   // Convert tasks to calendar events
   const taskEvents: CalendarEvent[] = tasks.map(task => ({
     id: task.id || `task-${Date.now()}`,
@@ -42,64 +43,9 @@ export function CalendarView({ tasks = [] }: CalendarViewProps) {
     location: task.fieldName,
   }));
 
-  // Generate daily events for all visible days including previous/next month
-  const generateMonthlyEvents = (): CalendarEvent[] => {
-    const monthStart = startOfMonth(currentDate);
-    const monthEnd = endOfMonth(currentDate);
-    
-    // Calculate first visible day (including previous month days)
-    const firstDayOfWeek = new Date(monthStart);
-    firstDayOfWeek.setDate(monthStart.getDate() - monthStart.getDay());
-    
-    // Calculate last visible day (including next month days)
-    const lastDayOfWeek = new Date(monthEnd);
-    lastDayOfWeek.setDate(monthEnd.getDate() + (6 - monthEnd.getDay()));
-    
-    const allVisibleDays = eachDayOfInterval({ start: firstDayOfWeek, end: lastDayOfWeek });
-    
-    const dailyEvents: CalendarEvent[] = [];
-    const eventTypes: Array<'planting' | 'harvesting' | 'fertilizing' | 'watering' | 'maintenance'> =
-      ['watering', 'maintenance', 'fertilizing', 'planting', 'harvesting'];
-    
-    allVisibleDays.forEach((day, index) => {
-      const dayStr = format(day, 'yyyy-MM-dd');
-      const eventType = eventTypes[index % eventTypes.length];
-      
-      // Add 1-2 events per day
-      dailyEvents.push({
-        id: `daily-${dayStr}-1`,
-        title: eventType === 'watering' ? '潅水' :
-               eventType === 'fertilizing' ? '施肥' :
-               eventType === 'planting' ? '種まき' :
-               eventType === 'harvesting' ? '収穫' : '点検',
-        date: dayStr,
-        type: eventType,
-        location: 'B圃場',
-      });
-      
-      // Add second event for some days
-      if (index % 3 === 0) {
-        const secondType = eventTypes[(index + 1) % eventTypes.length];
-        dailyEvents.push({
-          id: `daily-${dayStr}-2`,
-          title: secondType === 'watering' ? '見回り' :
-                 secondType === 'fertilizing' ? '追肥' :
-                 secondType === 'planting' ? '育苗' :
-                 secondType === 'harvesting' ? '選別' : '整備',
-          date: dayStr,
-          type: secondType,
-          location: 'A圃場',
-        });
-      }
-    });
-    
-    return dailyEvents;
-  };
-
-  // Mock data for demonstration (merged with task events and daily events)
+  // Use only task events
   const events: CalendarEvent[] = [
     ...taskEvents,
-    ...generateMonthlyEvents(),
   ];
 
   const getTypeColor = (type: string) => {
@@ -151,15 +97,15 @@ export function CalendarView({ tasks = [] }: CalendarViewProps) {
   // Generate days for the current month view including previous/next month days
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
-  
+
   // Get first day of week (including previous month days)
   const firstDayOfWeek = new Date(monthStart);
   firstDayOfWeek.setDate(monthStart.getDate() - monthStart.getDay());
-  
+
   // Get last day of week (including next month days)
   const lastDayOfWeek = new Date(monthEnd);
   lastDayOfWeek.setDate(monthEnd.getDate() + (6 - monthEnd.getDay()));
-  
+
   // Include all visible days
   const days = eachDayOfInterval({ start: firstDayOfWeek, end: lastDayOfWeek });
 
@@ -182,9 +128,9 @@ export function CalendarView({ tasks = [] }: CalendarViewProps) {
         </button>
         <div className="text-center">
           <h2 className="text-2xl font-bold tracking-wide">
-            {format(currentDate, 'yyyy年 M月')}
+            {format(currentDate, locale === 'ja' ? 'yyyy年 M月' : 'MMMM yyyy')}
           </h2>
-          <p className="text-xs mt-1 opacity-90">AI自動生成スケジュール</p>
+          <p className="text-xs mt-1 opacity-90">{t('calendar.title')}</p>
         </div>
         <button
           onClick={nextMonth}
@@ -216,40 +162,38 @@ export function CalendarView({ tasks = [] }: CalendarViewProps) {
         </div>
 
         {/* Calendar Days */}
-         <div className="grid grid-cols-7 gap-2">
-           {days.map((day) => {
-             const dayEvents = getEventsForDay(day);
-             const isCurrentMonth = isSameMonth(day, currentDate);
-             return (
-               <div
-                 key={day.toString()}
-                 className={`h-28 p-2 border-2 rounded-xl transition-all transform hover:scale-105 hover:shadow-xl cursor-pointer ${
-                   isToday(day)
-                     ? 'bg-gradient-to-br from-emerald-50 via-green-50 to-cyan-50 border-emerald-400 shadow-lg ring-2 ring-emerald-300'
-                     : isCurrentMonth
-                     ? 'bg-white border-gray-200 hover:border-blue-300 shadow-sm'
-                     : 'bg-gradient-to-br from-gray-50 to-gray-100 border-gray-200 opacity-50 hover:opacity-75'
-                 }`}
-               >
+        <div className="grid grid-cols-7 gap-2">
+          {days.map((day) => {
+            const dayEvents = getEventsForDay(day);
+            const isCurrentMonth = isSameMonth(day, currentDate);
+            return (
+              <div
+                key={day.toString()}
+                className={`h-28 p-2 border-2 rounded-xl transition-all transform hover:scale-105 hover:shadow-xl cursor-pointer ${isToday(day)
+                  ? 'bg-gradient-to-br from-emerald-50 via-green-50 to-cyan-50 border-emerald-400 shadow-lg ring-2 ring-emerald-300'
+                  : isCurrentMonth
+                    ? 'bg-white border-gray-200 hover:border-blue-300 shadow-sm'
+                    : 'bg-gradient-to-br from-gray-50 to-gray-100 border-gray-200 opacity-50 hover:opacity-75'
+                  }`}
+              >
                 <div className="flex flex-col items-center w-full h-full overflow-hidden">
                   {/* Date */}
                   <span
-                    className={`text-sm font-bold inline-flex items-center justify-center rounded-full w-7 h-7 ${
-                      isToday(day)
-                        ? 'bg-gradient-to-br from-emerald-600 to-green-600 text-white shadow-md'
-                        : 'text-gray-700'
-                    }`}
+                    className={`text-sm font-bold inline-flex items-center justify-center rounded-full w-7 h-7 ${isToday(day)
+                      ? 'bg-gradient-to-br from-emerald-600 to-green-600 text-white shadow-md'
+                      : 'text-gray-700'
+                      }`}
                   >
                     {format(day, 'd')}
                   </span>
-                  
+
                   {/* Event Count */}
                   {dayEvents.length > 0 && (
                     <span className="text-[9px] font-semibold px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full whitespace-nowrap">
                       {dayEvents.length}件
                     </span>
                   )}
-                  
+
                   {/* Icons Grid */}
                   {dayEvents.length > 0 && (
                     <div className="flex flex-wrap gap-0.5 justify-center mt-1">

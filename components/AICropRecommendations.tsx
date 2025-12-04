@@ -39,15 +39,14 @@ const getMockGeoData = async () => {
 
 // --- Main Component ---
 
-export function AICropRecommendations() {
+export function AICropRecommendations({ projectId }: { projectId: string }) {
   const t = useTranslations();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-
   // Initial greeting from the AI
-    useEffect(() => {
+  useEffect(() => {
     setMessages([
       {
         id: 1,
@@ -68,55 +67,49 @@ export function AICropRecommendations() {
     setMessages(prev => [...prev, newUserMessage]);
     setIsLoading(true);
 
-    // --- AI Response Simulation ---
-    // This simulates the AI thinking, calling tools, and forming a response.
     try {
-      // 1. Simulate calling MCP for weather and geo data
-            const thinkingMessage: ChatMessage = {
+      // Show thinking state
+      const thinkingMessage: ChatMessage = {
         id: Date.now() + 1,
         sender: 'ai',
-        text: t('chat.acknowledgement'),
-        tool_calls: [
-          { name: 'getWeatherData', args: { location: 'Niigata' } },
-          { name: 'getGeoData', args: { farmId: 'user_farm_1' } },
-        ],
+        text: t('chat.thinking'), // "Thinking..."
       };
       setMessages(prev => [...prev, thinkingMessage]);
-      
-      const [weatherData, geoData] = await Promise.all([
-        getMockWeatherData(),
-        getMockGeoData(),
-      ]);
 
-      // 2. Simulate AI generating a recommendation based on the data
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate thinking time
+      // Call Real Advice API
+      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+      if (!baseUrl) throw new Error('NEXT_PUBLIC_API_BASE_URL is not defined');
 
-            const aiResponse: ChatMessage = {
+      const res = await fetch(`${baseUrl}/api/v1/agents/advice`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          message: text,
+        }),
+      });
+
+      if (!res.ok) throw new Error('Failed to get advice');
+
+      const data = await res.json();
+
+      // Replace thinking message with real advice
+      const aiResponse: ChatMessage = {
         id: Date.now() + 2,
         sender: 'ai',
-        text: [
-          t('chat.recommendation_intro', {
-            temperature: weatherData.temperature,
-            forecast: weatherData.forecast,
-            soil_composition: geoData.soil_composition,
-          }),
-          '\n\n1. ' + t('chat.recommendation_item_1'),
-          '2. ' + t('chat.recommendation_item_2'),
-          '3. ' + t('chat.recommendation_item_3'),
-          '\n\n' + t('chat.recommendation_outro'),
-        ].join('\n'),
+        text: data.advice,
       };
-      
-      // Replace the "thinking" message with the final response
+
       setMessages(prev => [...prev.slice(0, -1), aiResponse]);
 
     } catch (error) {
-            const errorMessage: ChatMessage = {
+      console.error('Advice error:', error);
+      const errorMessage: ChatMessage = {
         id: Date.now() + 3,
         sender: 'ai',
         text: t('chat.error'),
       };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages(prev => [...prev.slice(0, -1), errorMessage]);
     } finally {
       setIsLoading(false);
     }
@@ -137,7 +130,7 @@ export function AICropRecommendations() {
                 <div className="mt-2 p-2 border-t border-gray-300">
                   <p className="text-xs font-semibold text-gray-500">ツール呼び出し:</p>
                   {msg.tool_calls.map(call => (
-                     <p key={call.name} className="text-xs text-gray-500 font-mono">{`mcp.${call.name}(${JSON.stringify(call.args)})`}</p>
+                    <p key={call.name} className="text-xs text-gray-500 font-mono">{`mcp.${call.name}(${JSON.stringify(call.args)})`}</p>
                   ))}
                 </div>
               )}

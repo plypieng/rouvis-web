@@ -43,7 +43,7 @@ export function WeatherWorkPlanCard({
 }: WeatherWorkPlanCardProps) {
   const t = useTranslations('vibe');
   const [internalSelectedField, setInternalSelectedField] = useState<string | undefined>(undefined);
-  const [editingWorkBlock, setEditingWorkBlock] = useState<WorkBlock | null>(null);
+  const [, setEditingWorkBlock] = useState<WorkBlock | null>(null);
 
   // Use external state if provided, otherwise use internal state
   const selectedField = externalSelectedField !== undefined ? externalSelectedField : internalSelectedField;
@@ -68,8 +68,6 @@ export function WeatherWorkPlanCard({
   const {
     workBlocks,
     loading: loadingWorkBlocks,
-    createWorkBlock,
-    updateWorkBlock
   } = useWorkBlocks({
     fieldId: selectedField,
     startDate,
@@ -85,7 +83,7 @@ export function WeatherWorkPlanCard({
   };
 
   // Transform weekly forecast for display
-  const transformedForecast: ForecastDay[] = weekly.slice(0, 7).map((day, index) => {
+  const transformedForecast: ForecastDay[] = weekly.slice(0, 7).map((day) => {
     const dayOfWeek = getDayAbbreviation(day.date);
     return {
       date: day.date,

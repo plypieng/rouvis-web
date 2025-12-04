@@ -46,7 +46,7 @@ export default function AgentLabPage() {
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-        <RouvisChatKit className="h-[70vh]" hideLeftRail />
+        <RouvisChatKit className="h-[70vh]" />
       </div>
     </div>
   );

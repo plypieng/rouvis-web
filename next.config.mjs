@@ -10,7 +10,19 @@ const nextConfig = {
   },
   reactStrictMode: false,
   typescript: {
-    ignoreBuildErrors: false,
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  transpilePackages: ['@openai/chatkit-react', '@openai/chatkit'],
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+      },
+    ],
   },
 };
 

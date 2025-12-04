@@ -99,6 +99,13 @@ export default function Header({ locale, user = null, alerts = [], kpis }: Heade
   const [liveWarnings, setLiveWarnings] = useState<JMAWarning[]>([]);
   const [typhoons, setTyphoons] = useState<JMATyphoonInfo[]>([]);
   const base = `/${locale}`;
+  const pathname = usePathname();
+
+  // Hide global header on landing page for unauthenticated users
+  const isLandingPage = pathname === `/${locale}` || pathname === '/';
+  if (!user && isLandingPage) {
+    return null;
+  }
 
   // Fetch live warnings from JMA API
   useEffect(() => {
@@ -154,19 +161,8 @@ export default function Header({ locale, user = null, alerts = [], kpis }: Heade
     return (
       <ul className="flex flex-col md:flex-row md:items-center gap-1 md:gap-2">
         <li><Link href={`${base}`} className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600" onClick={handle}>{t('header.nav.dashboard')}</Link></li>
-        <li><Link href={`${base}/activities`} className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600" onClick={handle}>{t('header.nav.activities')}</Link></li>
-        <li><Link href={`${base}/planner`} className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600" onClick={handle}>{t('header.nav.fields')}</Link></li>
+        <li><Link href={`${base}/map`} className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600" onClick={handle}>マップ</Link></li>
         <li><Link href={`${base}/calendar`} className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600" onClick={handle}>{t('header.nav.calendar')}</Link></li>
-        <li><Link href={`${base}/chat`} className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600" onClick={handle}>{t('header.nav.chat')}</Link></li>
-        <li className="relative">
-          <details className="group">
-            <summary className="list-none cursor-pointer px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600" aria-label={t('header.nav.more')}>{t('header.nav.more')}</summary>
-            <div className="absolute md:left-0 mt-1 w-48 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-30 p-1">
-              <Link href={`${base}/analytics`} className="block px-3 py-2 rounded-md text-sm hover:bg-gray-100 dark:hover:bg-gray-800" onClick={handle}>Analytics</Link>
-              <Link href={`${base}/community`} className="block px-3 py-2 rounded-md text-sm hover:bg-gray-100 dark:hover:bg-gray-800" onClick={handle}>{t('community.title')}</Link>
-            </div>
-          </details>
-        </li>
       </ul>
     );
   };
@@ -331,7 +327,7 @@ export default function Header({ locale, user = null, alerts = [], kpis }: Heade
   };
 
   return (
-    <header role="banner" className="sticky top-0 z-40 backdrop-blur bg-white/70 dark:bg-gray-900/70 border-b border-gray-200 dark:border-gray-800">
+    <header role="banner" className="sticky top-0 z-40 glass-panel border-b-0">
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-white focus:text-black focus:px-3 focus:py-1 focus:rounded focus:shadow">{t('header.a11y.skip_to_content')}</a>
       <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         <div className="flex items-center gap-3">

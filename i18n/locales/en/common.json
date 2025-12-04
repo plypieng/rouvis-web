@@ -326,6 +326,15 @@
       "next_task": "Next task: {task}",
       "view_details": "View details"
     },
+    "insights_panel": {
+      "title": "AI Cultivation Advice",
+      "weather_impact": "Weather Impact",
+      "stage_advice": "Growth Stage",
+      "priority_tasks": "Priority Tasks",
+      "view_details": "View Details",
+      "ask_ai": "Ask AI",
+      "close_chat": "Close"
+    },
     "tasks": {
       "title": "Today’s Tasks",
       "regenerate": "Regenerate",

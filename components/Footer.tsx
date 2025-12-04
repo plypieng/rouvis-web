@@ -5,13 +5,24 @@ import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import { Locale } from '../i18n/config';
 
+import { usePathname } from 'next/navigation';
+
 interface FooterProps {
   locale: Locale;
+  user?: any;
 }
 
-export default function Footer({ locale }: FooterProps) {
+export default function Footer({ locale, user }: FooterProps) {
   const t = useTranslations();
+  const pathname = usePathname();
   const base = `/${locale}`;
+
+  // Hide global footer on landing page for unauthenticated users
+  // Landing page path is usually `/${locale}` or just `/`
+  const isLandingPage = pathname === `/${locale}` || pathname === '/';
+  if (!user && isLandingPage) {
+    return null;
+  }
 
   return (
     <footer
