@@ -101,11 +101,7 @@ export default function Header({ locale, user = null, alerts = [], kpis }: Heade
   const base = `/${locale}`;
   const pathname = usePathname();
 
-  // Hide global header on landing page for unauthenticated users
-  const isLandingPage = pathname === `/${locale}` || pathname === '/';
-  if (!user && isLandingPage) {
-    return null;
-  }
+
 
   // Fetch live warnings from JMA API
   useEffect(() => {
@@ -325,6 +321,10 @@ export default function Header({ locale, user = null, alerts = [], kpis }: Heade
       </details>
     );
   };
+
+  if (!user && (pathname === `/${locale}` || pathname === '/')) {
+    return null;
+  }
 
   return (
     <header role="banner" className="sticky top-0 z-40 glass-panel border-b-0">
