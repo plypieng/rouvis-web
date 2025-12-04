@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Loader } from '@googlemaps/js-api-loader';
+import { googleMapsLoader } from '@/lib/google-maps';
 import { useTranslations } from 'next-intl';
 
 interface MapDrawerProps {
@@ -26,11 +26,7 @@ export default function MapDrawer({ isOpen, onClose, onSave }: MapDrawerProps) {
         if (!isOpen) return;
 
         const initMap = async () => {
-            const loader = new Loader({
-                apiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
-                version: 'weekly',
-                libraries: ['drawing', 'geometry'], // Need drawing and geometry
-            });
+            const loader = googleMapsLoader;
 
             const { Map } = await loader.importLibrary('maps') as google.maps.MapsLibrary;
             const { DrawingManager } = await loader.importLibrary('drawing') as google.maps.DrawingLibrary;

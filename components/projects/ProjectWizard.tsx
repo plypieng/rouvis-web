@@ -45,6 +45,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                 // 1. First get recommendation/analysis from image
                 const res = await fetch(`${baseUrl}/api/v1/agents/recommend`, {
                     method: 'POST',
+                    credentials: 'include',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ image: reader.result }),
                 });
@@ -57,7 +58,9 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                     const region = "Niigata"; // Default for now, could be dynamic later
 
                     // 2. Then fetch/research knowledge base for this crop
-                    const knowledgeRes = await fetch(`${baseUrl}/api/v1/knowledge/crops?crop=${encodeURIComponent(data.crop)}&variety=${encodeURIComponent(variety)}&region=${encodeURIComponent(region)}`);
+                    const knowledgeRes = await fetch(`${baseUrl}/api/v1/knowledge/crops?crop=${encodeURIComponent(data.crop)}&variety=${encodeURIComponent(variety)}&region=${encodeURIComponent(region)}`, {
+                        credentials: 'include',
+                    });
                     if (knowledgeRes.ok) {
                         const knowledgeData = await knowledgeRes.json();
                         // Merge knowledge into analysis
@@ -89,7 +92,9 @@ export default function ProjectWizard({ locale }: { locale: string }) {
             const region = "Niigata";
 
             // 1. Fetch/Research Knowledge Base first
-            const knowledgeRes = await fetch(`${baseUrl}/api/v1/knowledge/crops?crop=${encodeURIComponent(cropName)}&variety=${encodeURIComponent(variety)}&region=${encodeURIComponent(region)}`);
+            const knowledgeRes = await fetch(`${baseUrl}/api/v1/knowledge/crops?crop=${encodeURIComponent(cropName)}&variety=${encodeURIComponent(variety)}&region=${encodeURIComponent(region)}`, {
+                credentials: 'include',
+            });
             let knowledge = null;
 
             if (knowledgeRes.ok) {
@@ -100,6 +105,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
             // 2. Get standard recommendation (using knowledge if available to improve result)
             const res = await fetch(`${baseUrl}/api/v1/agents/recommend`, {
                 method: 'POST',
+                credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ crop: cropName, knowledge }),
             });
@@ -152,6 +158,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
             // Create project with basic info (no tasks initially)
             const res = await fetch(`${baseUrl}/api/v1/projects`, {
                 method: 'POST',
+                credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
             });

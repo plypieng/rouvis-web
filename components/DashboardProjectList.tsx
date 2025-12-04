@@ -2,11 +2,19 @@ import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import DashboardHeader from './DashboardHeader';
 
+import { cookies } from 'next/headers';
+
 async function getProjects() {
     try {
         const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+        const cookieStore = await cookies();
+        const cookieHeader = cookieStore.getAll().map(c => `${c.name}=${c.value}`).join('; ');
+
         const res = await fetch(`${baseUrl}/api/v1/projects`, {
             cache: 'no-store',
+            headers: {
+                Cookie: cookieHeader
+            }
         });
 
         if (!res.ok) throw new Error('Failed to fetch projects');
@@ -57,9 +65,15 @@ async function getTodayTasks() {
         const endDate = new Date(today);
         endDate.setHours(23, 59, 59, 999);
 
+        const cookieStore = await cookies();
+        const cookieHeader = cookieStore.getAll().map(c => `${c.name}=${c.value}`).join('; ');
+
         // Fetch tasks due before end of today that are pending
         const res = await fetch(`${baseUrl}/api/v1/tasks?endDate=${endDate.toISOString()}&status=pending`, {
             cache: 'no-store',
+            headers: {
+                Cookie: cookieHeader
+            }
         });
 
         if (!res.ok) throw new Error('Failed to fetch today tasks');

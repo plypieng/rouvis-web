@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Loader } from '@googlemaps/js-api-loader';
+import { googleMapsLoader } from '@/lib/google-maps';
 import { useTranslations } from 'next-intl';
 
 interface Field {
@@ -24,7 +24,10 @@ export default function MapTab({ locale }: { locale: string }) {
     useEffect(() => {
         const fetchFields = async () => {
             try {
-                const res = await fetch('/api/v1/fields');
+                const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+                const res = await fetch(`${baseUrl}/api/v1/fields`, {
+                    credentials: 'include',
+                });
                 if (res.ok) {
                     const data = await res.json();
                     setFields(data.fields);
@@ -41,10 +44,7 @@ export default function MapTab({ locale }: { locale: string }) {
     // Initialize Map
     useEffect(() => {
         const initMap = async () => {
-            const loader = new Loader({
-                apiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
-                version: 'weekly',
-            });
+            const loader = googleMapsLoader;
 
             const { Map } = await loader.importLibrary('maps') as google.maps.MapsLibrary;
 

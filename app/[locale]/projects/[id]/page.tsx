@@ -2,7 +2,8 @@ import { notFound } from 'next/navigation';
 import ProjectDetailClient from '@/components/projects/ProjectDetailClient';
 
 async function getProject(id: string) {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/projects/${id}`, {
+    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+    const res = await fetch(`${baseUrl}/api/v1/projects/${id}`, {
         cache: 'no-store',
     });
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Loader } from '@googlemaps/js-api-loader';
+import { googleMapsLoader } from '@/lib/google-maps';
 
 interface Field {
   id: string;
@@ -38,10 +38,7 @@ export function FieldMapView({ fields }: FieldMapViewProps) {
       return;
     }
 
-    const loader = new Loader({
-      apiKey,
-      version: 'weekly',
-    });
+    const loader = googleMapsLoader;
 
     const initializeMap = async () => {
       try {

@@ -25,6 +25,7 @@ export default function ProjectInsightsPanel({ project, onAskAI }: ProjectInsigh
                 const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
                 const res = await fetch(`${baseUrl}/api/v1/agents/advice`, {
                     method: 'POST',
+                    credentials: 'include',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ projectId: project.id }),
                 });

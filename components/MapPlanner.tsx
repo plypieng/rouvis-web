@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Loader } from '@googlemaps/js-api-loader';
+import { googleMapsLoader } from '@/lib/google-maps';
 import { useTranslations } from 'next-intl';
 
 interface Field {
@@ -25,7 +25,10 @@ export function MapPlanner() {
   useEffect(() => {
     const fetchFields = async () => {
       try {
-        const res = await fetch('/api/v1/fields');
+        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+        const res = await fetch(`${baseUrl}/api/v1/fields`, {
+          credentials: 'include',
+        });
         if (res.ok) {
           const data = await res.json();
           setFields(data.fields);
@@ -50,10 +53,7 @@ export function MapPlanner() {
       return;
     }
 
-    const loader = new Loader({
-      apiKey,
-      version: 'weekly',
-    });
+    const loader = googleMapsLoader;
 
     const initializeMap = async () => {
       try {
@@ -171,8 +171,8 @@ export function MapPlanner() {
           <button
             onClick={() => setActiveLayer('satellite')}
             className={`px-3 py-1.5 text-sm font-medium rounded-lg ${activeLayer === 'satellite'
-                ? 'bg-primary-50 text-primary-700'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              ? 'bg-primary-50 text-primary-700'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
           >
             {t('planner.satellite_view')}
@@ -180,8 +180,8 @@ export function MapPlanner() {
           <button
             onClick={() => setActiveLayer('soil')}
             className={`px-3 py-1.5 text-sm font-medium rounded-lg ${activeLayer === 'soil'
-                ? 'bg-primary-50 text-primary-700'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              ? 'bg-primary-50 text-primary-700'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
           >
             {t('planner.soil_analysis')}
@@ -189,8 +189,8 @@ export function MapPlanner() {
           <button
             onClick={() => setActiveLayer('terrain')}
             className={`px-3 py-1.5 text-sm font-medium rounded-lg ${activeLayer === 'terrain'
-                ? 'bg-primary-50 text-primary-700'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              ? 'bg-primary-50 text-primary-700'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
           >
             {t('planner.terrain')}

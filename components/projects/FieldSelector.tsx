@@ -24,7 +24,10 @@ export default function FieldSelector({ selectedFieldId, onChange }: FieldSelect
     // Fetch Fields
     const fetchFields = async () => {
         try {
-            const res = await fetch('/api/v1/fields');
+            const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+            const res = await fetch(`${baseUrl}/api/v1/fields`, {
+                credentials: 'include',
+            });
             if (res.ok) {
                 const data = await res.json();
                 setFields(data.fields);
@@ -42,16 +45,18 @@ export default function FieldSelector({ selectedFieldId, onChange }: FieldSelect
 
     const handleSaveNewField = async (fieldData: any) => {
         try {
+            const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
             // Save to Backend
-            const res = await fetch('/api/v1/fields', {
+            const res = await fetch(`${baseUrl}/api/v1/fields`, {
                 method: 'POST',
+                credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     name: fieldData.name,
                     area: fieldData.area,
                     color: fieldData.color,
-                    polygon: JSON.stringify(fieldData.polygon),
-                    location: JSON.stringify(fieldData.location),
+                    polygon: fieldData.polygon,
+                    location: fieldData.location,
                 }),
             });
 
@@ -84,8 +89,8 @@ export default function FieldSelector({ selectedFieldId, onChange }: FieldSelect
                         type="button"
                         onClick={() => onChange(field.id)}
                         className={`relative p-3 rounded-xl border-2 text-left transition-all ${selectedFieldId === field.id
-                                ? 'border-green-500 bg-green-50 ring-1 ring-green-500'
-                                : 'border-gray-200 hover:border-gray-300 bg-white'
+                            ? 'border-green-500 bg-green-50 ring-1 ring-green-500'
+                            : 'border-gray-200 hover:border-gray-300 bg-white'
                             }`}
                     >
                         <div className="flex items-center gap-2 mb-1">
