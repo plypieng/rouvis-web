@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth-config';
+import { getToken } from 'next-auth/jwt';
 
 // Use explicit production URL as fallback
 const BACKEND_URL = process.env.BACKEND_URL
@@ -8,9 +7,11 @@ const BACKEND_URL = process.env.BACKEND_URL
   || (process.env.NODE_ENV === 'production' ? 'https://localfarm-backend.vercel.app' : 'http://localhost:4000');
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+  // Use getToken instead of getServerSession to avoid Prisma dependency
+  // Cast to any due to NextRequest type mismatch in monorepo
+  const token = await getToken({ req: req as any, secret: process.env.NEXTAUTH_SECRET });
 
-  if (!session?.user?.id) {
+  if (!token?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -18,7 +19,7 @@ export async function GET(req: NextRequest) {
     const res = await fetch(`${BACKEND_URL}/api/v1/fields`, {
       headers: {
         'Content-Type': 'application/json',
-        'x-user-id': session.user.id,
+        'x-user-id': token.id as string,
       },
     });
 
@@ -31,9 +32,11 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+  // Use getToken instead of getServerSession to avoid Prisma dependency
+  // Cast to any due to NextRequest type mismatch in monorepo
+  const token = await getToken({ req: req as any, secret: process.env.NEXTAUTH_SECRET });
 
-  if (!session?.user?.id) {
+  if (!token?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -51,7 +54,7 @@ export async function POST(req: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-user-id': session.user.id,
+        'x-user-id': token.id as string,
       },
       body: JSON.stringify(payload),
     });
@@ -63,4 +66,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to create field' }, { status: 500 });
   }
 }
-
