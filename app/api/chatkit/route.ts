@@ -114,6 +114,7 @@ export async function POST(req: NextRequest) {
                   data.type === 'custom_ui' ||
                   data.type === 'action_confirmation' ||
                   data.type === 'reasoning_trace' ||
+                  data.type === 'diagnosis_result' ||
                   data.type === 'error') {
                   controller.enqueue(encoder.encode(`e:${JSON.stringify(data)}\n`));
                 }

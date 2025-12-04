@@ -179,12 +179,26 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   const sendMessage = useCallback(async (content: string) => {
     if ((!content.trim() && !selectedImage) || isLoading) return;
 
+    // Capture image before clearing state
+    const currentImageUrl = selectedImage;
+
     const userMessage: Message = {
       id: `user-${Date.now()}`,
       role: 'user',
       content: content.trim(),
-      imageUrl: selectedImage || undefined,
+      imageUrl: currentImageUrl || undefined,
     };
+
+    // Build API messages array BEFORE clearing state
+    const apiMessages = [...messages, userMessage].map(m => ({
+      role: m.role,
+      content: m.imageUrl
+        ? [
+          { type: 'text', text: m.content },
+          { type: 'image_url', image_url: { url: m.imageUrl } }
+        ]
+        : m.content
+    }));
 
     setMessages(prev => [...prev, userMessage]);
     setInput('');
@@ -205,15 +219,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [...messages, userMessage].map(m => ({
-            role: m.role,
-            content: m.imageUrl
-              ? [
-                { type: 'text', text: m.content },
-                { type: 'image_url', image_url: { url: m.imageUrl } }
-              ]
-              : m.content
-          })),
+          messages: apiMessages,
           projectId,
           threadId,
         }),
@@ -328,7 +334,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
       setIsLoading(false);
       setCurrentStatus('');
     }
-  }, [messages, projectId, threadId, isLoading, onTaskUpdate, onDiagnosisComplete]);
+  }, [messages, projectId, threadId, isLoading, selectedImage, onTaskUpdate, onDiagnosisComplete]);
 
   const handleRetry = useCallback(() => {
     setMessages(prev => {
