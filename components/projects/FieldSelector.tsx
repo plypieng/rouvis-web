@@ -24,13 +24,11 @@ export default function FieldSelector({ selectedFieldId, onChange }: FieldSelect
     // Fetch Fields
     const fetchFields = async () => {
         try {
-            const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-            const res = await fetch(`${baseUrl}/api/v1/fields`, {
-                credentials: 'include',
-            });
+            // Use local API proxy to avoid cross-origin auth issues
+            const res = await fetch('/api/v1/fields');
             if (res.ok) {
                 const data = await res.json();
-                setFields(data.fields);
+                setFields(data.fields || []);
             }
         } catch (error) {
             console.error('Failed to fetch fields', error);
@@ -45,11 +43,9 @@ export default function FieldSelector({ selectedFieldId, onChange }: FieldSelect
 
     const handleSaveNewField = async (fieldData: any) => {
         try {
-            const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-            // Save to Backend
-            const res = await fetch(`${baseUrl}/api/v1/fields`, {
+            // Use local API proxy to avoid cross-origin auth issues
+            const res = await fetch('/api/v1/fields', {
                 method: 'POST',
-                credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     name: fieldData.name,
