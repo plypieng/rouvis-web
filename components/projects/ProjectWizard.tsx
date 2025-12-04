@@ -142,8 +142,6 @@ export default function ProjectWizard({ locale }: { locale: string }) {
         setLoading(true);
 
         try {
-            const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-
             const payload = {
                 name: `${cropAnalysis.crop} ${new Date().getFullYear()}`,
                 crop: cropAnalysis.crop,
@@ -155,10 +153,9 @@ export default function ProjectWizard({ locale }: { locale: string }) {
             };
             console.log('Creating project with payload:', payload);
 
-            // Create project with basic info (no tasks initially)
-            const res = await fetch(`${baseUrl}/api/v1/projects`, {
+            // Use local API proxy to handle cross-origin auth
+            const res = await fetch('/api/v1/projects', {
                 method: 'POST',
-                credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
             });
