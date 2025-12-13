@@ -1,6 +1,15 @@
 'use client';
 
-export default function CropAnalysisCard({ analysis }: { analysis: any }) {
+type CropAnalysis = {
+    crop?: string;
+    variety?: string;
+    startDate?: string;
+    targetHarvestDate?: string;
+    daysToHarvest?: number;
+    notes?: string;
+};
+
+export default function CropAnalysisCard({ analysis }: { analysis: CropAnalysis | null }) {
     if (!analysis) return null;
 
     return (
@@ -11,7 +20,7 @@ export default function CropAnalysisCard({ analysis }: { analysis: any }) {
                 </div>
                 <div className="flex-1">
                     <h3 className="text-2xl font-bold text-green-900 mb-2">
-                        {analysis.crop}
+                        {analysis.crop || '—'}
                         {analysis.variety && <span className="text-lg font-normal text-green-700 ml-2">({analysis.variety})</span>}
                     </h3>
 
@@ -20,7 +29,9 @@ export default function CropAnalysisCard({ analysis }: { analysis: any }) {
                             <span className="material-symbols-outlined text-green-600">calendar_today</span>
                             <div>
                                 <p className="text-xs text-green-600">最適な植付時期</p>
-                                <p className="font-semibold text-green-900">{new Date(analysis.startDate).toLocaleDateString('ja-JP')}</p>
+                                <p className="font-semibold text-green-900">
+                                    {analysis.startDate ? new Date(analysis.startDate).toLocaleDateString('ja-JP') : '—'}
+                                </p>
                             </div>
                         </div>
 
@@ -36,7 +47,9 @@ export default function CropAnalysisCard({ analysis }: { analysis: any }) {
                             <span className="material-symbols-outlined text-green-600">agriculture</span>
                             <div>
                                 <p className="text-xs text-green-600">収穫予定</p>
-                                <p className="font-semibold text-green-900">{new Date(analysis.targetHarvestDate).toLocaleDateString('ja-JP')}</p>
+                                <p className="font-semibold text-green-900">
+                                    {analysis.targetHarvestDate ? new Date(analysis.targetHarvestDate).toLocaleDateString('ja-JP') : '—'}
+                                </p>
                             </div>
                         </div>
                     </div>

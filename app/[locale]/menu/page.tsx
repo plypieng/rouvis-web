@@ -1,7 +1,11 @@
 import Link from 'next/link';
 import { Calendar, TrendingUp, Book, Settings, ChevronRight, User } from 'lucide-react';
+import { getServerSessionFromToken } from '@/lib/server-auth';
 
-export default function MenuPage({ params: { locale } }: { params: { locale: string } }) {
+export default async function MenuPage({ params: { locale } }: { params: { locale: string } }) {
+    const session = await getServerSessionFromToken();
+    const displayName = session?.user?.name || session?.user?.email || 'ユーザー';
+
     const menuItems = [
         {
             title: '今週の予定 (Calendar)',
@@ -42,8 +46,8 @@ export default function MenuPage({ params: { locale } }: { params: { locale: str
                         <User className="w-8 h-8" />
                     </div>
                     <div className="flex-1">
-                        <h2 className="font-bold text-gray-900">Demo User</h2>
-                        <p className="text-sm text-gray-500">新潟県長岡市</p>
+                        <h2 className="font-bold text-gray-900">{displayName}</h2>
+                        <p className="text-sm text-gray-500">プロフィール未設定</p>
                     </div>
                     <Link href={`/${locale}/settings`} className="p-2 text-gray-400 hover:text-gray-600">
                         <Settings className="w-6 h-6" />

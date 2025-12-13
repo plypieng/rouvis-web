@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 
 interface Task {
@@ -23,7 +22,6 @@ interface TodayFocusProps {
 }
 
 export default function TodayFocus({ tasks: initialTasks, locale }: TodayFocusProps) {
-    const t = useTranslations('dashboard'); // Assuming dashboard namespace has relevant keys or we'll add them
     const router = useRouter();
     const [tasks, setTasks] = useState<Task[]>(initialTasks);
     const [completingId, setCompletingId] = useState<string | null>(null);
@@ -31,10 +29,9 @@ export default function TodayFocus({ tasks: initialTasks, locale }: TodayFocusPr
     const handleComplete = async (taskId: string) => {
         setCompletingId(taskId);
         try {
-            const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
             // 1. Update Task Status
-            const res = await fetch(`${baseUrl}/api/v1/tasks/${taskId}`, {
-                method: 'PUT',
+            const res = await fetch(`/api/v1/tasks/${taskId}`, {
+                method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status: 'completed' }),
             });

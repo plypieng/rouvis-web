@@ -1,10 +1,14 @@
 import { notFound } from 'next/navigation';
 import ProjectDetailClient from '@/components/projects/ProjectDetailClient';
+import { cookies } from 'next/headers';
 
 async function getProject(id: string) {
     const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+    const cookieStore = await cookies();
+    const cookieHeader = cookieStore.getAll().map(c => `${c.name}=${c.value}`).join('; ');
     const res = await fetch(`${baseUrl}/api/v1/projects/${id}`, {
         cache: 'no-store',
+        headers: cookieHeader ? { Cookie: cookieHeader } : undefined,
     });
 
     if (!res.ok) {

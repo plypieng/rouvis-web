@@ -8,10 +8,8 @@ import {
     eachDayOfInterval,
     getDay,
     isSameDay,
-    isToday,
-    isWithinInterval
+    isToday
 } from 'date-fns';
-import { ja } from 'date-fns/locale';
 
 interface Task {
     id: string;

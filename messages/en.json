@@ -63,7 +63,21 @@
     "view_detailed_forecast": "View detailed forecast",
     "crop_recommendations": "Crop Recommendations",
     "yield_forecast": "Yield Forecast",
-    "view_details": "View Details"
+    "view_details": "View Details",
+    "my_projects": "My Projects",
+    "projects_subtitle": "Your projects list",
+    "today_focus": "Today's Focus",
+    "all_caught_up": "All tasks completed",
+    "days": "Days",
+    "create_project": "Create Project",
+    "create_new_project": "Create New Project",
+    "last_activity": "Last Activity",
+    "next_task": "Next Task",
+    "not_set": "Not set",
+    "welcome_title": "Welcome to Rouvis!",
+    "welcome_subtitle": "Manage your crop cycles as \"Projects\"",
+    "welcome_description": "When you create a project, AI will suggest an optimal schedule and guide your daily tasks.",
+    "welcome_cta": "Create Your First Project"
   },
   "today": {
     "advisor_strip": {

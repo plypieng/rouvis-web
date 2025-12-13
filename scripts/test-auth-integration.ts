@@ -8,7 +8,7 @@
  * 4. Backend Data Persistence (User, Tenant, Field)
  *
  * Test Requirements:
- * - Backend running at http://localhost:3000 (or BACKEND_URL env var)
+ * - Web app running at http://localhost:3000 (or APP_URL/BACKEND_URL env var)
  * - Database accessible with valid credentials
  * - Google OAuth credentials configured (or mock mode enabled)
  *
@@ -19,7 +19,7 @@
 import * as https from 'https';
 
 // Configuration
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3000';
+const APP_URL = process.env.APP_URL || process.env.BACKEND_URL || process.env.NEXTAUTH_URL || 'http://localhost:3000';
 const MOCK_AUTH = process.env.MOCK_AUTH === 'true';
 const VERBOSE = process.env.VERBOSE === 'true';
 
@@ -205,7 +205,7 @@ class AuthIntegrationTests {
   async testBackendHealth(): Promise<void> {
     log('Health', 'Testing backend health endpoint...');
 
-    const response = await fetchWithCookies(`${BACKEND_URL}/api/v1/health`);
+    const response = await fetchWithCookies(`${APP_URL}/api/v1/health`);
 
     if (response.status !== 200) {
       throw new Error(`Health check failed with status ${response.status}`);
@@ -225,7 +225,7 @@ class AuthIntegrationTests {
   async testAuthProviders(): Promise<void> {
     log('Auth', 'Testing /api/auth/providers endpoint...');
 
-    const response = await fetchWithCookies(`${BACKEND_URL}/api/auth/providers`);
+    const response = await fetchWithCookies(`${APP_URL}/api/auth/providers`);
 
     if (response.status !== 200) {
       throw new Error(`Providers endpoint failed with status ${response.status}`);
@@ -249,7 +249,7 @@ class AuthIntegrationTests {
   async testCsrfToken(): Promise<void> {
     log('Auth', 'Testing CSRF token generation...');
 
-    const response = await fetchWithCookies(`${BACKEND_URL}/api/auth/csrf`);
+    const response = await fetchWithCookies(`${APP_URL}/api/auth/csrf`);
 
     if (response.status !== 200) {
       throw new Error(`CSRF endpoint failed with status ${response.status}`);
@@ -269,7 +269,7 @@ class AuthIntegrationTests {
   async testUnauthenticatedSession(): Promise<void> {
     log('Session', 'Testing session endpoint without authentication...');
 
-    const response = await fetchWithCookies(`${BACKEND_URL}/api/auth/session`);
+    const response = await fetchWithCookies(`${APP_URL}/api/auth/session`);
 
     if (response.status !== 200) {
       throw new Error(`Session endpoint failed with status ${response.status}`);
@@ -294,7 +294,7 @@ class AuthIntegrationTests {
   async testOAuthRedirect(): Promise<void> {
     log('OAuth', 'Testing Google OAuth redirect...');
 
-    const response = await fetchWithCookies(`${BACKEND_URL}/api/auth/signin/google`, {
+    const response = await fetchWithCookies(`${APP_URL}/api/auth/signin/google`, {
       followRedirect: false,
     });
 
@@ -325,7 +325,7 @@ class AuthIntegrationTests {
     // Clear cookies to ensure we're unauthenticated
     state.cookies = [];
 
-    const response = await fetchWithCookies(`${BACKEND_URL}/api/v1/fields`);
+    const response = await fetchWithCookies(`${APP_URL}/api/v1/fields`);
 
     // Should return 401 Unauthorized
     if (response.status !== 401) {
@@ -347,7 +347,7 @@ class AuthIntegrationTests {
       geojson: 'not-an-object', // Invalid: should be object
     };
 
-    const response = await fetchWithCookies(`${BACKEND_URL}/api/v1/fields`, {
+    const response = await fetchWithCookies(`${APP_URL}/api/v1/fields`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -416,11 +416,11 @@ class AuthIntegrationTests {
     log('Session', 'Testing session persistence...');
 
     // Make first request to establish session
-    const response1 = await fetchWithCookies(`${BACKEND_URL}/api/auth/session`);
+    const response1 = await fetchWithCookies(`${APP_URL}/api/auth/session`);
     const initialCookies = [...state.cookies];
 
     // Make second request with same cookies
-    const response2 = await fetchWithCookies(`${BACKEND_URL}/api/auth/session`);
+    const response2 = await fetchWithCookies(`${APP_URL}/api/auth/session`);
 
     if (response1.status !== 200 || response2.status !== 200) {
       throw new Error('Session endpoint failed');
@@ -444,7 +444,7 @@ class AuthIntegrationTests {
 
     console.log(`\nTest Suite: ROuvis Authentication Flow`);
     console.log(`Date: ${new Date().toISOString()}`);
-    console.log(`Environment: ${BACKEND_URL}`);
+    console.log(`Environment: ${APP_URL}`);
     console.log(`Mock Mode: ${MOCK_AUTH ? 'Enabled' : 'Disabled'}`);
 
     const totalTests = this.testResults.length;
@@ -528,7 +528,7 @@ class AuthIntegrationTests {
     console.log('╚═══════════════════════════════════════════════════════════════════════════════╝');
     console.log('\x1b[0m\n');
 
-    logInfo(`Backend URL: ${BACKEND_URL}`);
+    logInfo(`App URL: ${APP_URL}`);
     logInfo(`Mock Mode: ${MOCK_AUTH ? 'Enabled' : 'Disabled'}`);
     logInfo(`Verbose: ${VERBOSE ? 'Enabled' : 'Disabled'}`);
     console.log('');

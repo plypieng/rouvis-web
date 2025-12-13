@@ -21,7 +21,7 @@ import { Home, Users, Store, Menu, Map as MapIcon } from 'lucide-react';
  * - 市場 (Market): Sales/Inventory
  * - メニュー (Menu): Planning/Records/Knowledge
  */
-export function BottomNav({ locale, user }: { locale: string; user?: any }) {
+export function BottomNav({ locale, user }: { locale: string; user?: unknown }) {
   const pathname = usePathname();
 
   // Hide bottom nav on landing page for unauthenticated users

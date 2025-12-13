@@ -20,7 +20,7 @@ interface EvidenceCardProps {
   toolEvent?: {
     tool: string;
     status: 'running' | 'completed' | 'error';
-    result?: any;
+    result?: unknown;
   };
   isStreaming?: boolean;
   onStreamEvent?: (event: StreamEvent) => void;

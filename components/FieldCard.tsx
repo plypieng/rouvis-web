@@ -8,7 +8,7 @@ interface Field {
   name: string;
   crop?: string;
   area_sqm?: number;
-  geojson: any;
+  geojson?: unknown;
   created_at: string;
   updated_at: string;
 }

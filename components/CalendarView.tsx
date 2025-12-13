@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, parseISO } from 'date-fns';
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, isToday } from 'date-fns';
 
 type CalendarEvent = {
   id: string;
@@ -18,8 +20,8 @@ interface Task {
   title: string;
   description?: string;
   dueAt: Date;
-  fieldId?: string;
-  fieldName?: string;
+  projectId?: string;
+  projectName?: string;
   priority?: 'low' | 'medium' | 'high';
   status: 'pending' | 'scheduled' | 'cancelled';
 }
@@ -31,39 +33,24 @@ interface CalendarViewProps {
 
 export function CalendarView({ tasks = [], locale }: CalendarViewProps) {
   const t = useTranslations();
+  const router = useRouter();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [view, setView] = useState<'month' | 'week'>('month');
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [localTasks, setLocalTasks] = useState<Task[]>(tasks);
 
-  // Convert tasks to calendar events
-  const taskEvents: CalendarEvent[] = tasks.map(task => ({
-    id: task.id || `task-${Date.now()}`,
-    title: task.title,
-    date: format(task.dueAt, 'yyyy-MM-dd'),
-    type: 'watering', // Default type from demo tasks
-    location: task.fieldName,
-  }));
+  useEffect(() => {
+    setLocalTasks(tasks);
+  }, [tasks]);
 
-  // Use only task events
-  const events: CalendarEvent[] = [
-    ...taskEvents,
-  ];
-
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case 'planting':
-        return 'bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 border-green-300';
-      case 'harvesting':
-        return 'bg-gradient-to-r from-yellow-100 to-amber-100 text-yellow-800 border-yellow-300';
-      case 'fertilizing':
-        return 'bg-gradient-to-r from-amber-100 to-orange-100 text-amber-800 border-amber-300';
-      case 'watering':
-        return 'bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-800 border-blue-300';
-      case 'maintenance':
-        return 'bg-gradient-to-r from-gray-100 to-slate-100 text-gray-800 border-gray-300';
-      default:
-        return 'bg-gradient-to-r from-gray-100 to-slate-100 text-gray-800 border-gray-300';
-    }
-  };
+  const events: CalendarEvent[] = useMemo(() => (
+    localTasks.map(task => ({
+      id: task.id || `task-${Date.now()}`,
+      title: task.title,
+      date: format(task.dueAt, 'yyyy-MM-dd'),
+      type: 'maintenance',
+      location: task.projectName,
+    }))
+  ), [localTasks]);
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -91,7 +78,9 @@ export function CalendarView({ tasks = [], locale }: CalendarViewProps) {
   };
 
   const goToCurrentMonth = () => {
-    setCurrentDate(new Date());
+    const now = new Date();
+    setCurrentDate(now);
+    setSelectedDate(now);
   };
 
   // Generate days for the current month view including previous/next month days
@@ -115,6 +104,30 @@ export function CalendarView({ tasks = [], locale }: CalendarViewProps) {
     return events.filter(event => event.date === dayStr);
   };
 
+  const handleCompleteTask = async (taskId?: string) => {
+    if (!taskId) return;
+    const res = await fetch(`/api/v1/tasks/${taskId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'completed' }),
+    });
+
+    if (!res.ok) {
+      alert('タスク更新に失敗しました');
+      return;
+    }
+
+    setLocalTasks(prev => prev.filter(t => t.id !== taskId));
+    router.refresh();
+  };
+
+  const selectedDayTasks = useMemo(() => {
+    const selectedStr = format(selectedDate, 'yyyy-MM-dd');
+    return localTasks
+      .filter(t => format(t.dueAt, 'yyyy-MM-dd') === selectedStr)
+      .sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime());
+  }, [localTasks, selectedDate]);
+
   return (
     <div className="h-full w-full" style={{ scrollbarGutter: 'stable' }}>
       <div className="flex justify-between items-center mb-6 bg-gradient-to-r from-blue-600 via-cyan-600 to-emerald-600 text-white p-4 rounded-xl shadow-lg">
@@ -131,6 +144,13 @@ export function CalendarView({ tasks = [], locale }: CalendarViewProps) {
             {format(currentDate, locale === 'ja' ? 'yyyy年 M月' : 'MMMM yyyy')}
           </h2>
           <p className="text-xs mt-1 opacity-90">{t('calendar.title')}</p>
+          <button
+            type="button"
+            onClick={goToCurrentMonth}
+            className="mt-2 inline-flex items-center rounded-full bg-white/20 px-3 py-1 text-xs font-semibold hover:bg-white/30"
+          >
+            {locale === 'ja' ? '今日へ' : 'Today'}
+          </button>
         </div>
         <button
           onClick={nextMonth}
@@ -169,12 +189,18 @@ export function CalendarView({ tasks = [], locale }: CalendarViewProps) {
             return (
               <div
                 key={day.toString()}
+                onClick={() => setSelectedDate(day)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') setSelectedDate(day);
+                }}
                 className={`h-28 p-2 border-2 rounded-xl transition-all transform hover:scale-105 hover:shadow-xl cursor-pointer ${isToday(day)
                   ? 'bg-gradient-to-br from-emerald-50 via-green-50 to-cyan-50 border-emerald-400 shadow-lg ring-2 ring-emerald-300'
                   : isCurrentMonth
                     ? 'bg-white border-gray-200 hover:border-blue-300 shadow-sm'
                     : 'bg-gradient-to-br from-gray-50 to-gray-100 border-gray-200 opacity-50 hover:opacity-75'
-                  }`}
+                  } ${isSameDay(day, selectedDate) ? 'ring-2 ring-blue-500' : ''}`}
               >
                 <div className="flex flex-col items-center w-full h-full overflow-hidden">
                   {/* Date */}
@@ -218,6 +244,55 @@ export function CalendarView({ tasks = [], locale }: CalendarViewProps) {
             );
           })}
         </div>
+      </div>
+
+      <div className="mt-6 rounded-xl border border-gray-200 bg-white p-4">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-base font-bold text-gray-900">
+            {format(selectedDate, locale === 'ja' ? 'M月d日' : 'MMM d')}
+          </h3>
+          <Link
+            href={`/${locale}/projects`}
+            className="text-sm text-blue-700 hover:underline"
+          >
+            プロジェクト一覧 →
+          </Link>
+        </div>
+
+        {selectedDayTasks.length === 0 ? (
+          <p className="mt-3 text-sm text-gray-600">この日の予定はありません。</p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {selectedDayTasks.map((task) => (
+              <li key={task.id} className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 p-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm" aria-hidden="true">🔧</span>
+                    <p className="font-medium text-gray-900 truncate">{task.title}</p>
+                  </div>
+                  <p className="mt-0.5 text-xs text-gray-600 truncate">
+                    {task.projectName || '—'}
+                  </p>
+                  {task.projectId && (
+                    <Link
+                      href={`/${locale}/projects/${task.projectId}`}
+                      className="mt-1 inline-block text-xs text-blue-700 hover:underline"
+                    >
+                      プロジェクトへ →
+                    </Link>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleCompleteTask(task.id)}
+                  className="shrink-0 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
+                >
+                  完了
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
     </div>

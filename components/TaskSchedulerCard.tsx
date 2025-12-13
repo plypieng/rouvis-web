@@ -1,7 +1,5 @@
 'use client';
 
-import { useState } from 'react';
-import { useTranslations } from 'next-intl';
 import { Calendar, Clock, MapPin, CheckCircle, XCircle } from 'lucide-react';
 
 interface Task {
@@ -28,9 +26,6 @@ export function TaskSchedulerCard({
   onCancel,
   onEdit,
 }: TaskSchedulerCardProps) {
-  const t = useTranslations();
-  const [isExpanded, setIsExpanded] = useState(false);
-
   const getPriorityColor = (priority?: string) => {
     switch (priority) {
       case 'high':

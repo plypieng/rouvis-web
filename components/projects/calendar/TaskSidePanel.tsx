@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { format, isSameDay, isToday } from 'date-fns';
 import { ja } from 'date-fns/locale';
@@ -19,6 +20,13 @@ interface TaskSidePanelProps {
     onTaskComplete?: (taskId: string, status: string) => void;
 }
 
+type ForecastDay = {
+    date: string;
+    temperature: { min: number; max: number };
+    condition: string;
+    icon?: string;
+};
+
 export default function TaskSidePanel({ selectedDate, tasks, onAddTask, onTaskComplete }: TaskSidePanelProps) {
     const t = useTranslations('projects.calendar');
     const tProject = useTranslations('projects');
@@ -26,11 +34,36 @@ export default function TaskSidePanel({ selectedDate, tasks, onAddTask, onTaskCo
     const selectedTasks = tasks.filter(task => isSameDay(new Date(task.dueDate), selectedDate));
     const isTodaySelected = isToday(selectedDate);
 
-    // Mock Weather Data (In a real app, fetch based on date)
-    const weather = {
-        temp: 24,
-        condition: 'sunny', // sunny, cloudy, rain
-        icon: 'sunny'
+    const [forecast, setForecast] = useState<ForecastDay[]>([]);
+
+    useEffect(() => {
+        const loadWeather = async () => {
+            try {
+                const res = await fetch('/api/weather', { cache: 'no-store' });
+                if (!res.ok) return;
+                const data = await res.json().catch(() => ({}));
+                if (Array.isArray(data?.forecast)) setForecast(data.forecast as ForecastDay[]);
+            } catch {
+                // ignore
+            }
+        };
+        loadWeather();
+    }, []);
+
+    const forecastForSelectedDate = useMemo(() => {
+        const key = format(selectedDate, 'yyyy-MM-dd');
+        return forecast.find(d => d.date === key);
+    }, [forecast, selectedDate]);
+
+    const getWeatherIcon = (code?: string) => {
+        if (!code) return 'cloud';
+        if (code.startsWith('01') || code.startsWith('02')) return 'sunny';
+        if (code.startsWith('03') || code.startsWith('04')) return 'cloud';
+        if (code.startsWith('09') || code.startsWith('10')) return 'rainy';
+        if (code.startsWith('11')) return 'thunderstorm';
+        if (code.startsWith('13')) return 'weather_snowy';
+        if (code.startsWith('50')) return 'foggy';
+        return 'cloud';
     };
 
     return (
@@ -46,12 +79,22 @@ export default function TaskSidePanel({ selectedDate, tasks, onAddTask, onTaskCo
                             {isTodaySelected ? t('todays_focus') : t('tasks_for_date')}
                         </p>
                     </div>
-                    {/* Weather Widget (Mock) */}
-                    <div className="flex items-center gap-2 bg-white px-2 py-1 rounded-lg border border-gray-100 shadow-sm">
-                        <span className="material-symbols-outlined text-orange-500">sunny</span>
-                        <span className="text-sm font-bold text-gray-700">24°C</span>
-                    </div>
+                    {forecastForSelectedDate && (
+                        <div className="flex items-center gap-2 bg-white px-2 py-1 rounded-lg border border-gray-100 shadow-sm">
+                            <span className="material-symbols-outlined text-sky-600">
+                                {getWeatherIcon(forecastForSelectedDate.icon)}
+                            </span>
+                            <span className="text-sm font-bold text-gray-700">
+                                {Math.round(forecastForSelectedDate.temperature.max)}°C
+                            </span>
+                        </div>
+                    )}
                 </div>
+                {forecastForSelectedDate?.condition && (
+                    <p className="text-xs text-gray-600">
+                        天気: {forecastForSelectedDate.condition}
+                    </p>
+                )}
             </div>
 
             {/* Task List */}

@@ -1,22 +1,27 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect } from 'react';
 import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
 
 export default function LoginPage() {
   const t = useTranslations('auth.signIn');
-  const { data: session, status } = useSession();
+  const { status } = useSession();
+  const params = useParams<{ locale: string }>();
+  const locale = (params?.locale as string) || 'ja';
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get('callbackUrl');
+  const safeCallbackUrl = callbackUrl?.startsWith('/') ? callbackUrl : null;
 
   // Redirect if already authenticated
   useEffect(() => {
     if (status === 'authenticated') {
-      router.push('/calendar');
+      router.replace(safeCallbackUrl ?? `/${locale}`);
     }
-  }, [status, router]);
+  }, [status, router, locale, safeCallbackUrl]);
 
   if (status === 'loading') {
     return (
@@ -42,7 +47,7 @@ export default function LoginPage() {
             <p className="mt-2 text-gray-600">{t('subtitle')}</p>
           </div>
 
-          <GoogleSignInButton callbackUrl="/onboarding" />
+          <GoogleSignInButton callbackUrl={safeCallbackUrl ?? `/${locale}/onboarding`} />
 
           <div className="text-center text-xs text-gray-500">
             <p>{t('terms')}</p>

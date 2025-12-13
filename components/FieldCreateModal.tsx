@@ -6,7 +6,7 @@ import { MapPin, X, Upload, Loader } from 'lucide-react';
 
 interface FieldCreateModalProps {
   onClose: () => void;
-  onSubmit: (data: { name: string; geojson: any; crop?: string }) => Promise<void>;
+  onSubmit: (data: { name: string; geojson?: unknown; crop?: string }) => Promise<void>;
 }
 
 export function FieldCreateModal({ onClose, onSubmit }: FieldCreateModalProps) {
@@ -27,16 +27,21 @@ export function FieldCreateModal({ onClose, onSubmit }: FieldCreateModalProps) {
       return;
     }
 
-    let geojson;
+    let geojson: unknown | undefined;
     try {
       if (formData.geojsonText.trim()) {
-        geojson = JSON.parse(formData.geojsonText);
+        const parsed = JSON.parse(formData.geojsonText) as unknown;
         // Basic validation for GeoJSON
-        if (!geojson.type || geojson.type !== 'Polygon') {
+        const parsedType =
+          parsed && typeof parsed === 'object'
+            ? (parsed as { type?: unknown }).type
+            : undefined;
+        if (parsedType !== 'Polygon') {
           throw new Error('Invalid GeoJSON: Must be a Polygon');
         }
+        geojson = parsed;
       }
-    } catch (err) {
+    } catch {
       setError(t('fields.invalid_geojson'));
       return;
     }
@@ -63,13 +68,15 @@ export function FieldCreateModal({ onClose, onSubmit }: FieldCreateModalProps) {
 
     const reader = new FileReader();
     reader.onload = (event) => {
+      const text = event.target?.result;
+      if (typeof text !== 'string') return;
       try {
-        const geojson = JSON.parse(event.target?.result as string);
+        const geojson = JSON.parse(text) as unknown;
         setFormData(prev => ({
           ...prev,
           geojsonText: JSON.stringify(geojson, null, 2),
         }));
-      } catch (err) {
+      } catch {
         setError(t('fields.invalid_geojson_file'));
       }
     };

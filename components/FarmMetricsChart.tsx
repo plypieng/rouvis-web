@@ -17,11 +17,25 @@ import {
 
 type ChartType = 'yield' | 'profit';
 
+type SeasonalDatum = {
+  month: string;
+  rice?: number;
+  vegetables?: number;
+  fruits?: number;
+};
+
+type ProfitDatum = {
+  month: string;
+  revenue?: number;
+  expenses?: number;
+  profit?: number;
+};
+
 export function FarmMetricsChart() {
   const t = useTranslations();
   const [activeChart, setActiveChart] = useState<ChartType>('yield');
-  const [seasonalData, setSeasonalData] = useState<any[]>([]);
-  const [profitData, setProfitData] = useState<any[]>([]);
+  const [seasonalData, setSeasonalData] = useState<SeasonalDatum[]>([]);
+  const [profitData, setProfitData] = useState<ProfitDatum[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -29,7 +43,10 @@ export function FarmMetricsChart() {
       try {
         const res = await fetch('/api/v1/analytics/financial');
         if (res.ok) {
-          const data = await res.json();
+          const data = (await res.json()) as {
+            seasonal?: SeasonalDatum[];
+            profit?: ProfitDatum[];
+          };
           setSeasonalData(data.seasonal || []);
           setProfitData(data.profit || []);
         }

@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useTranslations } from 'next-intl';
-import { X, Save, MapPin, Calendar, Clock } from 'lucide-react';
+import { X, Save, MapPin, Calendar } from 'lucide-react';
 
 interface Field {
   id: string;
@@ -42,7 +41,6 @@ export function ActivityLogModal({
   onSave,
   initialFieldId,
 }: ActivityLogModalProps) {
-  const t = useTranslations();
   const [fields, setFields] = useState<Field[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);

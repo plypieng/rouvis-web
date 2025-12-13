@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, AlertTriangle, CheckCircle, Info, Droplets, Sprout, Bug } from 'lucide-react';
+import { X, CheckCircle, Info, Droplets, Sprout, Bug } from 'lucide-react';
 
 export interface DiagnosisAction {
     type: 'pesticide' | 'water' | 'fertilizer' | 'other';

@@ -16,6 +16,15 @@ interface FieldSelectorProps {
     onChange: (fieldId: string) => void;
 }
 
+type LatLng = { lat: number; lng: number };
+type NewFieldData = {
+    name: string;
+    polygon: LatLng[];
+    location: LatLng;
+    color: string;
+    area: number;
+};
+
 export default function FieldSelector({ selectedFieldId, onChange }: FieldSelectorProps) {
     const [fields, setFields] = useState<Field[]>([]);
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -41,7 +50,7 @@ export default function FieldSelector({ selectedFieldId, onChange }: FieldSelect
         fetchFields();
     }, []);
 
-    const handleSaveNewField = async (fieldData: any) => {
+    const handleSaveNewField = async (fieldData: NewFieldData) => {
         try {
             // Use local API proxy to avoid cross-origin auth issues
             const res = await fetch('/api/v1/fields', {

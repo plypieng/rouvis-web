@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useTranslations } from 'next-intl';
 import { CheckCircle, XCircle, Undo2, Clock } from 'lucide-react';
 
 interface Activity {
@@ -30,7 +29,6 @@ export function ActionConfirmationCard({
   onCancel,
   autoConfirmDelay = 10,
 }: ActionConfirmationCardProps) {
-  const t = useTranslations();
   const [timeLeft, setTimeLeft] = useState(autoConfirmDelay);
   const [isAutoConfirming, setIsAutoConfirming] = useState(true);
 
@@ -99,30 +97,6 @@ export function ActionConfirmationCard({
       default:
         return <Clock className="w-5 h-5 text-blue-600" />;
     }
-  const handleUndo = async () => {
-    if (!activity.id) return;
-
-    try {
-      // Call undo API endpoint
-      const response = await fetch(`/api/v1/activities/${activity.id}/undo`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': 'demo-user', // TODO: Get from auth
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to undo activity');
-      }
-
-      // Update local state
-      onUndo?.();
-    } catch (error) {
-      console.error('Failed to undo activity:', error);
-      alert('活動の取り消しに失敗しました');
-    }
-  };
   };
 
   if (activity.status === 'confirmed') {

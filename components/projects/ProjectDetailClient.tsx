@@ -11,8 +11,28 @@ import ProjectAgentOnboarding from '@/components/projects/ProjectAgentOnboarding
 import TaskCreateModal from './TaskCreateModal';
 import ProjectInsightsPanel from './ProjectInsightsPanel';
 
+type ProjectTask = {
+    id: string;
+    title: string;
+    dueDate: string;
+    status: string;
+};
+
+type Project = {
+    id: string;
+    name: string;
+    crop: string;
+    variety?: string;
+    startDate: string;
+    targetHarvestDate?: string;
+    status: string;
+    notes?: string;
+    tasks?: ProjectTask[];
+    currentStage?: string;
+};
+
 interface ProjectDetailClientProps {
-    project: any;
+    project: Project;
     locale: string;
 }
 
@@ -33,9 +53,8 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
 
     const handleTaskComplete = async (taskId: string, status: string) => {
         try {
-            const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-            const res = await fetch(`${baseUrl}/api/v1/projects/${project.id}/tasks/${taskId}`, {
-                method: 'PUT',
+            const res = await fetch(`/api/v1/tasks/${taskId}`, {
+                method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status }),
             });
@@ -81,24 +100,7 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
                         {/* 1. Header */}
                         <ProjectHeader project={project} />
 
-                        {/* 2. Insights Panel */}
-                        <ProjectInsightsPanel
-                            project={project}
-                            onAskAI={() => {
-                                // Scroll chat into view on mobile
-                                const chatElement = document.getElementById('project-chat-kit');
-                                if (chatElement) {
-                                    chatElement.scrollIntoView({ behavior: 'smooth' });
-                                }
-
-                                // Send prompt
-                                if (chatRef.current) {
-                                    chatRef.current.sendMessage('このプロジェクトへのアドバイスをお願いします。');
-                                }
-                            }}
-                        />
-
-                        {/* 3. Onboarding OR Calendar */}
+                        {/* 2. Onboarding OR Calendar */}
                         {(!project.tasks || project.tasks.length === 0) ? (
                             <ProjectAgentOnboarding
                                 projectId={project.id}
@@ -117,6 +119,16 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
                                 />
                             </div>
                         )}
+
+                        {/* 3. Insights Panel */}
+                        <ProjectInsightsPanel
+                            project={project}
+                            onAskAI={() => {
+                                if (chatRef.current) {
+                                    chatRef.current.sendMessage('このプロジェクトへのアドバイスをお願いします。');
+                                }
+                            }}
+                        />
                     </div>
                 </div>
             </div>

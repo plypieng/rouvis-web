@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { googleMapsLoader } from '@/lib/google-maps';
-import { useTranslations } from 'next-intl';
+
+type LatLng = { lat: number; lng: number };
 
 interface MapDrawerProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (fieldData: { name: string; polygon: any; location: any; color: string; area: number }) => void;
+    onSave: (fieldData: { name: string; polygon: LatLng[]; location: LatLng; color: string; area: number }) => void;
 }
 
 export default function MapDrawer({ isOpen, onClose, onSave }: MapDrawerProps) {

@@ -67,7 +67,7 @@ interface DefaultErrorFallbackProps {
 function DefaultErrorFallback({ error, reset }: DefaultErrorFallbackProps) {
   const getErrorSuggestions = (error: Error): string[] => {
     const message = error.message.toLowerCase();
-    
+
     if (message.includes('network') || message.includes('fetch')) {
       return [
         'インターネット接続を確認してください',
@@ -75,7 +75,7 @@ function DefaultErrorFallback({ error, reset }: DefaultErrorFallbackProps) {
         'しばらく待ってから再試行してください',
       ];
     }
-    
+
     if (message.includes('timeout')) {
       return [
         'ネットワークが遅い可能性があります',
@@ -83,7 +83,7 @@ function DefaultErrorFallback({ error, reset }: DefaultErrorFallbackProps) {
         '後でもう一度お試しください',
       ];
     }
-    
+
     if (message.includes('unauthorized') || message.includes('403')) {
       return [
         'ログインし直してください',
@@ -91,7 +91,7 @@ function DefaultErrorFallback({ error, reset }: DefaultErrorFallbackProps) {
         'サポートにお問い合わせください',
       ];
     }
-    
+
     return [
       'ページを更新してみてください',
       '問題が続く場合はサポートにご連絡ください',
@@ -228,6 +228,32 @@ function DefaultErrorFallback({ error, reset }: DefaultErrorFallbackProps) {
           </div>
         </details>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Simple inline error message for network/API failures.
+ * Shows in Japanese with a friendly retry option.
+ */
+export function NetworkErrorCard({ onRetry, message }: { onRetry?: () => void; message?: string }) {
+  return (
+    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
+      <div className="text-2xl mb-2">📡</div>
+      <p className="text-amber-800 font-medium mb-1">
+        {message || '接続に問題があります'}
+      </p>
+      <p className="text-amber-600 text-sm mb-3">
+        ネットワーク接続を確認してください
+      </p>
+      {onRetry && (
+        <button
+          onClick={onRetry}
+          className="text-amber-700 underline text-sm hover:text-amber-900"
+        >
+          再試行する
+        </button>
+      )}
     </div>
   );
 }

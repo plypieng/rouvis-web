@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useTranslations } from 'next-intl';
 import { X, Save, Calendar, Clock, MapPin, AlertTriangle } from 'lucide-react';
 
 interface Field {
@@ -27,7 +26,9 @@ const PRIORITY_LEVELS = [
   { value: 'low', label: '低', color: 'bg-green-100 text-green-800' },
   { value: 'medium', label: '中', color: 'bg-yellow-100 text-yellow-800' },
   { value: 'high', label: '高', color: 'bg-red-100 text-red-800' },
-];
+] as const;
+
+type Priority = (typeof PRIORITY_LEVELS)[number]['value'];
 
 export function TaskSchedulerModal({
   isOpen,
@@ -35,7 +36,6 @@ export function TaskSchedulerModal({
   onSave,
   initialFieldId,
 }: TaskSchedulerModalProps) {
-  const t = useTranslations();
   const [fields, setFields] = useState<Field[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -44,7 +44,7 @@ export function TaskSchedulerModal({
     title: '',
     dueAt: '',
     fieldId: initialFieldId || '',
-    priority: 'medium' as 'low' | 'medium' | 'high',
+    priority: 'medium' as Priority,
     notes: '',
   });
 
@@ -240,7 +240,7 @@ export function TaskSchedulerModal({
                 <button
                   key={priority.value}
                   type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, priority: priority.value as any }))}
+                  onClick={() => setFormData(prev => ({ ...prev, priority: priority.value }))}
                   className={`mobile-btn-secondary text-left mobile-tap ${
                     formData.priority === priority.value
                       ? `${priority.color} border-current`

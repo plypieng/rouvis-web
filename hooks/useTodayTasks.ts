@@ -89,36 +89,6 @@ export function useTodayTasks(options: UseTodayTasksOptions = {}): UseTodayTasks
     } catch (err) {
       console.error('Error fetching tasks:', err);
       setError(err instanceof Error ? err : new Error('Failed to fetch tasks'));
-
-      // Fallback to mock data for development
-      if (process.env.NODE_ENV === 'development') {
-        setTasks([
-          {
-            id: '1',
-            title: 'A圃場に水やり',
-            field: 'A圃場',
-            estimatedTime: '30分',
-            priority: 'high',
-            completed: false,
-            weatherDependent: true,
-          },
-          {
-            id: '2',
-            title: 'B圃場の生育確認',
-            field: 'B圃場',
-            estimatedTime: '15分',
-            priority: 'medium',
-            completed: false,
-          },
-          {
-            id: '3',
-            title: '作業記録の整理',
-            estimatedTime: '10分',
-            priority: 'low',
-            completed: false,
-          },
-        ]);
-      }
     } finally {
       setLoading(false);
     }

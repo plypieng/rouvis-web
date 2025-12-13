@@ -12,8 +12,6 @@ import {
     eachDayOfInterval,
     isSameDay,
     isWithinInterval,
-    addYears,
-    subYears,
     getDay,
     isToday
 } from 'date-fns';

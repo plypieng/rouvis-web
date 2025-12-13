@@ -10,12 +10,19 @@ import GoogleProvider from "next-auth/providers/google";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { prisma } from "./prisma";
 
+const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim();
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
+
+if (!googleClientId || !googleClientSecret) {
+  throw new Error('Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET');
+}
+
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID?.trim()!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET?.trim()!,
+      clientId: googleClientId,
+      clientSecret: googleClientSecret,
       authorization: {
         params: {
           // Request calendar scope for Google Calendar integration
@@ -40,6 +47,9 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id;
         token.email = user.email;
         token.name = user.name;
+      } else if (!token.id && token.sub) {
+        // Backward compatibility: older tokens may only have `sub`
+        token.id = token.sub;
       }
 
       return token;
@@ -50,7 +60,7 @@ export const authOptions: NextAuthOptions = {
      */
     async session({ session, token }) {
       if (session.user && token) {
-        session.user.id = token.id as string;
+        session.user.id = (token.id as string | undefined) ?? (token.sub as string) ?? '';
         session.user.email = token.email as string;
         session.user.name = token.name as string;
       }

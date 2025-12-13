@@ -13,26 +13,37 @@ interface ProjectInsightsPanelProps {
     onAskAI: () => void;
 }
 
+type AdviceBlock = {
+    status?: 'safe' | 'warning' | 'critical' | string;
+    summary?: string;
+    detail?: string;
+    message?: string;
+};
+
+type AdviceTask = string | { summary?: string; detail?: string };
+
+type Advice = {
+    weatherImpact?: AdviceBlock;
+    stageAdvice?: { summary?: string; detail?: string; message?: string };
+    priorityTasks?: AdviceTask[];
+};
+
 export default function ProjectInsightsPanel({ project, onAskAI }: ProjectInsightsPanelProps) {
     const t = useTranslations('projects.insights_panel');
     const [loading, setLoading] = useState(true);
-    const [insights, setInsights] = useState<any>(null);
+    const [insights, setInsights] = useState<Advice | null>(null);
 
     useEffect(() => {
         const fetchAdvice = async () => {
             try {
-                console.log('Fetching advice for project:', project.id);
-                const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-                const res = await fetch(`${baseUrl}/api/v1/agents/advice`, {
+                const res = await fetch('/api/v1/agents/advice', {
                     method: 'POST',
-                    credentials: 'include',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ projectId: project.id }),
                 });
 
                 if (res.ok) {
                     const data = await res.json();
-                    console.log('Advice received:', data);
                     setInsights(data.advice);
                 } else {
                     console.error('Advice fetch failed:', res.status, res.statusText);
@@ -148,10 +159,12 @@ export default function ProjectInsightsPanel({ project, onAskAI }: ProjectInsigh
                 <div className="bg-white/60 backdrop-blur-sm rounded-lg p-3 border border-indigo-50">
                     <h4 className="text-xs font-bold text-gray-500 uppercase mb-1">{t('priority_tasks')}</h4>
                     <ul className="space-y-2">
-                        {Array.isArray(insights.priorityTasks) && insights.priorityTasks.map((task: any, index: number) => {
+                        {Array.isArray(insights.priorityTasks) && insights.priorityTasks.map((task, index: number) => {
                             const isExpanded = expandedTasks.includes(index);
-                            const taskText = typeof task === 'string' ? task : (isExpanded ? task.detail : task.summary);
-                            const hasDetail = typeof task === 'object' && task.detail;
+                            const taskText = typeof task === 'string'
+                                ? task
+                                : (isExpanded ? task.detail : task.summary) || '—';
+                            const hasDetail = typeof task === 'object' && !!task?.detail;
 
                             return (
                                 <li key={index} className="flex items-start gap-1.5">

@@ -6,7 +6,17 @@ import { useTranslations } from 'next-intl';
 
 import FieldSelector from './FieldSelector';
 
-export default function CreateProjectForm({ locale, initialData }: { locale: string; initialData?: any }) {
+interface InitialProjectData {
+    name?: string;
+    crop?: string;
+    variety?: string;
+    startDate?: string;
+    targetHarvestDate?: string;
+    notes?: string;
+    fieldId?: string;
+}
+
+export default function CreateProjectForm({ locale, initialData }: { locale: string; initialData?: InitialProjectData }) {
     const t = useTranslations('projects.create');
     const router = useRouter();
     const [loading, setLoading] = useState(false);

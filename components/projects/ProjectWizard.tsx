@@ -10,14 +10,23 @@ import PlantingHistoryInput from './PlantingHistoryInput';
 
 type WizardStep = 'project-type' | 'selection' | 'crop-analysis' | 'planting-history' | 'field-context';
 
+type CropAnalysis = {
+    crop: string;
+    variety?: string;
+    startDate: string;
+    targetHarvestDate: string;
+    notes?: string;
+    daysToHarvest?: number;
+    knowledge?: unknown;
+};
+
 export default function ProjectWizard({ locale }: { locale: string }) {
     const t = useTranslations('projects.create.wizard');
     const router = useRouter();
 
     const [step, setStep] = useState<WizardStep>('project-type');
-    const [cropAnalysis, setCropAnalysis] = useState<any>(null);
-    const [selectedField, setSelectedField] = useState<any>(null);
-    const [generatedSchedule, setGeneratedSchedule] = useState<any>(null);
+    const [cropAnalysis, setCropAnalysis] = useState<CropAnalysis | null>(null);
+    const [selectedField, setSelectedField] = useState<{ id: string } | null>(null);
     const [loading, setLoading] = useState(false);
 
     // State for new workflow
@@ -51,7 +60,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                 });
 
                 if (res.ok) {
-                    const data = await res.json();
+                    const data = await res.json() as CropAnalysis;
 
                     // Extract variety if available, otherwise empty string
                     const variety = data.variety || "";
@@ -111,7 +120,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
             });
 
             if (res.ok) {
-                const data = await res.json();
+                const data = await res.json() as CropAnalysis;
                 setCropAnalysis({ ...data, knowledge });
                 setStep('crop-analysis');
             }
@@ -124,6 +133,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
 
     // Step 2: Crop Analysis Review -> Field Context OR Planting History
     const handleProceedFromAnalysis = () => {
+        if (!cropAnalysis) return;
         if (projectType === 'existing') {
             setStep('planting-history');
         } else {
@@ -139,6 +149,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
 
     // Step 3: Field Context -> Create Project (Directly)
     const handleCreateProject = async () => {
+        if (!cropAnalysis) return;
         setLoading(true);
 
         try {
@@ -250,6 +261,14 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                         </div>
                     </div>
                 </div>
+            </div>
+        );
+    }
+
+    if (!cropAnalysis) {
+        return (
+            <div className="text-sm text-gray-600">
+                作物情報を読み込めませんでした。最初からやり直してください。
             </div>
         );
     }

@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Locale } from '../i18n/config';
 import LanguageSwitcher from './LanguageSwitcher';
+import { signOut, useSession } from 'next-auth/react';
 
 type ThemeMode = 'light' | 'dark' | 'system';
 
@@ -101,6 +102,16 @@ export default function Header({ locale, user = null, alerts = [], kpis }: Heade
   const base = `/${locale}`;
   const pathname = usePathname();
 
+  // Use client-side session for real-time auth state (updates after OAuth without page refresh)
+  const { data: session, status: sessionStatus } = useSession();
+
+  // Debug logging
+  console.log('[Header] useSession result:', { session, sessionStatus, user });
+
+  // Use client-side session if available, otherwise fall back to server-passed user prop
+  const currentUser = session?.user || user;
+  const isSessionLoading = sessionStatus === 'loading';
+
 
 
   // Fetch live warnings from JMA API
@@ -159,6 +170,8 @@ export default function Header({ locale, user = null, alerts = [], kpis }: Heade
         <li><Link href={`${base}`} className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600" onClick={handle}>{t('header.nav.dashboard')}</Link></li>
         <li><Link href={`${base}/map`} className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600" onClick={handle}>マップ</Link></li>
         <li><Link href={`${base}/calendar`} className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600" onClick={handle}>{t('header.nav.calendar')}</Link></li>
+        <li><Link href={`${base}/team`} className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600" onClick={handle}>{t('header.nav.team')}</Link></li>
+        <li><Link href={`${base}/market`} className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600" onClick={handle}>{t('header.nav.market')}</Link></li>
       </ul>
     );
   };
@@ -214,7 +227,7 @@ export default function Header({ locale, user = null, alerts = [], kpis }: Heade
         {/* Live JMA warnings */}
         {liveWarnings.map((warning, idx) => {
           let icon = 'warning';
-          let label = warning.name;
+          const label = warning.name;
 
           // Determine icon based on warning type
           if (warning.name && warning.name.includes('高温')) {
@@ -299,7 +312,16 @@ export default function Header({ locale, user = null, alerts = [], kpis }: Heade
   };
 
   const AuthMenu = () => {
-    if (!user) {
+    // Use top-level session state
+    if (isSessionLoading) {
+      return (
+        <div className="flex items-center gap-2">
+          <div className="w-20 h-8 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse" />
+        </div>
+      );
+    }
+
+    if (!currentUser) {
       return (
         <div className="flex items-center gap-2">
           <Link href={`${base}/login`} className="px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800">{t('header.sign_in')}</Link>
@@ -307,22 +329,31 @@ export default function Header({ locale, user = null, alerts = [], kpis }: Heade
         </div>
       );
     }
-    const initials = (user.name || user.email || 'U').slice(0, 1).toUpperCase();
+    const initials = (currentUser.name || currentUser.email || 'U').slice(0, 1).toUpperCase();
+    // Handle both avatarUrl (from server prop) and image (from session)
+    const avatarSrc = (currentUser as { avatarUrl?: string }).avatarUrl || (currentUser as { image?: string }).image;
     return (
       <details className="relative">
         <summary className="list-none cursor-pointer flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800">
-          {user.avatarUrl ? (<img src={user.avatarUrl} alt={user.name || 'User'} className="w-7 h-7 rounded-full" />) : (<div className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center text-sm font-semibold">{initials}</div>)}
-          <span className="text-sm">{user.name || user.email}</span>
+          {avatarSrc ? (<img src={avatarSrc} alt={currentUser.name || 'User'} className="w-7 h-7 rounded-full" />) : (<div className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center text-sm font-semibold">{initials}</div>)}
+          <span className="text-sm">{currentUser.name || currentUser.email}</span>
         </summary>
         <div className="absolute right-0 mt-1 w-56 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-30 p-1">
           <Link href={`${base}/profile`} className="block px-3 py-2 rounded-md text-sm hover:bg-gray-100 dark:hover:bg-gray-800">{t('header.profile')}</Link>
-          <button type="button" className="block w-full text-left px-3 py-2 rounded-md text-sm hover:bg-gray-100 dark:hover:bg-gray-800">{t('header.sign_out')}</button>
+          <button
+            type="button"
+            onClick={() => signOut({ callbackUrl: `${base}/login` })}
+            className="block w-full text-left px-3 py-2 rounded-md text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
+          >
+            {t('header.sign_out')}
+          </button>
         </div>
       </details>
     );
   };
 
-  if (!user && (pathname === `/${locale}` || pathname === '/')) {
+  // Hide header on landing page for unauthenticated users (after session check completes)
+  if (!isSessionLoading && !currentUser && (pathname === `/${locale}` || pathname === '/')) {
     return null;
   }
 
@@ -337,6 +368,7 @@ export default function Header({ locale, user = null, alerts = [], kpis }: Heade
           <nav role="navigation" aria-label="Primary" className="hidden md:block ml-4"><NavLinks /></nav>
         </div>
         <div className="hidden md:flex items-center gap-2">
+          <AlertChips />
           <KPIIndicators />
           <SettingsMenu />
           <AuthMenu />

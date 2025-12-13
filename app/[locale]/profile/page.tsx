@@ -3,19 +3,21 @@
 import { useTranslations } from 'next-intl';
 import { useSession, signOut } from 'next-auth/react';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 export default function ProfilePage() {
     const t = useTranslations('pages.profile');
     const { data: session, status } = useSession();
+    const params = useParams<{ locale: string }>();
+    const locale = (params?.locale as string) || 'ja';
     const router = useRouter();
 
     useEffect(() => {
         if (status === 'unauthenticated') {
-            router.push('/ja/login');
+            router.push(`/${locale}/login`);
         }
-    }, [status, router]);
+    }, [status, router, locale]);
 
     if (status === 'loading') {
         return (
@@ -77,7 +79,7 @@ export default function ProfilePage() {
 
                         <div className="mt-8 flex justify-end">
                             <button
-                                onClick={() => signOut({ callbackUrl: '/ja/login' })}
+                                onClick={() => signOut({ callbackUrl: `/${locale}/login` })}
                                 className="px-4 py-2 border border-red-200 text-red-600 rounded-md hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
                             >
                                 {t('sign_out')}

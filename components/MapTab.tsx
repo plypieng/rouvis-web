@@ -2,35 +2,32 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { googleMapsLoader } from '@/lib/google-maps';
-import { useTranslations } from 'next-intl';
+
+type LatLng = { lat: number; lng: number };
 
 interface Field {
     id: string;
     name: string;
     crop?: string;
-    polygon?: any; // GeoJSON or array of coords
-    location?: any; // Center point
+    polygon?: string | LatLng[];
+    location?: string | LatLng;
     color?: string;
 }
 
-export default function MapTab({ locale }: { locale: string }) {
+export default function MapTab() {
     const mapRef = useRef<HTMLDivElement>(null);
     const [map, setMap] = useState<google.maps.Map | null>(null);
     const [fields, setFields] = useState<Field[]>([]);
     const [selectedField, setSelectedField] = useState<Field | null>(null);
-    const t = useTranslations('dashboard'); // Reuse dashboard translations for now
 
     // Fetch fields
     useEffect(() => {
         const fetchFields = async () => {
             try {
-                const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-                const res = await fetch(`${baseUrl}/api/v1/fields`, {
-                    credentials: 'include',
-                });
+                const res = await fetch('/api/v1/fields');
                 if (res.ok) {
                     const data = await res.json();
-                    setFields(data.fields);
+                    setFields(data.fields || []);
                 } else {
                     console.error('API Error:', res.status, res.statusText);
                 }
@@ -76,14 +73,16 @@ export default function MapTab({ locale }: { locale: string }) {
         fields.forEach((field) => {
             if (field.polygon) {
                 // Parse polygon data
-                let paths = field.polygon;
+                let paths: LatLng[] = [];
                 if (typeof field.polygon === 'string') {
                     try {
-                        paths = JSON.parse(field.polygon);
+                        paths = JSON.parse(field.polygon) as LatLng[];
                     } catch (e) {
                         console.error('Error parsing polygon', e);
                         return;
                     }
+                } else if (Array.isArray(field.polygon)) {
+                    paths = field.polygon;
                 }
 
                 const polygon = new google.maps.Polygon({
@@ -99,22 +98,24 @@ export default function MapTab({ locale }: { locale: string }) {
                 polygon.addListener('click', () => {
                     setSelectedField(field);
                     if (field.location) {
-                        let loc = field.location;
+                        let loc: LatLng | null = null;
                         if (typeof field.location === 'string') {
-                            try { loc = JSON.parse(field.location); } catch (e) { }
+                            try { loc = JSON.parse(field.location) as LatLng; } catch { }
+                        } else {
+                            loc = field.location;
                         }
-                        map.panTo(loc);
-                        map.setZoom(16);
+                        if (loc) {
+                            map.panTo(loc);
+                            map.setZoom(16);
+                        }
                     }
                 });
 
                 // Extend bounds
-                if (Array.isArray(paths)) {
-                    paths.forEach((p: any) => {
-                        bounds.extend(p);
-                        hasValidBounds = true;
-                    });
-                }
+                paths.forEach((p) => {
+                    bounds.extend(p);
+                    hasValidBounds = true;
+                });
             }
         });
 
@@ -138,9 +139,13 @@ export default function MapTab({ locale }: { locale: string }) {
         let hasValidBounds = false;
         fields.forEach(f => {
             if (f.polygon) {
-                let paths = f.polygon;
-                if (typeof paths === 'string') try { paths = JSON.parse(paths); } catch (e) { }
-                if (Array.isArray(paths)) paths.forEach((p: any) => { bounds.extend(p); hasValidBounds = true; });
+                let paths: LatLng[] = [];
+                if (typeof f.polygon === 'string') {
+                    try { paths = JSON.parse(f.polygon) as LatLng[]; } catch { }
+                } else if (Array.isArray(f.polygon)) {
+                    paths = f.polygon;
+                }
+                paths.forEach((p) => { bounds.extend(p); hasValidBounds = true; });
             }
         });
         if (hasValidBounds) map.fitBounds(bounds);

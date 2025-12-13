@@ -144,69 +144,92 @@ export default async function DashboardProjectList({ locale }: { locale: string 
                     </Link>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {/* Create New Card */}
-                    <Link
-                        href={`/${locale}/projects/create`}
-                        className="block border-2 border-dashed border-border rounded-xl p-10 text-center hover:border-primary/50 hover:bg-primary/5 transition-colors group"
-                    >
-                        <span className="text-3xl text-muted-foreground group-hover:text-primary transition-colors">+</span>
-                        <span className="mt-2 block text-sm text-muted-foreground">
-                            {t('create_new_project')}
-                        </span>
-                    </Link>
+                {/* Welcome Card for New Users */}
+                {projects.length === 0 ? (
+                    <div className="bg-gradient-to-br from-emerald-50 to-green-50 border border-emerald-200 rounded-2xl p-8 text-center max-w-md mx-auto">
+                        <div className="text-5xl mb-4">🌱</div>
+                        <h3 className="text-xl font-bold text-gray-900 mb-2">
+                            {t('welcome_title')}
+                        </h3>
+                        <p className="text-gray-600 mb-2">
+                            {t('welcome_subtitle')}
+                        </p>
+                        <p className="text-sm text-gray-500 mb-6">
+                            {t('welcome_description')}
+                        </p>
+                        <Link
+                            href={`/${locale}/projects/create`}
+                            className="inline-flex items-center px-6 py-3 rounded-full text-base font-semibold text-white bg-emerald-600 hover:bg-emerald-500 transition-colors shadow-lg"
+                        >
+                            {t('welcome_cta')}
+                            <span className="ml-2">→</span>
+                        </Link>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {/* Create New Card */}
+                        <Link
+                            href={`/${locale}/projects/create`}
+                            className="block border-2 border-dashed border-border rounded-xl p-10 text-center hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+                        >
+                            <span className="text-3xl text-muted-foreground group-hover:text-primary transition-colors">+</span>
+                            <span className="mt-2 block text-sm text-muted-foreground">
+                                {t('create_new_project')}
+                            </span>
+                        </Link>
 
-                    {/* Project Cards - Simplified */}
-                    {projects.map((project) => {
-                        const daysSinceStart = Math.floor((new Date().getTime() - new Date(project.startDate).getTime()) / (1000 * 60 * 60 * 24));
+                        {/* Project Cards - Simplified */}
+                        {projects.map((project) => {
+                            const daysSinceStart = Math.floor((new Date().getTime() - new Date(project.startDate).getTime()) / (1000 * 60 * 60 * 24));
 
-                        return (
-                            <Link
-                                key={project.id}
-                                href={`/${locale}/projects/${project.id}`}
-                                className="block bg-card rounded-xl border border-border hover:border-primary/30 transition-colors p-5"
-                            >
-                                {/* Header */}
-                                <div className="flex justify-between items-start mb-4">
-                                    <div>
-                                        <h3 className="text-base font-semibold text-foreground">
-                                            {project.name}
-                                        </h3>
-                                        <p className="text-sm text-muted-foreground mt-0.5">
-                                            {project.crop} {project.variety ? `· ${project.variety}` : ''}
-                                        </p>
+                            return (
+                                <Link
+                                    key={project.id}
+                                    href={`/${locale}/projects/${project.id}`}
+                                    className="block bg-card rounded-xl border border-border hover:border-primary/30 transition-colors p-5"
+                                >
+                                    {/* Header */}
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div>
+                                            <h3 className="text-base font-semibold text-foreground">
+                                                {project.name}
+                                            </h3>
+                                            <p className="text-sm text-muted-foreground mt-0.5">
+                                                {project.crop} {project.variety ? `· ${project.variety}` : ''}
+                                            </p>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className="text-xl font-semibold text-foreground">{daysSinceStart}</span>
+                                            <span className="text-xs text-muted-foreground block">{t('days')}</span>
+                                        </div>
                                     </div>
-                                    <div className="text-right">
-                                        <span className="text-xl font-semibold text-foreground">{daysSinceStart}</span>
-                                        <span className="text-xs text-muted-foreground block">{t('days')}</span>
-                                    </div>
-                                </div>
 
-                                {/* Info rows - simplified, no colored backgrounds */}
-                                <div className="space-y-2 text-sm">
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">{t('last_activity')}</span>
-                                        <span className="text-foreground">
-                                            {project.lastActivity?.type || '—'}
-                                        </span>
+                                    {/* Info rows - simplified, no colored backgrounds */}
+                                    <div className="space-y-2 text-sm">
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">{t('last_activity')}</span>
+                                            <span className="text-foreground">
+                                                {project.lastActivity?.type || '—'}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">{t('next_task')}</span>
+                                            <span className="text-foreground">
+                                                {project.nextTask?.title || '—'}
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">{t('next_task')}</span>
-                                        <span className="text-foreground">
-                                            {project.nextTask?.title || '—'}
-                                        </span>
-                                    </div>
-                                </div>
 
-                                {/* Footer */}
-                                <div className="mt-4 pt-3 border-t border-border flex justify-between items-center text-xs text-muted-foreground">
-                                    <span>{project.field?.name || t('not_set')}</span>
-                                    <span className="text-primary">詳細 →</span>
-                                </div>
-                            </Link>
-                        );
-                    })}
-                </div>
+                                    {/* Footer */}
+                                    <div className="mt-4 pt-3 border-t border-border flex justify-between items-center text-xs text-muted-foreground">
+                                        <span>{project.field?.name || t('not_set')}</span>
+                                        <span className="text-primary">詳細 →</span>
+                                    </div>
+                                </Link>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
         </div>
     );

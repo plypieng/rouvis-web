@@ -1,38 +1,57 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  getDemoActivities,
-  isDemoModeEnabled,
-  logDemoActivity,
-} from '@/lib/demo-scenario';
+import { getToken } from 'next-auth/jwt';
+
+const BACKEND_URL = process.env.BACKEND_URL
+  || process.env.NEXT_PUBLIC_API_BASE_URL
+  || (process.env.NODE_ENV === 'production'
+    ? 'https://localfarm-backend.vercel.app'
+    : 'http://localhost:4000');
 
 export async function GET(request: NextRequest) {
-  const fieldId = request.nextUrl.searchParams.get('field_id') ?? undefined;
-  return NextResponse.json({ activities: getDemoActivities(fieldId || undefined) });
-}
-
-export async function POST(request: NextRequest) {
-  if (!isDemoModeEnabled()) {
-    return NextResponse.json(
-      { error: 'Activity logging requires demo mode' },
-      { status: 501 },
-    );
+  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+  const userId = (token?.id as string | undefined) ?? token?.sub;
+  if (!userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    const payload = await request.json();
-    const activity = logDemoActivity({
-      type: payload.type || 'watering',
-      field_id: payload.field_id || payload.fieldId,
-      description: payload.description || payload.note || '作業記録',
-      performed_at: payload.performed_at || payload.performedAt,
+    const res = await fetch(`${BACKEND_URL}/api/v1/activities?${request.nextUrl.searchParams.toString()}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-id': userId,
+      },
     });
 
-    return NextResponse.json({ activity }, { status: 201 });
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
   } catch (error) {
-    console.error('Failed to log activity', error);
-    return NextResponse.json(
-      { error: 'Failed to log activity' },
-      { status: 500 },
-    );
+    console.error('Activities proxy GET error:', error);
+    return NextResponse.json({ error: 'Failed to fetch activities' }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+  const userId = (token?.id as string | undefined) ?? token?.sub;
+  if (!userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    const body = await request.json();
+    const res = await fetch(`${BACKEND_URL}/api/v1/activities`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-id': userId,
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
+  } catch (error) {
+    console.error('Activities proxy POST error:', error);
+    return NextResponse.json({ error: 'Failed to create activity' }, { status: 500 });
   }
 }

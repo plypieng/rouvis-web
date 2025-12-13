@@ -7,9 +7,10 @@ const BACKEND_URL = process.env.BACKEND_URL
     || (process.env.NODE_ENV === 'production' ? 'https://localfarm-backend.vercel.app' : 'http://localhost:4000');
 
 export async function GET(req: NextRequest) {
-    const token = await getToken({ req: req as any, secret: process.env.NEXTAUTH_SECRET });
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 
-    if (!token?.id) {
+    const userId = (token?.id as string | undefined) ?? token?.sub;
+    if (!userId) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -17,7 +18,7 @@ export async function GET(req: NextRequest) {
         const res = await fetch(`${BACKEND_URL}/api/v1/projects`, {
             headers: {
                 'Content-Type': 'application/json',
-                'x-user-id': token.id as string,
+                'x-user-id': userId,
             },
         });
 
@@ -30,9 +31,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-    const token = await getToken({ req: req as any, secret: process.env.NEXTAUTH_SECRET });
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 
-    if (!token?.id) {
+    const userId = (token?.id as string | undefined) ?? token?.sub;
+    if (!userId) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -43,7 +45,7 @@ export async function POST(req: NextRequest) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'x-user-id': token.id as string,
+                'x-user-id': userId,
             },
             body: JSON.stringify(body),
         });

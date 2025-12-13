@@ -1,22 +1,25 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { z } from 'zod';
+import { Loader2, ChevronDown, Info, Check, ArrowRight } from 'lucide-react';
+import { PREFECTURES, EXPERIENCE_OPTIONS, FARMING_TYPES, COMMON_CROPS } from '../../../lib/prefectures';
 
 // Validation schemas
 const profileSchema = z.object({
   name: z.string().min(1, '名前を入力してください'),
-  region: z.string().min(1, '地域を入力してください'),
-  farmSize: z.number().min(0.01, '農地面積を入力してください'),
+  prefecture: z.string().min(1, '都道府県を選択してください'),
+  experience: z.string().min(1, '経験年数を選択してください'),
+  farmingType: z.string().min(1, '栽培方法を選択してください'),
 });
 
 const fieldSchema = z.object({
-  name: z.string().min(1, '圃場名を入力してください'),
+  name: z.string().min(1, '畑の名前を入力してください'),
   area: z.number().min(0.01, '面積を入力してください'),
-  crop: z.string().min(1, '作物を入力してください'),
+  crop: z.string().min(1, '作物を選択してください'),
   plantingDate: z.string().optional(),
 });
 
@@ -25,57 +28,101 @@ type FieldData = z.infer<typeof fieldSchema>;
 
 export default function OnboardingPage() {
   const t = useTranslations('auth.onboarding');
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
+  const params = useParams<{ locale: string }>();
+  const locale = (params?.locale as string) || 'ja';
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const hasSeenLoading = useRef(false);
+  const hasPrefilledName = useRef(false);
+
+  if (status === 'loading') {
+    hasSeenLoading.current = true;
+  }
+
   // Form data
   const [profileData, setProfileData] = useState<Partial<ProfileData>>({
-    region: '新潟県', // Default to Niigata
+    prefecture: '15', // Default to Niigata
+    farmingType: 'conventional',
+    experience: '1_3', // Default to reasonable middle
   });
   const [fieldData, setFieldData] = useState<Partial<FieldData>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Redirect if not authenticated (moved to effect to avoid updating Router during render)
+  // Pre-fill name from Google session
   useEffect(() => {
-    console.debug('[Onboarding] session status:', status);
-    if (status === 'unauthenticated') {
-      console.debug('[Onboarding] redirect unauthenticated -> /login');
-      router.replace('/login');
+    if (session?.user?.name && !hasPrefilledName.current) {
+      setProfileData(prev => ({ ...prev, name: session.user?.name || '' }));
+      hasPrefilledName.current = true;
     }
-  }, [status, router]);
+  }, [session]);
 
-  if (status === 'unauthenticated') {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-gray-600">Redirecting...</div>
-      </div>
-    );
-  }
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (hasSeenLoading.current && status === 'unauthenticated') {
+      router.replace(`/${locale}/login`);
+    }
+  }, [status, router, locale]);
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-gray-600">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="flex items-center gap-3 text-gray-600">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span>読み込み中...</span>
+        </div>
       </div>
     );
   }
 
-  const handleProfileNext = () => {
+  if (hasSeenLoading.current && status === 'unauthenticated') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="flex items-center gap-3 text-gray-600">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span>ログインページへ移動中...</span>
+        </div>
+      </div>
+    );
+  }
+
+  const handleProfileNext = async () => {
     try {
       profileSchema.parse(profileData);
       setErrors({});
-      setStep(3); // Skip welcome (step 2), go to field creation (step 3)
+      setIsSubmitting(true);
+
+      const selectedPrefecture = PREFECTURES.find(p => p.code === profileData.prefecture);
+      await fetch('/api/v1/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          displayName: profileData.name,
+          region: selectedPrefecture?.name || '新潟県',
+          experienceLevel: profileData.experience,
+          farmingType: profileData.farmingType,
+        }),
+      });
+
+      // Trigger session update to refresh onboardingComplete flag
+      await update();
+
+      setIsSubmitting(false);
+      setStep(3);
     } catch (err) {
+      setIsSubmitting(false);
       if (err instanceof z.ZodError) {
         const newErrors: Record<string, string> = {};
-        err.issues.forEach((error: any) => {
-          if (error.path[0]) {
-            newErrors[error.path[0].toString()] = error.message;
+        err.issues.forEach((issue) => {
+          if (issue.path[0]) {
+            newErrors[issue.path[0].toString()] = issue.message;
           }
         });
         setErrors(newErrors);
+      } else {
+        setStep(3); // Proceed anyway
       }
     }
   };
@@ -86,194 +133,351 @@ export default function OnboardingPage() {
       setErrors({});
       setIsSubmitting(true);
 
-      // Create field via API
+      const selectedCrop = COMMON_CROPS.find(c => c.value === fieldData.crop);
+
       const response = await fetch('/api/v1/fields', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: fieldData.name,
           area: fieldData.area,
-          crop: fieldData.crop,
+          crop: selectedCrop?.label || fieldData.crop,
           planting_date: fieldData.plantingDate || null,
-          geojson: null, // Can be added later
+          geojson: null,
         }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create field');
+        throw new Error('Failed to create field');
       }
 
-      // Redirect to dashboard/calendar
-      console.debug('[Onboarding] field created, navigating -> /calendar');
-      router.push('/calendar');
+      setStep(4);
     } catch (err) {
       if (err instanceof z.ZodError) {
         const newErrors: Record<string, string> = {};
-        err.issues.forEach((error: any) => {
-          if (error.path[0]) {
-            newErrors[error.path[0].toString()] = error.message;
+        err.issues.forEach((issue) => {
+          if (issue.path[0]) {
+            newErrors[issue.path[0].toString()] = issue.message;
           }
         });
         setErrors(newErrors);
       } else {
         console.error('Field creation error:', err);
-        alert('圃場の作成に失敗しました。もう一度お試しください。');
+        setStep(4); // Proceed to completion anyway
       }
       setIsSubmitting(false);
     }
   };
 
-  // Welcome Step
+  const handleSkipField = async () => {
+    // Ensure session is updated with onboardingComplete = true
+    await update();
+    router.push(`/${locale}/projects`);
+  };
+
+  const handleComplete = () => {
+    router.push(`/${locale}/projects/create`);
+  };
+
+  const setTodayDate = () => {
+    const today = new Date().toISOString().split('T')[0];
+    setFieldData({ ...fieldData, plantingDate: today });
+  };
+
+  // Step 1: Welcome
   if (step === 1) {
     return (
-      <OnboardingLayout step={1} totalSteps={3}>
+      <OnboardingLayout step={1} totalSteps={4}>
         <div className="text-center space-y-6">
-          <div className="text-6xl mb-4">🌾</div>
-          <h1 className="text-3xl font-bold text-gray-900">{t('welcome.title')}</h1>
-          <p className="text-lg text-gray-600">{t('welcome.subtitle')}</p>
-          <p className="text-gray-600">{t('welcome.description')}</p>
+          <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto">
+            <span className="text-3xl">🌾</span>
+          </div>
 
-          {/* Benefits */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
-            <BenefitCard icon="💬" title={t('welcome.benefits.chat')} />
-            <BenefitCard icon="🌦️" title={t('welcome.benefits.weather')} />
-            <BenefitCard icon="📚" title={t('welcome.benefits.knowledge')} />
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              {session?.user?.name ? `${session.user.name}さん、` : ''}ようこそ
+            </h1>
+            <p className="text-gray-600">
+              農作業の計画と記録を、会話でシンプルに
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 mt-8 text-left">
+            <FeatureRow icon="📅" text="天気を見ながら最適なスケジュールを自動作成" />
+            <FeatureRow icon="📸" text="写真を送るだけで病害虫を診断" />
+            <FeatureRow icon="📝" text="作業記録を話しかけるだけで保存" />
           </div>
 
           <button
             onClick={() => setStep(2)}
-            className="mt-8 px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+            className="w-full mt-6 px-6 py-4 bg-emerald-600 text-white rounded-xl hover:bg-emerald-500 transition-colors font-medium flex items-center justify-center gap-2"
           >
-            {t('welcome.nextButton')}
+            セットアップを始める
+            <ArrowRight className="w-4 h-4" />
           </button>
+
+          <p className="text-xs text-gray-400">約1分で完了します</p>
         </div>
       </OnboardingLayout>
     );
   }
 
-  // Profile Step (currently skipped in flow, but code kept for future)
+  // Step 2: Profile
   if (step === 2) {
     return (
-      <OnboardingLayout step={2} totalSteps={3}>
+      <OnboardingLayout step={2} totalSteps={4}>
         <div className="space-y-6">
-          <h2 className="text-2xl font-bold text-gray-900">{t('profile.title')}</h2>
-          <p className="text-gray-600">{t('profile.subtitle')}</p>
-
-          <div className="space-y-4">
-            <FormField
-              label={t('profile.nameLabel')}
-              placeholder={t('profile.namePlaceholder')}
-              value={profileData.name || ''}
-              onChange={(value) => setProfileData({ ...profileData, name: value })}
-              error={errors.name}
-            />
-
-            <FormField
-              label={t('profile.regionLabel')}
-              placeholder={t('profile.regionPlaceholder')}
-              value={profileData.region || ''}
-              onChange={(value) => setProfileData({ ...profileData, region: value })}
-              error={errors.region}
-            />
-
-            <FormField
-              label={t('profile.farmSizeLabel')}
-              placeholder={t('profile.farmSizePlaceholder')}
-              type="number"
-              step="0.1"
-              value={profileData.farmSize?.toString() || ''}
-              onChange={(value) => setProfileData({ ...profileData, farmSize: parseFloat(value) || 0 })}
-              error={errors.farmSize}
-            />
+          <div className="text-center mb-4">
+            <h2 className="text-xl font-bold text-gray-900">基本情報</h2>
+            <p className="text-sm text-gray-500">より正確なアドバイスのために教えてください</p>
           </div>
 
-          <div className="flex gap-4">
-            <button
-              onClick={() => setStep(1)}
-              className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              {t('profile.backButton')}
-            </button>
+          <div className="space-y-4">
+            {/* Name - pre-filled from Google */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">お名前</label>
+              <input
+                type="text"
+                value={profileData.name || ''}
+                onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
+                placeholder="田中 太郎"
+                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${errors.name ? 'border-red-500' : 'border-gray-200'
+                  }`}
+              />
+              {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
+            </div>
+
+            {/* Prefecture */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">お住まいの地域</label>
+              <SelectField
+                value={profileData.prefecture || ''}
+                onChange={(value) => setProfileData({ ...profileData, prefecture: value })}
+                options={PREFECTURES.map(p => ({ value: p.code, label: p.name }))}
+                placeholder="都道府県を選択"
+                error={errors.prefecture}
+              />
+            </div>
+
+            {/* Experience - reframed positively */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                農業の経験
+                <span className="text-gray-400 font-normal ml-2">初心者でも大歓迎</span>
+              </label>
+              <SelectField
+                value={profileData.experience || ''}
+                onChange={(value) => setProfileData({ ...profileData, experience: value })}
+                options={EXPERIENCE_OPTIONS}
+                placeholder="選択してください"
+                error={errors.experience}
+              />
+            </div>
+
+            {/* Farming Type */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">栽培方法</label>
+              <SelectField
+                value={profileData.farmingType || ''}
+                onChange={(value) => setProfileData({ ...profileData, farmingType: value })}
+                options={FARMING_TYPES}
+                placeholder="選択してください"
+                error={errors.farmingType}
+              />
+            </div>
+          </div>
+
+          <div className="pt-4 space-y-3">
             <button
               onClick={handleProfileNext}
-              className="flex-1 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+              disabled={isSubmitting}
+              className="w-full px-6 py-4 bg-emerald-600 text-white rounded-xl hover:bg-emerald-500 transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {t('profile.nextButton')}
+              {isSubmitting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  次へ
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </button>
+            <button
+              onClick={() => setStep(1)}
+              disabled={isSubmitting}
+              className="w-full text-gray-500 hover:text-gray-700 text-sm"
+            >
+              戻る
+            </button>
+          </div>
+
+          <p className="text-xs text-gray-400 text-center">
+            <Info className="w-3 h-3 inline mr-1" />
+            後から設定で変更できます
+          </p>
+        </div>
+      </OnboardingLayout>
+    );
+  }
+
+  // Step 3: Field Creation
+  if (step === 3) {
+    return (
+      <OnboardingLayout step={3} totalSteps={4}>
+        <div className="space-y-6">
+          <div className="text-center mb-4">
+            <h2 className="text-xl font-bold text-gray-900">最初の畑を登録</h2>
+            <p className="text-sm text-gray-500">AIがスケジュールを作成するために必要です</p>
+          </div>
+
+          <div className="space-y-4">
+            {/* Field Name */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">畑の名前</label>
+              <input
+                type="text"
+                value={fieldData.name || ''}
+                onChange={(e) => setFieldData({ ...fieldData, name: e.target.value })}
+                placeholder="例：家の前の畑、第1圃場"
+                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${errors.name ? 'border-red-500' : 'border-gray-200'
+                  }`}
+              />
+              {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
+            </div>
+
+            {/* Area */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                面積
+                <span className="text-gray-400 font-normal ml-2">ヘクタール（ha）</span>
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                value={fieldData.area?.toString() || ''}
+                onChange={(e) => setFieldData({ ...fieldData, area: parseFloat(e.target.value) || 0 })}
+                placeholder="0.5"
+                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${errors.area ? 'border-red-500' : 'border-gray-200'
+                  }`}
+              />
+              <p className="mt-1 text-xs text-gray-400">おおよそでOK・1反 ≒ 0.1ha</p>
+              {errors.area && <p className="mt-1 text-sm text-red-600">{errors.area}</p>}
+            </div>
+
+            {/* Crop */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">今育てている作物</label>
+              <SelectField
+                value={fieldData.crop || ''}
+                onChange={(value) => setFieldData({ ...fieldData, crop: value })}
+                options={COMMON_CROPS}
+                placeholder="選択してください"
+                error={errors.crop}
+              />
+            </div>
+
+            {/* Planting Date */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                定植日・播種日
+                <span className="text-gray-400 font-normal ml-2">任意</span>
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="date"
+                  value={fieldData.plantingDate || ''}
+                  onChange={(e) => setFieldData({ ...fieldData, plantingDate: e.target.value })}
+                  className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                />
+                <button
+                  type="button"
+                  onClick={setTodayDate}
+                  className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition-colors text-sm font-medium"
+                >
+                  今日
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-4 space-y-3">
+            <button
+              onClick={handleFieldSubmit}
+              disabled={isSubmitting}
+              className="w-full px-6 py-4 bg-emerald-600 text-white rounded-xl hover:bg-emerald-500 transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  作成中...
+                </>
+              ) : (
+                <>
+                  登録して続ける
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+
+            <div className="flex justify-between items-center">
+              <button
+                onClick={() => setStep(2)}
+                disabled={isSubmitting}
+                className="text-gray-500 hover:text-gray-700 text-sm"
+              >
+                戻る
+              </button>
+              <button
+                onClick={handleSkipField}
+                disabled={isSubmitting}
+                className="text-gray-400 hover:text-gray-600 text-sm"
+              >
+                後で登録する →
+              </button>
+            </div>
           </div>
         </div>
       </OnboardingLayout>
     );
   }
 
-  // Field Creation Step
+  // Step 4: Complete
   return (
-    <OnboardingLayout step={3} totalSteps={3}>
-      <div className="space-y-6">
-        <h2 className="text-2xl font-bold text-gray-900">{t('field.title')}</h2>
-        <p className="text-gray-600">{t('field.subtitle')}</p>
-
-        <div className="space-y-4">
-          <FormField
-            label={t('field.nameLabel')}
-            placeholder={t('field.namePlaceholder')}
-            value={fieldData.name || ''}
-            onChange={(value) => setFieldData({ ...fieldData, name: value })}
-            error={errors.name}
-          />
-
-          <FormField
-            label={t('field.areaLabel')}
-            placeholder={t('field.areaPlaceholder')}
-            type="number"
-            step="0.1"
-            value={fieldData.area?.toString() || ''}
-            onChange={(value) => setFieldData({ ...fieldData, area: parseFloat(value) || 0 })}
-            error={errors.area}
-          />
-
-          <FormField
-            label={t('field.cropLabel')}
-            placeholder={t('field.cropPlaceholder')}
-            value={fieldData.crop || ''}
-            onChange={(value) => setFieldData({ ...fieldData, crop: value })}
-            error={errors.crop}
-          />
-
-          <FormField
-            label={t('field.plantingDateLabel')}
-            placeholder={t('field.plantingDatePlaceholder')}
-            type="date"
-            value={fieldData.plantingDate || ''}
-            onChange={(value) => setFieldData({ ...fieldData, plantingDate: value })}
-          />
+    <OnboardingLayout step={4} totalSteps={4}>
+      <div className="text-center space-y-6 py-4">
+        <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto">
+          <Check className="w-8 h-8 text-emerald-600" />
         </div>
 
-        <div className="flex gap-4">
-          <button
-            onClick={() => setStep(1)}
-            disabled={isSubmitting}
-            className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {t('field.backButton')}
-          </button>
-          <button
-            onClick={handleFieldSubmit}
-            disabled={isSubmitting}
-            className="flex-1 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isSubmitting ? t('field.submitting') : t('field.finishButton')}
-          </button>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">準備完了！</h2>
+          <p className="text-gray-600">
+            {profileData.name}さん、お疲れさまでした
+          </p>
         </div>
+
+        <div className="bg-gray-50 rounded-xl p-4 text-left space-y-3">
+          <p className="text-sm font-medium text-gray-700">次のステップ</p>
+          <div className="space-y-2">
+            <NextStepItem number={1} text="プロジェクトを作成" />
+            <NextStepItem number={2} text="AIがスケジュールを自動提案" />
+            <NextStepItem number={3} text="毎日のタスクをチェック" />
+          </div>
+        </div>
+
+        <button
+          onClick={handleComplete}
+          className="w-full px-6 py-4 bg-emerald-600 text-white rounded-xl hover:bg-emerald-500 transition-colors font-semibold flex items-center justify-center gap-2"
+        >
+          最初のプロジェクトを作成
+          <ArrowRight className="w-4 h-4" />
+        </button>
       </div>
     </OnboardingLayout>
   );
 }
 
-// Helper components
+// Layout
 function OnboardingLayout({
   step,
   totalSteps,
@@ -283,73 +487,83 @@ function OnboardingLayout({
   totalSteps: number;
   children: React.ReactNode;
 }) {
-  const t = useTranslations('auth.onboarding');
-
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
-      <div className="max-w-2xl mx-auto">
-        {/* Progress indicator */}
-        <div className="mb-8">
-          <p className="text-sm text-gray-500 text-center mb-4">
-            {t('progress', { current: step, total: totalSteps })}
-          </p>
-          <div className="flex gap-2">
-            {Array.from({ length: totalSteps }).map((_, i) => (
-              <div
-                key={i}
-                className={`flex-1 h-2 rounded-full transition-colors ${
-                  i < step ? 'bg-green-600' : 'bg-gray-200'
-                }`}
-              />
-            ))}
-          </div>
-        </div>
+    <div className="min-h-screen bg-white flex flex-col">
+      {/* Progress bar - minimal */}
+      <div className="h-1 bg-gray-100">
+        <div
+          className="h-full bg-emerald-500 transition-all duration-300"
+          style={{ width: `${(step / totalSteps) * 100}%` }}
+        />
+      </div>
 
-        <div className="bg-white rounded-2xl shadow-lg p-8">{children}</div>
+      <div className="flex-1 flex items-center justify-center p-6">
+        <div className="w-full max-w-md">
+          {children}
+        </div>
       </div>
     </div>
   );
 }
 
-function BenefitCard({ icon, title }: { icon: string; title: string }) {
+// Feature row for welcome
+function FeatureRow({ icon, text }: { icon: string; text: string }) {
   return (
-    <div className="p-4 bg-green-50 rounded-lg text-center">
-      <div className="text-3xl mb-2">{icon}</div>
-      <p className="text-sm text-gray-700">{title}</p>
+    <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+      <span className="text-xl">{icon}</span>
+      <span className="text-sm text-gray-700">{text}</span>
     </div>
   );
 }
 
-function FormField({
-  label,
-  placeholder,
-  type = 'text',
-  step,
+// Next step item for completion
+function NextStepItem({ number, text }: { number: number; text: string }) {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 text-xs font-bold flex items-center justify-center">
+        {number}
+      </div>
+      <span className="text-sm text-gray-600">{text}</span>
+    </div>
+  );
+}
+
+// Select field helper
+function SelectField({
   value,
   onChange,
+  options,
+  placeholder,
   error,
 }: {
-  label: string;
-  placeholder: string;
-  type?: string;
-  step?: string;
   value: string;
   onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+  placeholder?: string;
   error?: string;
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-      <input
-        type={type}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all ${
-          error ? 'border-red-500' : 'border-gray-300'
-        }`}
-      />
+      <div className="relative">
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent appearance-none bg-white ${error ? 'border-red-500' : 'border-gray-200'
+            }`}
+        >
+          {placeholder && (
+            <option value="" disabled>
+              {placeholder}
+            </option>
+          )}
+          {options.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+      </div>
       {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
     </div>
   );

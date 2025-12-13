@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useTranslations } from 'next-intl';
 
 type Question = {
     id: string;
@@ -21,10 +20,11 @@ export default function ConversationalQA({
     crop: string;
     onComplete: (estimatedDate: string) => void;
 }) {
-    const t = useTranslations('projects.conversational');
+    type AnswerOption = Question['options'][number];
+
     const [questions, setQuestions] = useState<Question[]>([]);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-    const [answers, setAnswers] = useState<Record<string, any>>({});
+    const [answers, setAnswers] = useState<Record<string, AnswerOption>>({});
     const [loading, setLoading] = useState(false);
     const [fetching, setFetching] = useState(false);
 
@@ -56,7 +56,7 @@ export default function ConversationalQA({
     };
 
     // Answer question
-    const handleAnswer = (questionId: string, option: any) => {
+    const handleAnswer = (questionId: string, option: AnswerOption) => {
         const newAnswers = { ...answers, [questionId]: option };
         setAnswers(newAnswers);
 
@@ -69,7 +69,7 @@ export default function ConversationalQA({
     };
 
     // Submit all answers to get estimated date
-    const submitAnswers = async (finalAnswers: Record<string, any>) => {
+    const submitAnswers = async (finalAnswers: Record<string, AnswerOption>) => {
         setLoading(true);
         try {
             const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';

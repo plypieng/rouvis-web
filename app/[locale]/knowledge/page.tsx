@@ -1,50 +1,34 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
-import { DashboardCard } from '../../../components/DashboardCard';
-import { KnowledgeSearch } from '../../../components/KnowledgeSearch';
-import { FeaturedArticle } from '../../../components/FeaturedArticle';
-import { ArticleList } from '../../../components/ArticleList';
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
+import { BookOpen, MessageCircle } from 'lucide-react';
 
-export default function CommunityPage() {
-  const t = useTranslations();
+export default function KnowledgePage() {
+  const params = useParams<{ locale: string }>();
+  const locale = params?.locale || 'ja';
 
   return (
     <div className="container mx-auto py-6 px-4 space-y-6">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">{t('community.title')}</h1>
+      <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+        <BookOpen className="w-6 h-6 text-purple-600" />
+        知識・マニュアル
+      </h1>
+
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h2 className="text-lg font-semibold text-gray-900">準備中</h2>
+        <p className="text-sm text-gray-600 mt-2">
+          マニュアル記事・ガイド検索は今後追加予定です。今はチャットで質問すると、状況に合わせて案内できます。
+        </p>
+
+        <Link
+          href={`/${locale}/chat`}
+          className="mt-5 inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+        >
+          <MessageCircle className="w-4 h-4" />
+          チャットで質問する
+        </Link>
       </div>
-
-      <div className="w-full max-w-3xl mx-auto mb-8">
-        <KnowledgeSearch />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <DashboardCard title={t('community.featured')}>
-            <FeaturedArticle />
-          </DashboardCard>
-        </div>
-
-        <div>
-          <DashboardCard title={t('community.categories')}>
-            <div className="space-y-2">
-              {['rice', 'vegetables', 'fruits', 'soil', 'equipment', 'climate'].map((category) => (
-                <div key={category} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer">
-                  <span className="capitalize">{category}</span>
-                  <span className="bg-gray-200 text-gray-700 text-xs px-2 py-1 rounded-full">
-                    {Math.floor(Math.random() * 50)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </DashboardCard>
-        </div>
-      </div>
-
-      <DashboardCard title={t('community.recent')}>
-        <ArticleList />
-      </DashboardCard>
     </div>
   );
 }

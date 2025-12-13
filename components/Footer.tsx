@@ -9,7 +9,7 @@ import { usePathname } from 'next/navigation';
 
 interface FooterProps {
   locale: Locale;
-  user?: any;
+  user?: unknown;
 }
 
 export default function Footer({ locale, user }: FooterProps) {

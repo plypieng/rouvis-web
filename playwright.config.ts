@@ -15,7 +15,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
-    ['html'],
+    ['html', { open: 'never' }],
     ['json', { outputFile: 'test-results/results.json' }],
     ['junit', { outputFile: 'test-results/results.xml' }]
   ],
@@ -73,16 +73,16 @@ export default defineConfig({
   ],
 
   /* Run your local dev server before starting the tests */
-  webServer: [
-    {
-      command: 'npm run dev',
-      port: 3002,
-      reuseExistingServer: !process.env.CI,
-      timeout: 120 * 1000,
-    },
+	  webServer: [
+	    {
+	      command: 'npm run dev -- -p 3002',
+	      port: 3002,
+	      reuseExistingServer: !process.env.CI,
+	      timeout: 120 * 1000,
+	    },
     {
       command: 'cd ../backend && npm run dev',
-      port: 3001,
+      port: 4000,
       reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000,
     },

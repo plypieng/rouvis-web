@@ -29,8 +29,11 @@ interface AlertsResponse {
  */
 export async function GET(request: NextRequest) {
   try {
-    // Get backend URL from environment (defaults to localhost for development)
-    const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
+    const backendUrl = process.env.BACKEND_URL
+      || process.env.NEXT_PUBLIC_API_BASE_URL
+      || (process.env.NODE_ENV === 'production'
+        ? 'https://localfarm-backend.vercel.app'
+        : 'http://localhost:4000');
 
     // Get area from query params (defaults to Niigata)
     const area = request.nextUrl.searchParams.get('area') || 'niigata';
@@ -48,7 +51,7 @@ export async function GET(request: NextRequest) {
 
     if (!response.ok) {
       console.warn(`Backend weather alerts API returned ${response.status}, falling back to empty alerts`);
-      return NextResponse.json(getMockAlerts());
+      return NextResponse.json(emptyAlerts());
     }
 
     const data: AlertsResponse = await response.json();
@@ -58,34 +61,15 @@ export async function GET(request: NextRequest) {
 
     // Return empty alerts array on error
     // This ensures the UI doesn't crash
-    return NextResponse.json(getMockAlerts());
+    return NextResponse.json(emptyAlerts());
   }
 }
 
 /**
- * Mock alerts for development/fallback
- * Returns realistic Niigata-region alerts when backend is unavailable
+ * Empty alerts fallback
  */
-function getMockAlerts(): AlertsResponse {
-  // For now, return empty alerts
-  // In development, we can uncomment sample alerts for testing
+function emptyAlerts(): AlertsResponse {
   const alerts: WeatherAlert[] = [];
-
-  // Sample frost alert (uncomment for testing)
-  /*
-  const isFrostSeason = new Date().getMonth() >= 9 || new Date().getMonth() <= 3;
-  if (isFrostSeason) {
-    alerts.push({
-      type: 'frost',
-      severity: 'high',
-      message: '今夜2°Cまで冷え込み、霜の可能性',
-      location: '長岡市',
-      actionRequired: 'コシヒカリの苗を保護してください',
-      validFrom: new Date().toISOString(),
-      validTo: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-    });
-  }
-  */
 
   return {
     alerts,

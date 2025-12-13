@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 
 export const runtime = 'edge';
 
@@ -8,9 +9,23 @@ export async function POST(req: NextRequest) {
     const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
     if (!backendUrl) throw new Error('BACKEND_URL or NEXT_PUBLIC_API_BASE_URL is not defined');
 
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    const userId = (token?.id as string | undefined) ?? token?.sub;
+    if (!userId) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     // Handle special chatkit actions
     if (body.action === 'chatkit.list_threads') {
-      const res = await fetch(`${backendUrl}/api/v1/threads`);
+      const res = await fetch(`${backendUrl}/api/v1/threads`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': userId,
+        },
+      });
       const data = await res.json();
       return new Response(JSON.stringify({ threads: data.threads || [] }), {
         headers: { 'Content-Type': 'application/json' },
@@ -20,7 +35,10 @@ export async function POST(req: NextRequest) {
     if (body.action === 'chatkit.create_thread') {
       const res = await fetch(`${backendUrl}/api/v1/threads`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': userId,
+        },
         body: JSON.stringify(body.payload || {}),
       });
       const data = await res.json();
@@ -32,7 +50,10 @@ export async function POST(req: NextRequest) {
     if (body.action === 'chatkit.undo') {
       const res = await fetch(`${backendUrl}/api/v1/undo`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': userId,
+        },
         body: JSON.stringify(body.payload || {}),
       });
       const data = await res.json();
@@ -47,7 +68,10 @@ export async function POST(req: NextRequest) {
 
     const response = await fetch(`${backendUrl}/api/v1/agents/run`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-id': userId,
+      },
       body: JSON.stringify({ messages, threadId, projectId }),
     });
 
@@ -118,7 +142,7 @@ export async function POST(req: NextRequest) {
                   data.type === 'error') {
                   controller.enqueue(encoder.encode(`e:${JSON.stringify(data)}\n`));
                 }
-              } catch (e) {
+              } catch {
                 // Skip unparseable
                 console.warn('Failed to parse SSE data:', dataStr.slice(0, 100));
               }
@@ -137,9 +161,10 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'text/plain; charset=utf-8',
       },
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('ChatKit adapter error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    const message = error instanceof Error ? error.message : 'ChatKit adapter error';
+    return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });
@@ -166,7 +191,21 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const res = await fetch(`${backendUrl}/api/v1/threads/${threadId}`);
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    const userId = (token?.id as string | undefined) ?? token?.sub;
+    if (!userId) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const res = await fetch(`${backendUrl}/api/v1/threads/${threadId}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-id': userId,
+      },
+    });
     if (!res.ok) {
       return new Response(JSON.stringify({ messages: [] }), {
         headers: { 'Content-Type': 'application/json' },

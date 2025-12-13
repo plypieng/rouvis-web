@@ -6,11 +6,20 @@ import { useState, useEffect } from 'react';
 
 import { use } from 'react';
 
+type Project = {
+    id: string;
+    name: string;
+    crop?: string | null;
+    variety?: string | null;
+    startDate?: string | null;
+    status?: string | null;
+};
+
 export default function ProjectsPage(props: { params: Promise<{ locale: string }> }) {
     const params = use(props.params);
     const { locale } = params;
     const t = useTranslations('projects');
-    const [projects, setProjects] = useState<any[]>([]);
+    const [projects, setProjects] = useState<Project[]>([]);
     const [showArchived, setShowArchived] = useState(false);
     const [loading, setLoading] = useState(true);
 
@@ -19,9 +28,8 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
     }, []);
 
     const fetchProjects = async () => {
-        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
         try {
-            const res = await fetch(`${baseUrl}/api/v1/projects`, { cache: 'no-store' });
+            const res = await fetch('/api/v1/projects', { cache: 'no-store' });
             if (!res.ok) {
                 console.error('Failed to fetch projects:', res.status, res.statusText);
                 setProjects([]);
@@ -41,10 +49,11 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
         e.preventDefault();
         e.stopPropagation();
 
-        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
         try {
-            const res = await fetch(`${baseUrl}/api/v1/projects/${projectId}/archive`, {
-                method: 'DELETE',
+            const res = await fetch(`/api/v1/projects/${projectId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'active' }),
             });
             if (!res.ok) throw new Error('Unarchive failed');
 
@@ -115,7 +124,7 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {displayProjects.map((project: any) => {
+                    {displayProjects.map((project) => {
                         const isArchived = project.status === 'archived';
                         return (
                             <div key={project.id} className="relative">

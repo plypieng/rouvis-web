@@ -428,6 +428,8 @@
       "fields": "Fields",
       "activities": "Activities",
       "calendar": "Calendar",
+      "team": "Team",
+      "market": "Market",
       "chat": "Chat",
       "more": "More"
     },

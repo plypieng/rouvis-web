@@ -30,35 +30,64 @@ export default async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(`/${defaultLocale}`, request.url));
   }
 
-  // Check if demo mode is enabled
-  const isDemoMode =
-    process.env.DEMO_MODE === 'true' ||
-    process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+  const localeMatch = pathname.match(/^\/(ja|en)(\/|$)/);
+  const locale = localeMatch?.[1] ?? defaultLocale;
 
-  if (!isDemoMode) {
-    // Check authentication
-    const token = await getToken({ req: request as any, secret: process.env.NEXTAUTH_SECRET });
+  // Extract the path without locale prefix for route checking
+  let pathWithoutLocale = pathname.replace(/^\/(ja|en)/, '');
+  if (pathWithoutLocale === '') pathWithoutLocale = '/';
 
-    // Extract the path without locale prefix for route checking
-    let pathWithoutLocale = pathname.replace(/^\/(ja|en)/, '');
-    if (pathWithoutLocale === '') pathWithoutLocale = '/';
+  const isPublicRoute = publicRoutes.some(route => pathWithoutLocale.startsWith(route)) || pathWithoutLocale === '/';
 
-    const isPublicRoute = publicRoutes.some(route => pathWithoutLocale.startsWith(route)) || pathWithoutLocale === '/';
+  // For public routes that already have a locale prefix, just proceed without redirect
+  // This prevents next-intl from interfering with client-side navigation (RSC requests)
+  if (isPublicRoute && localeMatch) {
+    return NextResponse.next();
+  }
 
-    // Redirect to login if not authenticated and trying to access protected route
-    if (!token && !isPublicRoute) {
-      const loginUrl = new URL(`/${defaultLocale}/login`, request.url);
-      loginUrl.searchParams.set('callbackUrl', pathname);
-      return NextResponse.redirect(loginUrl);
-    }
+  // For public routes without locale, use intl middleware to add locale
+  if (isPublicRoute) {
+    return intlMiddleware(request as any);
+  }
 
-    // Redirect away from login if already authenticated
-    if (token && pathWithoutLocale.startsWith('/login')) {
-      return NextResponse.redirect(new URL(`/${defaultLocale}/calendar`, request.url));
+  // Check authentication only for protected routes
+  const token = await getToken({ req: request as any, secret: process.env.NEXTAUTH_SECRET });
+  const userId =
+    (typeof (token as any)?.id === 'string' && (token as any).id) ||
+    (typeof token?.sub === 'string' && token.sub) ||
+    null;
+  const isAuthenticated = Boolean(userId);
+
+  // Redirect to login if not authenticated and trying to access protected route
+  if (!isAuthenticated) {
+    const loginUrl = new URL(`/${locale}/login`, request.url);
+    loginUrl.searchParams.set('callbackUrl', pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Soft onboarding enforcement for new users
+  // Check if user has completed onboarding (has UserProfile)
+  const onboardingComplete = (token as any)?.onboardingComplete;
+  const isOnboardingRoute = pathWithoutLocale.startsWith('/onboarding');
+
+  // If user hasn't completed onboarding and is trying to access main app routes,
+  // redirect them to onboarding (soft enforcement - only for dashboard)
+  if (!onboardingComplete && !isOnboardingRoute) {
+    // Only redirect from the main dashboard route, not for all routes
+    // This is "soft" enforcement - they can still access other pages
+    if (pathWithoutLocale === '/' || pathWithoutLocale === '/projects') {
+      const onboardingUrl = new URL(`/${locale}/onboarding`, request.url);
+      return NextResponse.redirect(onboardingUrl);
     }
   }
 
-  // Use next-intl middleware for all other paths
+  // For authenticated users on protected routes that already have a locale prefix,
+  // bypass intlMiddleware to prevent redirect loops during client-side navigation
+  if (localeMatch) {
+    return NextResponse.next();
+  }
+
+  // Only use intlMiddleware for authenticated users on routes without locale prefix
   return intlMiddleware(request as any);
 }
 

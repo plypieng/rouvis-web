@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Skeleton loading animation */
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 @layer base {
   :root {
     /* Warmer, organic background (Earth-50) */

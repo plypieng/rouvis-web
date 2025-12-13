@@ -45,8 +45,7 @@ export default function ProjectEditModal({ project, isOpen, onClose }: ProjectEd
 
         setSaving(true);
         try {
-            const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-            const res = await fetch(`${baseUrl}/api/v1/projects/${project.id}`, {
+            const res = await fetch(`/api/v1/projects/${project.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useTranslations } from 'next-intl';
 import { MapPin, Search, Check, X } from 'lucide-react';
 
 interface Field {
@@ -29,7 +28,6 @@ export function FieldSelector({
   fields: initialFields,
   onFetchFields,
 }: FieldSelectorProps) {
-  const t = useTranslations();
   const [fields, setFields] = useState<Field[]>(initialFields || []);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');

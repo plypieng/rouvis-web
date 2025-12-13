@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useTranslations } from 'next-intl';
 import { RAGContext, Citation } from '@/types/chat';
 
 interface RAGContextBadgeProps {
@@ -11,7 +10,6 @@ interface RAGContextBadgeProps {
 }
 
 export function RAGContextBadge({ context, citations = [], className = '' }: RAGContextBadgeProps) {
-  const t = useTranslations();
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Get relevance color

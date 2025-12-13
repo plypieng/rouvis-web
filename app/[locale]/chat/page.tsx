@@ -1,14 +1,19 @@
 ﻿'use client';
 
 import { useState, useEffect } from 'react';
-import { useTranslations } from 'next-intl';
 import { ErrorBoundary } from '../../../components/ErrorBoundary';
 import { RouvisChatKit } from '../../../components/RouvisChatKit';
 import { DiagnosisReport, DiagnosisResult } from '../../../components/DiagnosisReport';
 
+type Thread = {
+  id: string;
+  title?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export default function ChatPage() {
-  const t = useTranslations();
-  const [threads, setThreads] = useState<any[]>([]);
+  const [threads, setThreads] = useState<Thread[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState<string | undefined>(undefined);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [diagnosisResult, setDiagnosisResult] = useState<DiagnosisResult | null>(null);
@@ -25,9 +30,7 @@ export default function ChatPage() {
         const data = await res.json();
         if (data.threads) {
           setThreads(data.threads);
-          if (data.threads.length > 0 && !selectedThreadId) {
-            setSelectedThreadId(data.threads[0].id);
-          }
+          setSelectedThreadId(prev => prev ?? data.threads[0]?.id);
         }
       } catch (e) {
         console.error('Failed to load threads', e);
@@ -139,8 +142,6 @@ export default function ChatPage() {
     </ErrorBoundary>
   );
 }
-
-
 
 
 

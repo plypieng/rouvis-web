@@ -4,12 +4,17 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { googleMapsLoader } from '@/lib/google-maps';
 
+type PolygonGeoJson = {
+  type: 'Polygon';
+  coordinates: number[][][];
+};
+
 interface Field {
   id: string;
   name: string;
   crop?: string;
   area_sqm?: number;
-  geojson: any;
+  geojson?: unknown;
   created_at: string;
   updated_at: string;
 }
@@ -24,6 +29,13 @@ export function FieldMapView({ fields }: FieldMapViewProps) {
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [selectedField, setSelectedField] = useState<Field | null>(null);
+
+  const isPolygonGeoJson = (value: unknown): value is PolygonGeoJson => {
+    if (!value || typeof value !== 'object') return false;
+    const record = value as Record<string, unknown>;
+    if (record.type !== 'Polygon') return false;
+    return Array.isArray(record.coordinates);
+  };
 
   useEffect(() => {
     // Track all created map objects for proper cleanup
@@ -79,8 +91,8 @@ export function FieldMapView({ fields }: FieldMapViewProps) {
         const cropColors = ['#4ade80', '#fbbf24', '#60a5fa', '#f87171', '#a78bfa'];
 
         fields.forEach((field, index) => {
-          if (field.geojson && field.geojson.type === 'Polygon') {
-            const coordinates: google.maps.LatLngLiteral[] = field.geojson.coordinates[0].map((coord: number[]) => ({
+          if (isPolygonGeoJson(field.geojson) && Array.isArray(field.geojson.coordinates[0])) {
+            const coordinates: google.maps.LatLngLiteral[] = field.geojson.coordinates[0].map((coord) => ({
               lat: coord[1],
               lng: coord[0],
             }));
@@ -130,8 +142,8 @@ export function FieldMapView({ fields }: FieldMapViewProps) {
         if (fields.length > 0) {
           const bounds = new google.maps.LatLngBounds();
           fields.forEach(field => {
-            if (field.geojson && field.geojson.type === 'Polygon') {
-              field.geojson.coordinates[0].forEach((coord: number[]) => {
+            if (isPolygonGeoJson(field.geojson) && Array.isArray(field.geojson.coordinates[0])) {
+              field.geojson.coordinates[0].forEach((coord) => {
                 bounds.extend({ lat: coord[1], lng: coord[0] });
               });
             }
@@ -168,7 +180,7 @@ export function FieldMapView({ fields }: FieldMapViewProps) {
   // Normalize coordinates for GSI tiles
   function getNormalizedCoord(coord: google.maps.Point, zoom: number) {
     const y = coord.y;
-    let x = coord.x;
+    const x = coord.x;
 
     // Repeat x coordinates
     const tileRange = 1 << zoom;
@@ -181,7 +193,7 @@ export function FieldMapView({ fields }: FieldMapViewProps) {
       return null;
     }
 
-    return { x: x, y: y };
+    return { x, y };
   }
 
   return (

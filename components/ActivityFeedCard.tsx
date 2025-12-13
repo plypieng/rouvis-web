@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useTranslations } from 'next-intl';
 import { Activity, RefreshCw, Filter, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface ActivityItem {
@@ -30,7 +29,6 @@ export function ActivityFeedCard({
   showFilters = true,
   realtime = true,
 }: ActivityFeedCardProps) {
-  const t = useTranslations();
   const [activities, setActivities] = useState<ActivityItem[]>(initialActivities || []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -198,7 +196,12 @@ export function ActivityFeedCard({
             <Filter className="w-4 h-4 text-gray-500" />
             <select
               value={filter}
-              onChange={(e) => setFilter(e.target.value as any)}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === 'all' || value === 'today' || value === 'week') {
+                  setFilter(value);
+                }
+              }}
               className="text-sm border border-gray-300 rounded px-2 py-1 bg-white"
             >
               <option value="all">すべて</option>

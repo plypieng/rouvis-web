@@ -1,15 +1,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useTranslations } from 'next-intl';
 import { Activity, Calendar, MapPin, TrendingUp, Clock, Plus } from 'lucide-react';
 import { ActivityFeedCard } from './ActivityFeedCard';
 import { TaskSchedulerCard } from './TaskSchedulerCard';
 import { FieldCard } from './FieldCard';
+import { FieldEditModal } from './FieldEditModal';
 
 interface ActivityItem {
   id: string;
   type: 'watering' | 'fertilizing' | 'harvesting' | 'planting' | 'maintenance';
+  fieldId?: string;
   fieldName?: string;
   quantity?: number;
   unit?: string;
@@ -26,7 +27,7 @@ interface Task {
   fieldId?: string;
   fieldName?: string;
   priority?: 'low' | 'medium' | 'high';
-  status: 'pending' | 'scheduled' | 'cancelled';
+  status: 'pending' | 'scheduled' | 'cancelled' | 'completed';
 }
 
 interface Field {
@@ -35,11 +36,25 @@ interface Field {
   crop?: string;
   // Align with FieldCard expectations
   area_sqm?: number;
-  geojson?: any;
+  area?: number;
+  geojson?: unknown;
+  polygon?: unknown;
   created_at?: string;
   updated_at?: string;
+  createdAt?: string;
+  updatedAt?: string;
   location?: string;
 }
+
+type EditableField = {
+  id: string;
+  name: string;
+  crop?: string;
+  area_sqm?: number;
+  geojson?: unknown;
+  created_at: string;
+  updated_at: string;
+};
 
 interface ActivityDashboardProps {
   onLogActivity?: () => void;
@@ -52,12 +67,14 @@ export function ActivityDashboard({
   onScheduleTask,
   onViewCalendar,
 }: ActivityDashboardProps) {
-  const t = useTranslations();
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [fields, setFields] = useState<Field[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editingField, setEditingField] = useState<EditableField | null>(null);
+  const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
+  const [deletingFieldId, setDeletingFieldId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchDashboardData();
@@ -72,7 +89,7 @@ export function ActivityDashboard({
       let loadedFields: Field[] = [];
       const fieldsResponse = await fetch('/api/v1/fields');
       if (fieldsResponse.ok) {
-        const fieldsData = await fieldsResponse.json();
+        const fieldsData = (await fieldsResponse.json()) as { fields?: Field[] };
         loadedFields = fieldsData.fields || [];
         setFields(loadedFields);
       }
@@ -80,8 +97,9 @@ export function ActivityDashboard({
       // 2. Fetch activities
       const activitiesResponse = await fetch('/api/v1/activities');
       if (activitiesResponse.ok) {
-        const activitiesData = await activitiesResponse.json();
-        const parsedActivities = (activitiesData.activities || []).map((activity: any) => ({
+        type ActivityApiItem = Omit<ActivityItem, 'timestamp'> & { timestamp: string };
+        const activitiesData = (await activitiesResponse.json()) as { activities?: ActivityApiItem[] };
+        const parsedActivities = (activitiesData.activities || []).map((activity) => ({
           ...activity,
           timestamp: new Date(activity.timestamp),
           fieldName: activity.fieldName || loadedFields.find(f => f.id === activity.fieldId)?.name
@@ -93,8 +111,9 @@ export function ActivityDashboard({
       try {
         const tasksResponse = await fetch('/api/v1/tasks');
         if (tasksResponse.ok) {
-          const tasksData = await tasksResponse.json();
-          const parsedTasks = (tasksData.tasks || []).map((task: any) => ({
+          type TaskApiItem = Omit<Task, 'dueAt'> & { dueAt: string };
+          const tasksData = (await tasksResponse.json()) as { tasks?: TaskApiItem[] };
+          const parsedTasks = (tasksData.tasks || []).map((task) => ({
             ...task,
             dueAt: new Date(task.dueAt),
             fieldName: task.fieldName || loadedFields.find(f => f.id === task.fieldId)?.name
@@ -112,6 +131,51 @@ export function ActivityDashboard({
       setError('データの読み込みに失敗しました');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const updateTaskStatus = async (taskId: string, status: Task['status']) => {
+    if (!taskId) return;
+    if (updatingTaskId === taskId) return;
+    setUpdatingTaskId(taskId);
+    try {
+      const res = await fetch(`/api/v1/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || 'タスク更新に失敗しました');
+        return;
+      }
+
+      // Optimistic UI update
+      setTasks(prev => prev.map(task => (task.id === taskId ? { ...task, status } : task)));
+    } finally {
+      setUpdatingTaskId(null);
+    }
+  };
+
+  const deleteField = async (fieldId: string, fieldName: string) => {
+    if (!fieldId) return;
+    if (!confirm(`「${fieldName}」を削除しますか？\nこの操作は元に戻せません。`)) return;
+    if (deletingFieldId === fieldId) return;
+
+    setDeletingFieldId(fieldId);
+    try {
+      const res = await fetch(`/api/v1/fields/${fieldId}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || '圃場の削除に失敗しました');
+        return;
+      }
+
+      // Remove locally
+      setFields(prev => prev.filter(field => field.id !== fieldId));
+    } finally {
+      setDeletingFieldId(null);
     }
   };
 
@@ -295,12 +359,12 @@ export function ActivityDashboard({
                   key={task.id || `task-${task.title}`}
                   task={task}
                   onConfirm={() => {
-                    // TODO: Implement task confirmation
-                    console.log('Confirm task:', task.id);
+                    if (!task.id) return;
+                    void updateTaskStatus(task.id, 'scheduled');
                   }}
                   onCancel={() => {
-                    // TODO: Implement task cancellation
-                    console.log('Cancel task:', task.id);
+                    if (!task.id) return;
+                    void updateTaskStatus(task.id, 'cancelled');
                   }}
                 />
               ))
@@ -314,14 +378,17 @@ export function ActivityDashboard({
         <h3 className="text-lg font-semibold text-gray-900">圃場状況</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {fieldStatus.map((field) => {
+            const areaSqm = field.area_sqm ?? field.area;
+            const createdAt = field.created_at ?? field.createdAt ?? new Date().toISOString();
+            const updatedAt = field.updated_at ?? field.updatedAt ?? new Date().toISOString();
             const safeField = {
               id: field.id,
               name: field.name,
               crop: field.crop,
-              area_sqm: field.area_sqm,
-              geojson: field.geojson ?? {},
-              created_at: field.created_at ?? new Date().toISOString(),
-              updated_at: field.updated_at ?? new Date().toISOString(),
+              area_sqm: areaSqm,
+              geojson: field.geojson ?? undefined,
+              created_at: createdAt,
+              updated_at: updatedAt,
             };
             return (
               <FieldCard
@@ -329,18 +396,45 @@ export function ActivityDashboard({
                 field={safeField}
                 viewMode="grid"
                 onEdit={() => {
-                  // TODO: Implement field edit navigation
-                  console.log('Edit field:', field.id);
+                  setEditingField({
+                    ...safeField,
+                    geojson: undefined,
+                  });
                 }}
                 onDelete={() => {
-                  // TODO: Implement field delete flow
-                  console.log('Delete field:', field.id);
+                  void deleteField(field.id, field.name);
                 }}
               />
             );
           })}
         </div>
       </div>
+
+      {editingField && (
+        <FieldEditModal
+          field={editingField}
+          onClose={() => setEditingField(null)}
+          onSubmit={async (data) => {
+            const res = await fetch(`/api/v1/fields/${editingField.id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: data.name,
+                crop: data.crop,
+                geojson: data.geojson,
+              }),
+            });
+
+            if (!res.ok) {
+              const payload = await res.json().catch(() => ({}));
+              throw new Error(payload.error || 'Failed to update field');
+            }
+
+            setEditingField(null);
+            await fetchDashboardData();
+          }}
+        />
+      )}
     </div>
   );
 }

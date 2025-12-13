@@ -105,7 +105,7 @@ model ChatMessage {
 
 model Project {
   id                String    @id @default(cuid())
-  userId            String    @default("demo-user")
+  userId            String
   user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   name              String
   crop              String
@@ -170,7 +170,7 @@ model Field {
   polygon   Json?    // GeoJSON or array of coordinates
   location  Json?    // Center point {lat, lng}
   color     String?  // Hex color code for visualization
-  userId    String   @default("demo-user")
+  userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

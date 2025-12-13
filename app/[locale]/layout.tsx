@@ -2,14 +2,16 @@ import { Inter, Outfit } from 'next/font/google';
 import '../../styles/globals.css';
 import { NextIntlClientProvider } from 'next-intl';
 import { notFound } from 'next/navigation';
-import { getServerSession } from 'next-auth';
 import getMessages, { locales } from '../../i18n';
 import { BottomNav } from '../../components/BottomNav';
 // import LanguageSwitcher from '../../components/LanguageSwitcher';
 import Header from '../../components/Header';
 import Footer from '../../components/Footer';
 import { Providers } from '../../components/Providers';
-import { authOptions } from '../../lib/auth-config';
+import FeedbackButton from '../../components/FeedbackButton';
+import OnboardingTour from '../../components/OnboardingTour';
+import { getServerSessionFromToken } from '../../lib/server-auth';
+import type { Locale } from '../../i18n/config';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -55,7 +57,21 @@ export default async function RootLayout(props: {
 
   // Get messages for the locale
   const messages = await getMessages(locale);
-  const session = await getServerSession(authOptions);
+  const session = await getServerSessionFromToken();
+
+  // Debug: log server session
+  console.log('[Layout] Server session:', session);
+
+  const typedLocale = locale as Locale;
+  const headerUser = session?.user
+    ? {
+      name: session.user.name ?? undefined,
+      email: session.user.email ?? undefined,
+      avatarUrl: (session.user as { image?: string | null }).image ?? undefined,
+    }
+    : null;
+
+  console.log('[Layout] headerUser:', headerUser);
 
   return (
     <NextIntlClientProvider locale={locale} messages={messages}>
@@ -63,7 +79,7 @@ export default async function RootLayout(props: {
         {/* Full-height layout with mobile optimizations */}
         <div className={`${inter.variable} ${outfit.variable} font-sans mobile-viewport bg-background flex flex-col`} lang={locale}>
           {/* New sticky header */}
-          <Header locale={locale as any} user={session?.user as any} />
+          <Header locale={typedLocale} user={headerUser} />
 
           {/* Main Content - Full height minus bottom nav on mobile */}
           <main id="main-content" className="flex-1 overflow-auto mobile-scroll safe-bottom pb-20 lg:pb-0">
@@ -71,11 +87,17 @@ export default async function RootLayout(props: {
           </main>
 
           {/* New Footer */}
-          <Footer locale={locale as any} user={session?.user} />
+          <Footer locale={typedLocale} user={session?.user} />
+
+          {/* Feedback Button - Alpha Testing (Authenticated users only) */}
+          {session?.user && <FeedbackButton />}
+
+          {/* Onboarding Tour - Shows once for new users */}
+          {session?.user && <OnboardingTour />}
 
           {/* Bottom Navigation - Mobile Only - Enhanced */}
           <div className="mobile-nav-height">
-            <BottomNav locale={locale} user={session?.user as any} />
+            <BottomNav locale={typedLocale} user={session?.user} />
           </div>
         </div>
       </Providers>

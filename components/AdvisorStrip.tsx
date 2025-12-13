@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { useTranslations } from 'next-intl';
 
 type AdvisorState = {
   nextTask?: string;
@@ -11,20 +9,17 @@ type AdvisorState = {
 };
 
 export function AdvisorStrip({ className = '', projectId: propProjectId }: { className?: string; projectId?: string }) {
-  const t = useTranslations();
   const [state, setState] = useState<AdvisorState>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [projectId, setProjectId] = useState<string | null>(propProjectId || null);
 
   const fetchAdvice = async (forceRefresh = false) => {
     try {
       if (forceRefresh) setRefreshing(true);
       else setLoading(true);
 
-      const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
       const body = propProjectId ? { projectId: propProjectId, forceRefresh } : { forceRefresh };
-      const res = await fetch(`${baseUrl}/api/v1/agents/advice`, {
+      const res = await fetch('/api/v1/agents/advice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)

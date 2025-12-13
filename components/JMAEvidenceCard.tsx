@@ -1,6 +1,5 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
 import { JMAData } from '@/types/chat';
 
 interface JMAEvidenceCardProps {
@@ -9,8 +8,6 @@ interface JMAEvidenceCardProps {
 }
 
 export function JMAEvidenceCard({ data, className = '' }: JMAEvidenceCardProps) {
-  const t = useTranslations();
-
   // Calculate data freshness
   const getDataFreshness = () => {
     const now = new Date();

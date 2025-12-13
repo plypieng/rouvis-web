@@ -11,7 +11,7 @@ interface ActionConfirmation {
   id: string;
   type: 'activity_logged' | 'task_created' | 'task_updated';
   summary: string;
-  undoData?: any;
+  undoData?: unknown;
   expiresAt: number;
 }
 
@@ -38,7 +38,7 @@ interface RouvisChatKitProps {
   projectId?: string;
   initialThreadId?: string;
   onTaskUpdate?: () => void;
-  onDiagnosisComplete?: (result: any) => void;
+  onDiagnosisComplete?: (result: unknown) => void;
   density?: 'compact' | 'comfortable';
   growthStage?: string;
 }
@@ -109,38 +109,48 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   const [actionConfirmations, setActionConfirmations] = useState<ActionConfirmation[]>([]);
   const [weather, setWeather] = useState<{ condition?: string } | undefined>();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isUserNearBottom, setIsUserNearBottom] = useState(true);
+  const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load chat history on mount
-  useEffect(() => {
-    const loadHistory = async () => {
-      if (!threadId) {
-        if (projectId) {
-          try {
-            const res = await fetch('/api/chatkit', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ action: 'chatkit.create_thread', payload: { projectId, userId: 'demo-user' } }),
-            });
-            if (res.ok) {
-              const data = await res.json();
-              if (data.thread?.id) setThreadId(data.thread.id);
-            }
-          } catch (e) {
-            console.warn('Failed to create thread:', e);
-          }
-        }
-        return;
-      }
+	  useEffect(() => {
+	    const loadHistory = async () => {
+	      if (!threadId) {
+	        if (projectId) {
+	          try {
+	            const res = await fetch('/api/chatkit', {
+	              method: 'POST',
+	              headers: { 'Content-Type': 'application/json' },
+	              body: JSON.stringify({ action: 'chatkit.create_thread', payload: { projectId } }),
+	            });
+	            if (res.ok) {
+	              const data = await res.json();
+	              if (data.thread?.id) setThreadId(data.thread.id);
+	            }
+	          } catch (e) {
+	            console.warn('Failed to create thread:', e);
+	          }
+	        }
+	        return;
+	      }
 
       try {
         const res = await fetch(`/api/chatkit?thread_id=${threadId}`);
         if (res.ok) {
-          const data = await res.json();
-          const history: Message[] = (data.messages || []).map((m: any) => ({
+          const data = (await res.json()) as {
+            messages?: Array<{
+              id: string;
+              role: string;
+              content: string;
+              createdAt?: string;
+            }>;
+          };
+          const history: Message[] = (data.messages || []).map((m) => ({
             id: m.id,
-            role: m.role,
+            role: m.role === 'user' ? 'user' : 'assistant',
             content: m.content,
             createdAt: m.createdAt,
           }));
@@ -149,11 +159,10 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
       } catch (e) {
         console.warn('Failed to load history:', e);
       }
-    };
+	    };
 
-    loadHistory();
-    loadHistory();
-  }, [threadId, projectId]);
+	    loadHistory();
+	  }, [threadId, projectId]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -175,6 +184,21 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   const handleRemoveImage = () => {
     setSelectedImage(null);
   };
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
+    messagesEndRef.current?.scrollIntoView({ behavior });
+  }, []);
+
+  const handleMessagesScroll = useCallback(() => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const nearBottom = distanceFromBottom < 40;
+
+    setIsUserNearBottom(nearBottom);
+    if (nearBottom) setHasUnreadMessages(false);
+  }, []);
 
   const sendMessage = useCallback(async (content: string) => {
     if ((!content.trim() && !selectedImage) || isLoading) return;
@@ -205,6 +229,8 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     setSelectedImage(null);
     setIsLoading(true);
     setCurrentStatus('');
+    setIsUserNearBottom(true);
+    setHasUnreadMessages(false);
 
     const assistantId = `assistant-${Date.now()}`;
     const newAssistantMessage: Message = {
@@ -250,7 +276,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
               setMessages(prev => prev.map(m =>
                 m.id === assistantId ? { ...m, content: m.content + text } : m
               ));
-            } catch (e) {
+            } catch {
               // Skip parse errors
             }
             continue;
@@ -258,42 +284,57 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
 
           // Custom event format: e:{"type":"..."}
           if (line.startsWith('e:')) {
-            let data: any = null;
+            let data: unknown = null;
             try {
               data = JSON.parse(line.slice(2));
-            } catch (e) {
+            } catch {
               continue;
             }
 
+            const event = data as {
+              type?: string;
+              delta?: { tool?: string; status?: string; content?: string };
+              citation?: { source?: string };
+              action?: { type?: string; undoData?: unknown };
+              toolName?: string;
+              result?: unknown;
+            };
+
             // Simple status update (no complex thinking UI)
-            if (data.type === 'tool_call_delta') {
-              const friendlyStatus = FRIENDLY_STATUS[data.delta.tool] || '処理中...';
+            if (event.type === 'tool_call_delta' && event.delta?.tool) {
+              const friendlyStatus = FRIENDLY_STATUS[event.delta.tool] || '処理中...';
               setCurrentStatus(friendlyStatus);
             }
 
             // Content
-            if (data.type === 'content' && data.delta?.content) {
+            if (event.type === 'content' && event.delta?.content) {
               setMessages(prev => prev.map(m =>
-                m.id === assistantId ? { ...m, content: m.content + data.delta.content } : m
+                m.id === assistantId ? { ...m, content: m.content + event.delta.content } : m
               ));
             }
 
             // Source (simplified - no confidence %)
-            if (data.type === 'citation' && data.citation?.source) {
+            if (event.type === 'citation' && event.citation?.source) {
               setMessages(prev => prev.map(m =>
-                m.id === assistantId ? { ...m, source: data.citation.source } : m
+                m.id === assistantId ? { ...m, source: event.citation.source } : m
               ));
             }
 
             // Action confirmations (simplified)
-            if (data.type === 'action_confirmation') {
+            if (event.type === 'action_confirmation' && event.action?.type) {
+              const actionType =
+                event.action.type === 'task_created' ||
+                event.action.type === 'activity_logged' ||
+                event.action.type === 'task_updated'
+                  ? event.action.type
+                  : 'task_updated';
               const confirmation: ActionConfirmation = {
                 id: `confirm-${Date.now()}`,
-                type: data.action.type,
-                summary: data.action.type === 'task_created' ? '予定に追加しました' :
-                  data.action.type === 'activity_logged' ? '記録しました' :
+                type: actionType,
+                summary: actionType === 'task_created' ? '予定に追加しました' :
+                  actionType === 'activity_logged' ? '記録しました' :
                     '更新しました',
-                undoData: data.action.undoData,
+                undoData: event.action.undoData,
                 expiresAt: Date.now() + 30000,
               };
               setActionConfirmations(prev => [...prev, confirmation]);
@@ -303,20 +344,24 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
             }
 
             // Weather for context
-            if (data.type === 'tool_call_result' && data.toolName === 'jma.getForecast') {
-              setWeather({ condition: data.result?.condition });
+            if (event.type === 'tool_call_result' && event.toolName === 'jma.getForecast') {
+              const condition =
+                event.result && typeof event.result === 'object'
+                  ? (event.result as { condition?: unknown }).condition
+                  : undefined;
+              setWeather({ condition: typeof condition === 'string' ? condition : undefined });
             }
 
             // Mark error
-            if (data.type === 'tool_call_delta' && data.delta.status === 'error') {
+            if (event.type === 'tool_call_delta' && event.delta?.status === 'error') {
               setMessages(prev => prev.map(m =>
                 m.id === assistantId ? { ...m, hasError: true } : m
               ));
             }
 
             // Diagnosis Result
-            if (data.type === 'diagnosis_result') {
-              onDiagnosisComplete?.(data.result);
+            if (event.type === 'diagnosis_result') {
+              onDiagnosisComplete?.(event.result);
             }
           }
         }
@@ -351,8 +396,12 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   useImperativeHandle(ref, () => ({ sendMessage }));
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, currentStatus]);
+    if (isUserNearBottom) {
+      scrollToBottom('auto');
+    } else {
+      setHasUnreadMessages(true);
+    }
+  }, [messages, isUserNearBottom, scrollToBottom]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -383,7 +432,11 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   return (
     <div className={`flex flex-col h-full bg-card ${className}`}>
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div
+        ref={messagesContainerRef}
+        onScroll={handleMessagesScroll}
+        className="flex-1 overflow-y-auto p-4 space-y-4"
+      >
         {/* Empty state with personality */}
         {messages.length === 0 && !isLoading && (
           <div className="text-center py-12 px-6">
@@ -442,6 +495,22 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
           <p className="text-sm text-muted-foreground animate-pulse pl-1">
             {currentStatus}
           </p>
+        )}
+
+        {!isUserNearBottom && hasUnreadMessages && (
+          <div className="sticky bottom-2 z-10 flex justify-center">
+            <button
+              type="button"
+              onClick={() => {
+                scrollToBottom('smooth');
+                setHasUnreadMessages(false);
+                setIsUserNearBottom(true);
+              }}
+              className="px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-medium shadow-md hover:opacity-90"
+            >
+              最新のメッセージへ
+            </button>
+          </div>
         )}
 
         <div ref={messagesEndRef} />

@@ -47,14 +47,18 @@ export default function TaskCreateModal({ projectId, isOpen, onClose, initialDat
 
         setSaving(true);
         try {
-            const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-            const res = await fetch(`${baseUrl}/api/v1/projects/${projectId}/tasks`, {
+            const dueAt = formData.dueDate
+                ? new Date(`${formData.dueDate}T12:00:00`).toISOString()
+                : undefined;
+
+            const res = await fetch('/api/v1/tasks', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
+                    projectId,
                     title: formData.title.trim(),
                     description: formData.description || null,
-                    dueDate: formData.dueDate,
+                    dueAt,
                     priority: formData.priority,
                 }),
             });

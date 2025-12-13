@@ -1,11 +1,41 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import ProjectEditModal from './ProjectEditModal';
 import ArchiveConfirmation from './ArchiveConfirmation';
 import UndoSnackbar from '../UndoSnackbar';
+
+type StageConfigItem = {
+    key: string;
+    label?: string;
+    threshold: number; // Progress threshold (0-100)
+    personalized?: boolean;
+};
+
+type StageConfig = StageConfigItem[];
+
+const DEFAULT_STAGES: StageConfig = [
+    { key: 'seedling', label: 'Seedling', threshold: 20 },
+    { key: 'vegetative', label: 'Vegetative', threshold: 50 },
+    { key: 'flowering', label: 'Flowering', threshold: 80 },
+    { key: 'harvest', label: 'Harvest', threshold: 100 }
+];
+
+type KnowledgeStage = {
+    key: string;
+    label: string;
+    duration: number;
+    isPersonalized?: boolean;
+};
+
+type CropKnowledgeResponse = {
+    knowledge?: {
+        stages?: KnowledgeStage[];
+    };
+};
 
 interface ProjectHeaderProps {
     project: {
@@ -22,8 +52,10 @@ interface ProjectHeaderProps {
 
 export default function ProjectHeader({ project }: ProjectHeaderProps) {
     const t = useTranslations('projects');
-    const tHeader = useTranslations('projects.header');
     const router = useRouter();
+    const params = useParams<{ locale: string }>();
+    const locale = (params?.locale as string) || 'ja';
+    const { data: session } = useSession();
     const [showMenu, setShowMenu] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [showArchiveDialog, setShowArchiveDialog] = useState(false);
@@ -37,7 +69,7 @@ export default function ProjectHeader({ project }: ProjectHeaderProps) {
     const target = project.targetHarvestDate ? new Date(project.targetHarvestDate).getTime() : null;
 
     let progress = 0;
-    let dayCount = Math.floor((now - start) / (1000 * 60 * 60 * 24));
+    const dayCount = Math.floor((now - start) / (1000 * 60 * 60 * 24));
     let totalDays = 0;
 
     if (target) {
@@ -48,9 +80,10 @@ export default function ProjectHeader({ project }: ProjectHeaderProps) {
     const handleArchive = async () => {
         setArchiving(true);
         try {
-            const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-            const res = await fetch(`${baseUrl}/api/v1/projects/${project.id}/archive`, {
-                method: 'POST',
+            const res = await fetch(`/api/v1/projects/${project.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'archived' }),
             });
 
             if (!res.ok) throw new Error(t('archive_failed'));
@@ -62,7 +95,7 @@ export default function ProjectHeader({ project }: ProjectHeaderProps) {
             // Auto-hide snackbar and redirect after 10 seconds
             setTimeout(() => {
                 setShowUndoSnackbar(false);
-                router.push('/ja/projects');
+                router.push(`/${locale}/projects`);
             }, 10000);
         } catch (error) {
             console.error('Archive error:', error);
@@ -76,9 +109,10 @@ export default function ProjectHeader({ project }: ProjectHeaderProps) {
         if (!lastArchivedId) return;
 
         try {
-            const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-            const res = await fetch(`${baseUrl}/api/v1/projects/${lastArchivedId}/archive`, {
-                method: 'DELETE',
+            const res = await fetch(`/api/v1/projects/${lastArchivedId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'active' }),
             });
 
             if (!res.ok) throw new Error(t('unarchive_failed'));
@@ -91,67 +125,49 @@ export default function ProjectHeader({ project }: ProjectHeaderProps) {
         }
     };
 
-    // Stage Configuration
-    type StageConfig = {
-        key: string;
-        icon?: string; // Optional now as we map it
-        labelKey?: string; // Optional
-        label?: string; // Direct label from DB
-        threshold: number; // Progress threshold (0-100)
-        personalized?: boolean; // New flag for overrides
-    }[];
-
-    const [stages, setStages] = useState<StageConfig>([]);
-    const [loadingStages, setLoadingStages] = useState(true);
-
-    // Default Fallback Stages
-    const DEFAULT_STAGES: StageConfig = [
-        { key: 'seedling', label: 'Seedling', threshold: 20 },
-        { key: 'vegetative', label: 'Vegetative', threshold: 50 },
-        { key: 'flowering', label: 'Flowering', threshold: 80 },
-        { key: 'harvest', label: 'Harvest', threshold: 100 }
-    ];
+    const [stages, setStages] = useState<StageConfig>(DEFAULT_STAGES);
 
     // Fetch dynamic stages
     useEffect(() => {
         const fetchStages = async () => {
             try {
                 const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-                // Pass userId=demo-user to get personalized overrides
-                const res = await fetch(`${baseUrl}/api/v1/knowledge/crops?crop=${encodeURIComponent(project.crop)}&userId=demo-user`);
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.knowledge?.stages) {
-                        // Transform DB stages to UI config
-                        // Calculate thresholds based on duration
-                        const dbStages = data.knowledge.stages;
-                        const totalDuration = dbStages.reduce((acc: number, s: any) => acc + s.duration, 0);
-                        let currentDuration = 0;
-
-                        const mappedStages = dbStages.map((s: any) => {
-                            currentDuration += s.duration;
-                            return {
-                                key: s.key,
-                                label: s.label, // Use label from DB (which might include Japanese)
-                                threshold: Math.round((currentDuration / totalDuration) * 100),
-                                personalized: s.isPersonalized
-                            };
-                        });
-                        setStages(mappedStages);
-                        return;
-                    }
+                const userId = (session?.user as { id?: string })?.id;
+                const res = await fetch(`${baseUrl}/api/v1/knowledge/crops?crop=${encodeURIComponent(project.crop)}${userId ? `&userId=${encodeURIComponent(userId)}` : ''}`);
+                if (!res.ok) {
+                    setStages(DEFAULT_STAGES);
+                    return;
                 }
+
+                const data = await res.json() as CropKnowledgeResponse;
+                const dbStages = data.knowledge?.stages;
+                if (!Array.isArray(dbStages) || dbStages.length === 0) {
+                    setStages(DEFAULT_STAGES);
+                    return;
+                }
+
+                const totalDuration = dbStages.reduce((acc, s) => acc + s.duration, 0);
+                let currentDuration = 0;
+
+                const mappedStages: StageConfig = dbStages.map((s) => {
+                    currentDuration += s.duration;
+                    return {
+                        key: s.key,
+                        label: s.label,
+                        threshold: totalDuration > 0 ? Math.round((currentDuration / totalDuration) * 100) : 100,
+                        personalized: s.isPersonalized,
+                    };
+                });
+
+                setStages(mappedStages);
             } catch (error) {
                 console.error('Failed to fetch stages:', error);
-            } finally {
-                setLoadingStages(false);
+                setStages(DEFAULT_STAGES);
             }
-            // Fallback
-            setStages(DEFAULT_STAGES);
         };
 
         fetchStages();
-    }, [project.crop]);
+    }, [project.crop, session?.user]);
 
     // Helper to get icon for stage key
     const getStageIcon = (key: string) => {
@@ -173,15 +189,6 @@ export default function ProjectHeader({ project }: ProjectHeaderProps) {
     };
 
     const stage = getCurrentStage(progress, stages);
-
-    const getBgColor = () => {
-        if (stage === 'seedling') return 'from-green-100 to-green-200';
-        if (stage === 'vegetative' || stage === 'tillering') return 'from-green-300 to-green-500';
-        if (stage === 'flowering' || stage === 'heading') return 'from-yellow-200 to-green-400';
-        if (stage === 'ripening') return 'from-yellow-400 to-orange-400';
-        if (stage === 'harvest') return 'from-orange-200 to-red-400';
-        return 'from-blue-100 to-blue-200';
-    };
 
     return (
         <>

@@ -46,7 +46,6 @@ export function GuidebookEvidenceCard({
   defaultExpanded = false,
   style,
 }: GuidebookEvidenceCardProps) {
-  const t = useTranslations();
   const [expanded, setExpanded] = useState(defaultExpanded);
 
   const confidencePercent = Math.round(citation.confidence * 100);
@@ -270,7 +269,7 @@ export function GuidebookEvidenceRail({
               key={`citation-${idx}-${citation.source}-${citation.page}`}
               citation={citation}
               className="animate-fadeIn"
-              style={{ animationDelay: `${idx * 50}ms` } as any}
+              style={{ animationDelay: `${idx * 50}ms` }}
             />
           ))}
         </div>

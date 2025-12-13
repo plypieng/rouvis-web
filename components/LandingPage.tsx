@@ -12,7 +12,7 @@ export default function LandingPage({ locale }: { locale: string }) {
     return (
         <div className="min-h-screen bg-white font-sans text-gray-900">
             {/* Navbar */}
-            <nav className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-6 max-w-7xl mx-auto">
+            <nav className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-6 max-w-7xl mx-auto pointer-events-auto">
                 <div className="flex items-center gap-2">
                     <Image src="/logo.svg" alt="Rouvis" width={32} height={32} />
                     <span className="text-xl font-bold text-white tracking-tight">Rouvis</span>
@@ -21,16 +21,16 @@ export default function LandingPage({ locale }: { locale: string }) {
                     <Link href={`/${locale}/login`} className="text-sm font-medium text-white/90 hover:text-white transition-colors">
                         {t('hero.cta_login')}
                     </Link>
-                    <Link href={`/${locale}/signup`} className="px-5 py-2.5 text-sm font-semibold text-emerald-900 bg-white rounded-full hover:bg-gray-100 transition-colors shadow-lg shadow-black/5">
+                    <Link href={`/${locale}/login`} className="px-5 py-2.5 text-sm font-semibold text-emerald-900 bg-white rounded-full hover:bg-gray-100 transition-colors shadow-lg shadow-black/5">
                         {t('hero.cta_start')}
                     </Link>
                 </div>
             </nav>
 
             {/* Hero Section */}
-            <section className="relative h-[90vh] flex items-center justify-center overflow-hidden">
+            <section className="relative z-0 h-[90vh] flex items-center justify-center overflow-hidden">
                 {/* Background Image */}
-                <div className="absolute inset-0 z-0">
+                <div className="absolute inset-0 z-0 pointer-events-none">
                     <Image
                         src="/landing-hero.png"
                         alt="Modern Farm"
@@ -67,7 +67,7 @@ export default function LandingPage({ locale }: { locale: string }) {
                         className="flex flex-col sm:flex-row items-center justify-center gap-4"
                     >
                         <Link
-                            href={`/${locale}/signup`}
+                            href={`/${locale}/login`}
                             className="w-full sm:w-auto px-8 py-4 text-base font-bold text-white bg-emerald-600 rounded-full hover:bg-emerald-500 transition-all transform hover:scale-105 shadow-xl shadow-emerald-900/20 flex items-center justify-center gap-2"
                         >
                             {t('hero.cta_start')}

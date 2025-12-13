@@ -4,6 +4,34 @@ import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+type GeneratedTask = {
+    title: string;
+    description?: string;
+    dueDate?: string;
+    priority?: string;
+};
+
+type GeneratedWeek = { tasks: GeneratedTask[] };
+
+type GeneratedSchedule = {
+    weeks?: GeneratedWeek[];
+    pastTasks?: GeneratedWeek[];
+    currentWeekTasks?: GeneratedTask[];
+    futureTasks?: GeneratedWeek[];
+};
+
+type GeneratedScheduleResponse = {
+    schedule: GeneratedSchedule;
+};
+
+type TaskPayload = {
+    title: string;
+    description?: string;
+    dueDate?: string;
+    priority?: string;
+    status: 'pending' | 'completed';
+    isBackfilled?: boolean;
+};
 
 export default function ProjectAgentOnboarding({
     projectId,
@@ -24,8 +52,6 @@ export default function ProjectAgentOnboarding({
     const handleGenerate = async () => {
         setIsGenerating(true);
         try {
-            const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-
             setProgressMessage('🤖 スケジュール生成を開始します...');
 
             // 1. Determine which endpoint to use based on start date
@@ -37,7 +63,7 @@ export default function ProjectAgentOnboarding({
             setProgressMessage(`📊 ${crop}の栽培計画を分析中...`);
 
             // 2. Generate Schedule
-            const genRes = await fetch(`${baseUrl}${endpoint}`, {
+            const genRes = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(isBackfilled ? {
@@ -55,7 +81,6 @@ export default function ProjectAgentOnboarding({
                         targetHarvestDate: ''
                     },
                     currentDate: new Date().toISOString().split('T')[0],
-                    userId: 'demo-user',
                 }),
             });
 
@@ -65,32 +90,36 @@ export default function ProjectAgentOnboarding({
             setProgressMessage('🌱 タスクを作成中...');
 
             // 3. Process Tasks
-            let tasks: any[] = [];
+            const scheduleData = (generatedData as GeneratedScheduleResponse).schedule;
+            const toPayload = (task: GeneratedTask, status: TaskPayload['status'], isBackfilledTask?: boolean): TaskPayload => ({
+                title: task.title,
+                description: task.description,
+                dueDate: task.dueDate,
+                priority: task.priority,
+                status,
+                ...(isBackfilledTask ? { isBackfilled: true } : {}),
+            });
+
+            let tasks: TaskPayload[] = [];
             if (isBackfilled) {
-                const pastTasks = generatedData.schedule.pastTasks.flatMap((w: any) =>
-                    w.tasks.map((t: any) => ({ ...t, status: 'completed', isBackfilled: true }))
+                const pastTasks = (scheduleData.pastTasks || []).flatMap((week) =>
+                    (week.tasks || []).map((task) => toPayload(task, 'completed', true))
                 );
-                const currentTasks = generatedData.schedule.currentWeekTasks.map((t: any) => ({ ...t, status: 'pending' }));
-                const futureTasks = generatedData.schedule.futureTasks.flatMap((w: any) =>
-                    w.tasks.map((t: any) => ({ ...t, status: 'pending' }))
+                const currentTasks = (scheduleData.currentWeekTasks || []).map((task) => toPayload(task, 'pending'));
+                const futureTasks = (scheduleData.futureTasks || []).flatMap((week) =>
+                    (week.tasks || []).map((task) => toPayload(task, 'pending'))
                 );
                 tasks = [...pastTasks, ...currentTasks, ...futureTasks];
             } else {
-                tasks = generatedData.schedule.weeks.flatMap((week: any) =>
-                    week.tasks.map((task: any) => ({
-                        title: task.title,
-                        description: task.description,
-                        dueDate: task.dueDate,
-                        priority: task.priority,
-                        status: 'pending',
-                    }))
+                tasks = (scheduleData.weeks || []).flatMap((week) =>
+                    (week.tasks || []).map((task) => toPayload(task, 'pending'))
                 );
             }
 
             setProgressMessage(`💾 ${tasks.length}個のタスクを保存中...`);
 
             // 4. Save Tasks to Project
-            const saveRes = await fetch(`${baseUrl}/api/v1/projects/${projectId}`, {
+            const saveRes = await fetch(`/api/v1/projects/${projectId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ tasks }),

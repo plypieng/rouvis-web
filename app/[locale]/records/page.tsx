@@ -1,44 +1,77 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
-import { DashboardCard } from '../../../components/DashboardCard';
-import { AnalyticsFilters } from '../../../components/AnalyticsFilters';
-import { AnalyticsCharts } from '../../../components/AnalyticsCharts';
-import { CostRevenueAnalysis } from '../../../components/CostRevenueAnalysis';
-import { YieldComparisonTable } from '../../../components/YieldComparisonTable';
+import { useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { ActivityDashboard } from '../../../components/ActivityDashboard';
+import { ActivityLogModal } from '../../../components/ActivityLogModal';
+import { TaskSchedulerModal } from '../../../components/TaskSchedulerModal';
 
-export default function AnalyticsPage() {
-  const t = useTranslations();
+export default function RecordsPage() {
+  const params = useParams<{ locale: string }>();
+  const locale = (params?.locale as string) || 'ja';
+  const router = useRouter();
+  const [showLogModal, setShowLogModal] = useState(false);
+  const [showTaskModal, setShowTaskModal] = useState(false);
 
   return (
     <div className="container mx-auto py-6 px-4 space-y-6">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">{t('analytics.title')}</h1>
-      </div>
-      <AnalyticsFilters />
+      <h1 className="text-2xl font-bold text-gray-900">記録・分析</h1>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <DashboardCard title={t('analytics.yield_comparison')}>
-          <AnalyticsCharts chartType="yield" />
-        </DashboardCard>
+      <ActivityDashboard
+        onLogActivity={() => setShowLogModal(true)}
+        onScheduleTask={() => setShowTaskModal(true)}
+        onViewCalendar={() => router.push(`/${locale}/calendar`)}
+      />
 
-        <DashboardCard title={t('analytics.cost_revenue')}>
-          <CostRevenueAnalysis />
-        </DashboardCard>
-      </div>
+      <ActivityLogModal
+        isOpen={showLogModal}
+        onClose={() => setShowLogModal(false)}
+        onSave={async (activity) => {
+          const res = await fetch('/api/v1/activities', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: activity.type,
+              qty: activity.quantity,
+              unit: activity.unit,
+              note: activity.note,
+              performedAt: activity.performedAt ? new Date(activity.performedAt).toISOString() : undefined,
+              fieldId: activity.fieldId,
+            }),
+          });
 
-      <DashboardCard title={t('analytics.detailed_metrics')}>
-        <YieldComparisonTable />
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.error || 'Failed to log activity');
+          }
 
-        <div className="mt-4 flex justify-end">
-          <button className="py-2 px-4 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            {t('analytics.export_data')}
-          </button>
-        </div>
-      </DashboardCard>
+          router.refresh();
+        }}
+      />
+
+      <TaskSchedulerModal
+        isOpen={showTaskModal}
+        onClose={() => setShowTaskModal(false)}
+        onSave={async (task) => {
+          const res = await fetch('/api/v1/tasks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title: task.title,
+              description: task.notes,
+              dueAt: new Date(task.dueAt).toISOString(),
+              fieldId: task.fieldId,
+            }),
+          });
+
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.error || 'Failed to create task');
+          }
+
+          router.refresh();
+        }}
+      />
     </div>
   );
 }
