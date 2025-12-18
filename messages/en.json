@@ -1,5 +1,32 @@
 {
   "app_name": "ROUVIS",
+  "pages": {
+    "profile": {
+      "title": "Profile",
+      "no_name": "No Name",
+      "account_settings": "Account Settings",
+      "email_notifications": "Email Notifications",
+      "email_notifications_desc": "Receive important updates and alerts via email",
+      "sign_out": "Sign Out",
+      "edit_profile": "Edit Profile",
+      "display_name": "Display Name",
+      "region": "Region",
+      "farming_type": "Farming Type",
+      "experience_level": "Experience Level",
+      "save": "Save",
+      "cancel": "Cancel",
+      "types": {
+        "conventional": "Conventional",
+        "organic": "Organic",
+        "natural": "Natural"
+      },
+      "levels": {
+        "beginner": "Beginner (1-3 years)",
+        "intermediate": "Intermediate (3-10 years)",
+        "expert": "Expert (10+ years)"
+      }
+    }
+  },
   "strategic_planning": "Strategic Farm Planning",
   "farmer": "Farmer",
   "niigata_japan": "Niigata, Japan",

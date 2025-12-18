@@ -1,5 +1,32 @@
 {
   "app_name": "ROUVIS",
+  "pages": {
+    "profile": {
+      "title": "プロフィール",
+      "no_name": "名無し",
+      "account_settings": "アカウント設定",
+      "email_notifications": "メール通知",
+      "email_notifications_desc": "重要な更新やアラートをメールで受け取る",
+      "sign_out": "ログアウト",
+      "edit_profile": "プロフィール編集",
+      "display_name": "表示名",
+      "region": "地域",
+      "farming_type": "農業形態",
+      "experience_level": "経験レベル",
+      "save": "保存",
+      "cancel": "キャンセル",
+      "types": {
+        "conventional": "慣行農法",
+        "organic": "有機農法",
+        "natural": "自然農法"
+      },
+      "levels": {
+        "beginner": "初級（1-3年）",
+        "intermediate": "中級（3-10年）",
+        "expert": "上級（10年以上）"
+      }
+    }
+  },
   "strategic_planning": "農業戦略計画",
   "farmer": "農家",
   "niigata_japan": "新潟、日本",

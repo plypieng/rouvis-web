@@ -52,6 +52,14 @@ export const authOptions: NextAuthOptions = {
         token.id = token.sub;
       }
 
+      // Check if user has completed onboarding
+      if (token.id) {
+        const userProfile = await prisma.userProfile.findUnique({
+          where: { userId: token.id as string },
+        });
+        token.onboardingComplete = !!userProfile;
+      }
+
       return token;
     },
 
@@ -69,7 +77,7 @@ export const authOptions: NextAuthOptions = {
   },
   secret: process.env.NEXTAUTH_SECRET,
   pages: {
-    signIn: "/ja/login",
-    error: "/ja/login",
+    signIn: "/login",
+    error: "/login",
   },
 };

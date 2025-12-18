@@ -97,9 +97,6 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
 
                     {/* RIGHT COLUMN: Main Content */}
                     <div className="lg:col-span-8 order-1 lg:order-2 space-y-8">
-                        {/* 1. Header */}
-                        <ProjectHeader project={project} />
-
                         {/* 2. Onboarding OR Calendar */}
                         {(!project.tasks || project.tasks.length === 0) ? (
                             <ProjectAgentOnboarding
@@ -129,6 +126,9 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
                                 }
                             }}
                         />
+
+                        {/* 1. Header */}
+                        <ProjectHeader project={project} />
                     </div>
                 </div>
             </div>

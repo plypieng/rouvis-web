@@ -43,13 +43,13 @@ export default function LandingPage({ locale }: LandingPageProps) {
                     </div>
                     <div className="flex items-center space-x-4">
                         <Link
-                            href={`/${locale}/auth/signin`}
+                            href={`/${locale}/login`}
                             className="text-sm font-medium hover:text-green-600 transition-colors"
                         >
                             {t('hero.cta_login')}
                         </Link>
                         <Link
-                            href={`/${locale}/auth/signup`}
+                            href={`/${locale}/signup`}
                             className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-full transition-colors"
                         >
                             {t('hero.cta_start')}
@@ -88,7 +88,7 @@ export default function LandingPage({ locale }: LandingPageProps) {
 
                                 <div className="flex flex-col sm:flex-row items-center justify-start gap-4">
                                     <Link
-                                        href={`/${locale}/auth/signin`}
+                                        href={`/${locale}/login`}
                                         className="w-full sm:w-auto px-8 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-green-500 dark:hover:border-green-500 text-slate-900 dark:text-white font-bold rounded-full transition-all flex items-center justify-center"
                                     >
                                         {t('hero.cta_login')}
