@@ -12,7 +12,7 @@ export const Logo = ({ className }: { className?: string }) => {
         */}
             <img
                 src="/logo_text.png"
-                alt="Rouvis Logo"
+                alt="ROUVIS Logo"
                 className="w-full h-full object-contain"
             />
         </div>

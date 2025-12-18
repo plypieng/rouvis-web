@@ -1,5 +1,5 @@
 {
-  "app_name": "Rouvis",
+  "app_name": "ROUVIS",
   "strategic_planning": "農業戦略計画",
   "farmer": "農家",
   "niigata_japan": "新潟、日本",
@@ -78,7 +78,7 @@
     "projects_subtitle": "あなたのプロジェクト一覧",
     "today_focus": "今日のフォーカス",
     "all_caught_up": "すべてのタスクが完了しました",
-    "welcome_title": "ようこそ、Rouvisへ！",
+    "welcome_title": "ようこそ、ROUVISへ！",
     "welcome_subtitle": "作物の栽培サイクルを「プロジェクト」として管理します",
     "welcome_description": "プロジェクトを作成すると、AIが最適なスケジュールを提案し、毎日のタスクを教えてくれます。",
     "welcome_cta": "最初のプロジェクトを作成"
@@ -208,7 +208,7 @@
   },
   "auth": {
     "signIn": {
-      "title": "ROuvisへようこそ",
+      "title": "ROUVISへようこそ",
       "subtitle": "Googleアカウントでログインして始めましょう",
       "googleButton": "Googleでログイン",
       "loading": "ログイン中...",
@@ -218,9 +218,9 @@
     "onboarding": {
       "progress": "ステップ {current} / {total}",
       "welcome": {
-        "title": "ROuvisへようこそ",
+        "title": "ROUVISへようこそ",
         "subtitle": "チャットで農作業を管理する新しい体験",
-        "description": "ROuvisはAIアシスタントと会話しながら、圃場管理・作業記録・収穫計画を簡単に行えるサービスです。",
+        "description": "ROUVISはAIアシスタントと会話しながら、圃場管理・作業記録・収穫計画を簡単に行えるサービスです。",
         "benefits": {
           "chat": "チャットで作業を記録・相談",
           "weather": "天気予報と作業提案",

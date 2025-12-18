@@ -35,8 +35,8 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex items-center justify-center px-4">
       <div className="max-w-md w-full space-y-8">
         {/* ROuvis Logo */}
-        <div className="text-center">
-          <h1 className="text-5xl font-bold text-green-600 mb-2">ROuvis</h1>
+        <div className="text-center mb-6">
+          <h1 className="text-4xl font-bold text-emerald-600 tracking-tight mb-2">ROUVIS</h1>
           <p className="text-sm text-gray-500">農業チャットアシスタント</p>
         </div>
 
@@ -55,11 +55,7 @@ export default function LoginPage() {
         </div>
 
         {/* Optional: Add illustration or feature highlights */}
-        <div className="text-center text-sm text-gray-600 space-y-2">
-          <p>✅ チャットで簡単に作業記録</p>
-          <p>✅ 天気予報と作業提案</p>
-          <p>✅ 農業技術の検索とアドバイス</p>
-        </div>
+
       </div>
     </div>
   );

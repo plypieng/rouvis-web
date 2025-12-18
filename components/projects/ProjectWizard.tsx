@@ -59,6 +59,10 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                     body: JSON.stringify({ image: reader.result }),
                 });
 
+                if (!res.ok) {
+                    throw new Error(`Server responded with ${res.status}: ${res.statusText}`);
+                }
+
                 if (res.ok) {
                     const data = await res.json() as CropAnalysis;
 
@@ -82,7 +86,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                 }
             } catch (error) {
                 console.error('Scan error:', error);
-                alert('Failed to scan image');
+                alert(`画像の読み込みに失敗しました。\n詳細: ${error instanceof Error ? error.message : 'Unknown error'}`);
             } finally {
                 setLoading(false);
             }
@@ -319,7 +323,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
             <div className="space-y-6">
                 <CropAnalysisCard analysis={cropAnalysis} />
                 <FieldSelector
-                    selectedFieldId={selectedField?.id}
+                    selectedFieldId={selectedField?.id ?? ''}
                     onChange={(id) => setSelectedField({ id })}
                 />
                 <div className="flex justify-end gap-4">

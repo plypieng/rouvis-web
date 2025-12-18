@@ -1,5 +1,5 @@
 {
-  "app_name": "Rouvis",
+  "app_name": "ROUVIS",
   "strategic_planning": "Strategic Farm Planning",
   "farmer": "Farmer",
   "niigata_japan": "Niigata, Japan",
@@ -450,7 +450,7 @@
   },
   "auth": {
     "signIn": {
-      "title": "Welcome to ROuvis",
+      "title": "Welcome to ROUVIS",
       "subtitle": "Sign in with your Google account to get started",
       "googleButton": "Continue with Google",
       "loading": "Signing in...",
@@ -460,7 +460,7 @@
     "onboarding": {
       "progress": "Step {current} of {total}",
       "welcome": {
-        "title": "Welcome to ROuvis",
+        "title": "Welcome to ROUVIS",
         "subtitle": "A new way to manage your farm through conversation",
         "description": "ROuvis helps you manage fields, log activities, and plan harvests by chatting with an AI assistant.",
         "benefits": {
