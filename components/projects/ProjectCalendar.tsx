@@ -12,6 +12,7 @@ import ProjectInsightsPanel from './ProjectInsightsPanel';
 interface Task {
     id: string;
     title: string;
+    description?: string;
     dueDate: string;
     status: string;
 }

@@ -124,13 +124,20 @@ export default function MonthGrid({
                                 </span>
                                 <div className="flex gap-0.5 items-center">
                                     {weather && (
-                                        // eslint-disable-next-line @next/next/no-img-element
-                                        <img
-                                            src={`https://openweathermap.org/img/wn/${weather.icon}.png`}
-                                            alt={weather.condition}
-                                            title={`${weather.condition} / ${weather.temperature.max}°C`}
-                                            className="w-5 h-5 object-contain opacity-80"
-                                        />
+                                        <div className="flex flex-col items-end">
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img
+                                                src={`https://openweathermap.org/img/wn/${weather.icon}.png`}
+                                                alt={weather.condition}
+                                                title={`${weather.condition} / ${weather.temperature.max}°C`}
+                                                className="w-8 h-8 object-contain -my-1"
+                                            />
+                                            <div className="text-[10px] font-medium leading-none text-gray-600 flex gap-0.5">
+                                                <span className="text-red-500">{Math.round(weather.temperature.max)}</span>
+                                                <span className="text-gray-300">/</span>
+                                                <span className="text-blue-500">{Math.round(weather.temperature.min)}</span>
+                                            </div>
+                                        </div>
                                     )}
                                     {isStart && (
                                         <span className="material-symbols-outlined text-[14px] text-green-600" title={t('start_date')}>flag</span>

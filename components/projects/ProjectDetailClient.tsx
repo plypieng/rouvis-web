@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -41,6 +41,10 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
     const [showTaskCreateModal, setShowTaskCreateModal] = useState(false);
     const [selectedDateForTask, setSelectedDateForTask] = useState<Date | undefined>(undefined);
     const chatRef = useRef<RouvisChatKitRef>(null);
+
+    useEffect(() => {
+        window.scrollTo(0, 0);
+    }, []);
 
     const handleAiReschedule = () => {
         if (chatRef.current) {
