@@ -10,6 +10,7 @@ import {
     isSameDay,
     isToday
 } from 'date-fns';
+import { useMonthWeather } from '@/hooks/useMonthWeather';
 
 interface Task {
     id: string;
@@ -45,8 +46,10 @@ export default function MonthGrid({
     const projectStart = new Date(startDate);
     const projectEnd = targetHarvestDate ? new Date(targetHarvestDate) : null;
 
+    const { data: weatherData } = useMonthWeather(monthStart.getFullYear(), monthStart.getMonth() + 1);
+
     const getDayClass = (day: Date) => {
-        let classes = "min-h-[80px] p-1 border-b border-r border-gray-100 transition-colors relative cursor-pointer hover:bg-gray-50 ";
+        let classes = "h-full min-h-[40px] p-1 border-b border-r border-gray-100 transition-colors relative cursor-pointer hover:bg-gray-50 flex flex-col ";
 
         // Selected State
         if (isSameDay(day, selectedDate)) {
@@ -84,7 +87,7 @@ export default function MonthGrid({
     };
 
     return (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden h-full flex flex-col">
+        <div className="h-full flex flex-col">
             {/* Days Header */}
             <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
                 {['日', '月', '火', '水', '木', '金', '土'].map((d, i) => (
@@ -106,6 +109,8 @@ export default function MonthGrid({
                     const dayTasks = getTasksForDay(day);
                     const isStart = isSameDay(day, projectStart);
                     const isHarvest = projectEnd && isSameDay(day, projectEnd);
+                    const dateKey = format(day, 'yyyy-MM-dd');
+                    const weather = weatherData[dateKey];
 
                     return (
                         <div
@@ -117,7 +122,16 @@ export default function MonthGrid({
                                 <span className={getDateNumberClass(day)}>
                                     {format(day, 'd')}
                                 </span>
-                                <div className="flex gap-0.5">
+                                <div className="flex gap-0.5 items-center">
+                                    {weather && (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img
+                                            src={`https://openweathermap.org/img/wn/${weather.icon}.png`}
+                                            alt={weather.condition}
+                                            title={`${weather.condition} / ${weather.temperature.max}°C`}
+                                            className="w-5 h-5 object-contain opacity-80"
+                                        />
+                                    )}
                                     {isStart && (
                                         <span className="material-symbols-outlined text-[14px] text-green-600" title={t('start_date')}>flag</span>
                                     )}
@@ -131,8 +145,8 @@ export default function MonthGrid({
                             <div className="space-y-1 mt-1">
                                 {dayTasks.slice(0, 3).map(task => (
                                     <div key={task.id} className={`text-[10px] px-1.5 py-0.5 rounded truncate ${task.status === 'completed'
-                                            ? 'bg-gray-100 text-gray-500 line-through'
-                                            : 'bg-blue-100 text-blue-700'
+                                        ? 'bg-gray-100 text-gray-500 line-through'
+                                        : 'bg-blue-100 text-blue-700'
                                         }`}>
                                         {task.title}
                                     </div>

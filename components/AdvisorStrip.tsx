@@ -75,7 +75,7 @@ export function AdvisorStrip({ className = '', projectId: propProjectId }: { cla
     <section
       role="region"
       aria-live="polite"
-      className={`w-full rounded-xl border border-border bg-card p-4 ${className}`}
+      className={`w-full rounded-xl border-2 border-gray-400 bg-card p-4 ${className}`}
     >
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-sm font-medium text-foreground">今日のポイント</h2>

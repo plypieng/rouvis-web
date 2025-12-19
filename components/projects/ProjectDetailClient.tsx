@@ -9,7 +9,6 @@ import ProjectHeader from '@/components/projects/ProjectHeader';
 import ProjectCalendar from '@/components/projects/ProjectCalendar';
 import ProjectAgentOnboarding from '@/components/projects/ProjectAgentOnboarding';
 import TaskCreateModal from './TaskCreateModal';
-import ProjectInsightsPanel from './ProjectInsightsPanel';
 
 type ProjectTask = {
     id: string;
@@ -74,20 +73,22 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
     };
 
     return (
-        <div className="min-h-screen bg-gray-50/50">
-            <div className="container mx-auto px-4 py-6 max-w-7xl">
+        <div className="min-h-[calc(100vh-64px)] bg-gray-50/50 flex flex-col">
+            <div className="container mx-auto px-4 py-2 max-w-7xl flex-1 flex flex-col">
                 {/* Back Link */}
-                <Link href={`/${locale}/projects`} className="inline-flex items-center gap-1 text-gray-500 hover:text-gray-900 mb-6 transition font-medium text-sm">
-                    <span className="material-symbols-outlined text-lg">arrow_back</span>
-                    {t('back_to_projects')}
-                </Link>
+                <div className="flex-none mb-1">
+                    <Link href={`/${locale}/projects`} className="inline-flex items-center gap-1 text-gray-500 hover:text-gray-900 transition font-medium text-sm">
+                        <span className="material-symbols-outlined text-lg">arrow_back</span>
+                        {t('back_to_projects')}
+                    </Link>
+                </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                    {/* LEFT COLUMN: Companion Sidebar (Sticky) */}
-                    <div id="project-chat-kit" className="lg:col-span-4 lg:sticky lg:top-6 order-2 lg:order-1 h-[calc(100vh-100px)]">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch mb-2 h-[calc(100vh-120px)]">
+                    {/* LEFT COLUMN: Companion Sidebar */}
+                    <div id="project-chat-kit" className="lg:col-span-4 order-2 lg:order-1 flex flex-col h-full min-h-0">
                         <RouvisChatKit
                             ref={chatRef}
-                            className="h-full border border-gray-200 rounded-2xl shadow-sm overflow-hidden bg-white"
+                            className="flex-1 border border-gray-200 rounded-2xl shadow-sm overflow-hidden bg-white h-full"
                             projectId={project.id}
                             onTaskUpdate={() => router.refresh()}
                             density="compact"
@@ -95,8 +96,8 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
                         />
                     </div>
 
-                    {/* RIGHT COLUMN: Main Content */}
-                    <div className="lg:col-span-8 order-1 lg:order-2 space-y-8">
+                    {/* RIGHT COLUMN: Calendar Only (Auto Height) */}
+                    <div className="lg:col-span-8 order-1 lg:order-2 flex flex-col gap-2 h-full min-h-0">
                         {/* 2. Onboarding OR Calendar */}
                         {(!project.tasks || project.tasks.length === 0) ? (
                             <ProjectAgentOnboarding
@@ -105,31 +106,28 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
                                 startDate={project.startDate}
                             />
                         ) : (
-                            <div className="h-[calc(100vh-200px)]">
+                            <div className="flex flex-col h-full min-h-0">
                                 <ProjectCalendar
                                     startDate={project.startDate}
                                     targetHarvestDate={project.targetHarvestDate}
                                     tasks={project.tasks}
-                                    onAiReschedule={handleAiReschedule}
+                                    project={project}
+                                    onAskAI={() => {
+                                        if (chatRef.current) {
+                                            chatRef.current.sendMessage('このプロジェクトへのアドバイスをお願いします。');
+                                        }
+                                    }}
                                     onTaskComplete={handleTaskComplete}
                                     onTaskCreate={handleTaskCreate}
                                 />
                             </div>
                         )}
-
-                        {/* 3. Insights Panel */}
-                        <ProjectInsightsPanel
-                            project={project}
-                            onAskAI={() => {
-                                if (chatRef.current) {
-                                    chatRef.current.sendMessage('このプロジェクトへのアドバイスをお願いします。');
-                                }
-                            }}
-                        />
-
-                        {/* 1. Header */}
-                        <ProjectHeader project={project} />
                     </div>
+                </div>
+
+                {/* FOOTER: Project Header (Progress Tool) */}
+                <div className="flex-none pb-8">
+                    <ProjectHeader project={project} />
                 </div>
             </div>
 

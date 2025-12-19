@@ -45,7 +45,8 @@ async function getWeather() {
                 min: today?.temperature?.min ?? 0
             },
             condition: data.condition || '不明',
-            alerts: data.alerts || []
+            alerts: data.alerts || [],
+            forecast: data.forecast || [] // Pass daily forecast
         };
     } catch (error) {
         console.error('Failed to fetch weather:', error);
@@ -53,45 +54,39 @@ async function getWeather() {
             location: '長岡市',
             temperature: { max: 0, min: 0 },
             condition: '取得失敗',
-            alerts: []
+            alerts: [],
+            forecast: []
         };
     }
 }
 
-async function getTodayTasks() {
+async function getDashboardTasks() {
     try {
         const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+
+        // Fetch tasks for current month +/- 1 week to cover calendar view
         const today = new Date();
-        const endDate = new Date(today);
-        endDate.setHours(23, 59, 59, 999);
+        const startDate = new Date(today.getFullYear(), today.getMonth(), 1); // Start of month
+        startDate.setDate(startDate.getDate() - 7); // Buffer
+
+        const endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0); // End of month
+        endDate.setDate(endDate.getDate() + 7); // Buffer
 
         const cookieStore = await cookies();
         const cookieHeader = cookieStore.getAll().map(c => `${c.name}=${c.value}`).join('; ');
 
-        // Fetch tasks due before end of today that are pending
-        const res = await fetch(`${baseUrl}/api/v1/tasks?endDate=${endDate.toISOString()}&status=pending`, {
+        const res = await fetch(`${baseUrl}/api/v1/tasks?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}&status=pending`, {
             cache: 'no-store',
             headers: {
                 Cookie: cookieHeader
             }
         });
 
-        if (!res.ok) throw new Error('Failed to fetch today tasks');
+        if (!res.ok) throw new Error('Failed to fetch dashboard tasks');
         const data = await res.json();
-
-        // Enrich with project names if needed (API might not return project name, check schema)
-        // The current API returns tasks. If tasks include project relation, great.
-        // Let's check the API implementation in tasks.ts. 
-        // It does NOT include project relation by default in findMany.
-        // We might need to update API to include project, or fetch projects and map.
-        // For efficiency, let's update API to include project relation.
-        // But for now, let's assume we need to update API or map it.
-        // Wait, I didn't update API to include project.
-        // I should update API to include project relation.
-
         return data.tasks || [];
     } catch (error) {
-        console.error('Failed to fetch today tasks:', error);
+        console.error('Failed to fetch dashboard tasks:', error);
         return [];
     }
 }
@@ -124,113 +119,79 @@ export default async function DashboardProjectList({ locale }: { locale: string 
     const t = await getTranslations({ locale, namespace: 'dashboard' });
     const projects: Project[] = await getProjects();
     const weather = await getWeather();
-    const todayTasks = await getTodayTasks();
+    const dashboardTasks = await getDashboardTasks(); // All pending tasks for view
+
+    // Filter for "Today's Focus" list (Today and Overdue)
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    const todayTasks = dashboardTasks.filter((t: any) => new Date(t.dueAt) <= today);
 
     return (
         <div className="min-h-screen bg-background font-sans">
-            <DashboardHeader locale={locale} weather={weather} />
+            <DashboardHeader locale={locale} weather={weather} tasks={dashboardTasks} />
 
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-                {/* Today's Focus */}
-                <TodayFocus tasks={todayTasks} locale={locale} />
+            <main className="container mx-auto px-4 py-8 max-w-7xl space-y-8">
+                {/* Today's Focus Section */}
+                {todayTasks.length > 0 && (
+                    <TodayFocus tasks={todayTasks} locale={locale} />
+                )}
 
-                <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-lg font-semibold text-foreground">{t('my_projects')}</h2>
-                    <Link
-                        href={`/${locale}/projects/create`}
-                        className="inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium text-primary-foreground bg-primary hover:opacity-90 transition-opacity min-h-[44px]"
-                    >
-                        + {t('create_project')}
-                    </Link>
-                </div>
-
-                {/* Welcome Card for New Users */}
-                {projects.length === 0 ? (
-                    <div className="bg-gradient-to-br from-emerald-50 to-green-50 border border-emerald-200 rounded-2xl p-8 text-center max-w-md mx-auto">
-                        <div className="text-5xl mb-4">🌱</div>
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">
-                            {t('welcome_title')}
-                        </h3>
-                        <p className="text-gray-600 mb-2">
-                            {t('welcome_subtitle')}
-                        </p>
-                        <p className="text-sm text-gray-500 mb-6">
-                            {t('welcome_description')}
-                        </p>
+                {/* Projects Grid */}
+                <div>
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-xl font-bold text-gray-900">{t('active_projects')}</h2>
                         <Link
-                            href={`/${locale}/projects/create`}
-                            className="inline-flex items-center px-6 py-3 rounded-full text-base font-semibold text-white bg-emerald-600 hover:bg-emerald-500 transition-colors shadow-lg"
+                            href={`/${locale}/projects`}
+                            className="text-sm font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1"
                         >
-                            {t('welcome_cta')}
-                            <span className="ml-2">→</span>
+                            {t('view_all')}
+                            <span className="material-symbols-outlined text-sm">arrow_forward</span>
                         </Link>
                     </div>
-                ) : (
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        {/* Create New Card */}
-                        <Link
-                            href={`/${locale}/projects/create`}
-                            className="block border-2 border-dashed border-border rounded-xl p-10 text-center hover:border-primary/50 hover:bg-primary/5 transition-colors group"
-                        >
-                            <span className="text-3xl text-muted-foreground group-hover:text-primary transition-colors">+</span>
-                            <span className="mt-2 block text-sm text-muted-foreground">
-                                {t('create_new_project')}
-                            </span>
-                        </Link>
 
-                        {/* Project Cards - Simplified */}
-                        {projects.map((project) => {
-                            const daysSinceStart = Math.floor((new Date().getTime() - new Date(project.startDate).getTime()) / (1000 * 60 * 60 * 24));
-
-                            return (
-                                <Link
-                                    key={project.id}
-                                    href={`/${locale}/projects/${project.id}`}
-                                    className="block bg-card rounded-xl border border-border hover:border-primary/30 transition-colors p-5"
-                                >
-                                    {/* Header */}
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div>
-                                            <h3 className="text-base font-semibold text-foreground">
+                    {projects.length === 0 ? (
+                        <div className="text-center py-12 bg-white rounded-lg border border-dashed border-gray-300">
+                            <p className="text-gray-500 mb-4">{t('no_projects')}</p>
+                            <Link
+                                href={`/${locale}/projects/create`}
+                                className="text-green-600 hover:underline font-medium"
+                            >
+                                {t('create_new')}
+                            </Link>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {projects.slice(0, 6).map((project) => (
+                                <Link key={project.id} href={`/${locale}/projects/${project.id}`} className="block group">
+                                    <div className="border rounded-xl p-5 hover:shadow-md transition bg-white h-full flex flex-col border-gray-200 group-hover:border-green-200">
+                                        <div className="flex justify-between items-start mb-3">
+                                            <h3 className="text-lg font-semibold text-gray-900 group-hover:text-green-700 transition line-clamp-1">
                                                 {project.name}
                                             </h3>
-                                            <p className="text-sm text-muted-foreground mt-0.5">
-                                                {project.crop} {project.variety ? `· ${project.variety}` : ''}
-                                            </p>
-                                        </div>
-                                        <div className="text-right">
-                                            <span className="text-xl font-semibold text-foreground">{daysSinceStart}</span>
-                                            <span className="text-xs text-muted-foreground block">{t('days')}</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Info rows - simplified, no colored backgrounds */}
-                                    <div className="space-y-2 text-sm">
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">{t('last_activity')}</span>
-                                            <span className="text-foreground">
-                                                {project.lastActivity?.type || '—'}
+                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${project.status === 'active' ? 'bg-green-100 text-green-800' :
+                                                project.status === 'completed' ? 'bg-blue-100 text-blue-800' :
+                                                    'bg-yellow-100 text-yellow-800'
+                                                }`}>
+                                                {project.status}
                                             </span>
                                         </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">{t('next_task')}</span>
-                                            <span className="text-foreground">
-                                                {project.nextTask?.title || '—'}
-                                            </span>
+                                        <div className="space-y-2 text-sm text-gray-600 flex-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-gray-400 text-base">grass</span>
+                                                <span>{project.crop} {project.variety && `(${project.variety})`}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-gray-400 text-base">calendar_today</span>
+                                                <span>{new Date(project.startDate).toLocaleDateString(locale)}</span>
+                                            </div>
                                         </div>
-                                    </div>
-
-                                    {/* Footer */}
-                                    <div className="mt-4 pt-3 border-t border-border flex justify-between items-center text-xs text-muted-foreground">
-                                        <span>{project.field?.name || t('not_set')}</span>
-                                        <span className="text-primary">詳細 →</span>
                                     </div>
                                 </Link>
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </main>
         </div>
     );
 }

@@ -41,9 +41,16 @@ export async function GET(request: NextRequest) {
     // Niigata region coordinates (Nagaoka city: 37.4°N, 138.9°E)
     const lat = request.nextUrl.searchParams.get('lat') || '37.4';
     const lon = request.nextUrl.searchParams.get('lon') || '138.9';
+    const type = request.nextUrl.searchParams.get('type');
+    const year = request.nextUrl.searchParams.get('year');
+    const month = request.nextUrl.searchParams.get('month');
 
     // Call new backend endpoint
-    const url = `${backendUrl}/api/v1/weather/forecast?lat=${lat}&lon=${lon}`;
+    let url = `${backendUrl}/api/v1/weather/forecast?lat=${lat}&lon=${lon}`;
+
+    if (type === 'monthly' && year && month) {
+      url = `${backendUrl}/api/v1/weather/monthly?lat=${lat}&lon=${lon}&year=${year}&month=${month}`;
+    }
 
     const response = await fetch(url, {
       headers: {

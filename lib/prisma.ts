@@ -1,21 +1,21 @@
-
 import { PrismaClient } from '@prisma/client';
 import { withAccelerate } from '@prisma/extension-accelerate';
 
 const prismaGlobal = global as typeof global & {
-    prisma?: ReturnType<typeof createPrismaClient>;
+    prisma?: PrismaClient;
 };
 
-function createPrismaClient() {
-    return new PrismaClient({
-        log: ['error', 'warn'],
-    }).$extends(withAccelerate());
-}
+// Create the base Prisma Client
+const basePrisma = prismaGlobal.prisma || new PrismaClient({
+    log: ['error', 'warn'],
+});
 
-export const prisma =
-    prismaGlobal.prisma ||
-    createPrismaClient();
+// Use the base client for NextAuth to avoid type and runtime issues with extensions
+export const authPrisma = basePrisma;
+
+// Use the extended client for the application
+export const prisma = basePrisma.$extends(withAccelerate());
 
 if (process.env.NODE_ENV !== 'production') {
-    prismaGlobal.prisma = prisma;
+    prismaGlobal.prisma = basePrisma;
 }
