@@ -67,8 +67,8 @@ export default async function CalendarPage(props: { params: Promise<{ locale: st
         projectName: project.name,
         priority: (task.priority === 'low' || task.priority === 'medium' || task.priority === 'high')
           ? task.priority
-          : 'medium',
-        status: (task.status === 'scheduled' || task.status === 'cancelled') ? task.status : 'pending',
+          : 'medium' as 'low' | 'medium' | 'high',
+        status: ((task.status === 'scheduled' || task.status === 'cancelled') ? task.status : 'pending') as 'scheduled' | 'cancelled' | 'pending',
       }));
   });
 

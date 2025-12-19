@@ -202,7 +202,7 @@ export function EvidenceCard({
                 <span className="font-medium text-mobile-sm">{toolEvent.tool}</span>
                 <span className="text-mobile-sm opacity-70">({toolEvent.status})</span>
               </div>
-              {toolEvent.result && (
+              {!!toolEvent.result && (
                 <div className="text-mobile-sm bg-gray-50 p-2 rounded mt-2 mobile-scroll">
                   <pre className="whitespace-pre-wrap">{JSON.stringify(toolEvent.result, null, 2)}</pre>
                 </div>

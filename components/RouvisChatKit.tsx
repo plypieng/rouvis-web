@@ -116,26 +116,26 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load chat history on mount
-	  useEffect(() => {
-	    const loadHistory = async () => {
-	      if (!threadId) {
-	        if (projectId) {
-	          try {
-	            const res = await fetch('/api/chatkit', {
-	              method: 'POST',
-	              headers: { 'Content-Type': 'application/json' },
-	              body: JSON.stringify({ action: 'chatkit.create_thread', payload: { projectId } }),
-	            });
-	            if (res.ok) {
-	              const data = await res.json();
-	              if (data.thread?.id) setThreadId(data.thread.id);
-	            }
-	          } catch (e) {
-	            console.warn('Failed to create thread:', e);
-	          }
-	        }
-	        return;
-	      }
+  useEffect(() => {
+    const loadHistory = async () => {
+      if (!threadId) {
+        if (projectId) {
+          try {
+            const res = await fetch('/api/chatkit', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'chatkit.create_thread', payload: { projectId } }),
+            });
+            if (res.ok) {
+              const data = await res.json();
+              if (data.thread?.id) setThreadId(data.thread.id);
+            }
+          } catch (e) {
+            console.warn('Failed to create thread:', e);
+          }
+        }
+        return;
+      }
 
       try {
         const res = await fetch(`/api/chatkit?thread_id=${threadId}`);
@@ -159,10 +159,10 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
       } catch (e) {
         console.warn('Failed to load history:', e);
       }
-	    };
+    };
 
-	    loadHistory();
-	  }, [threadId, projectId]);
+    loadHistory();
+  }, [threadId, projectId]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -308,15 +308,17 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
 
             // Content
             if (event.type === 'content' && event.delta?.content) {
+              const content = event.delta.content;
               setMessages(prev => prev.map(m =>
-                m.id === assistantId ? { ...m, content: m.content + event.delta.content } : m
+                m.id === assistantId ? { ...m, content: m.content + content } : m
               ));
             }
 
             // Source (simplified - no confidence %)
             if (event.type === 'citation' && event.citation?.source) {
+              const source = event.citation.source;
               setMessages(prev => prev.map(m =>
-                m.id === assistantId ? { ...m, source: event.citation.source } : m
+                m.id === assistantId ? { ...m, source: source } : m
               ));
             }
 
@@ -324,8 +326,8 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
             if (event.type === 'action_confirmation' && event.action?.type) {
               const actionType =
                 event.action.type === 'task_created' ||
-                event.action.type === 'activity_logged' ||
-                event.action.type === 'task_updated'
+                  event.action.type === 'activity_logged' ||
+                  event.action.type === 'task_updated'
                   ? event.action.type
                   : 'task_updated';
               const confirmation: ActionConfirmation = {
@@ -527,7 +529,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
                 className="flex items-center justify-between py-2 px-4 bg-primary/10 text-primary text-sm rounded-lg"
               >
                 <span>{confirmation.summary} ✓</span>
-                {confirmation.undoData && Date.now() < confirmation.expiresAt && (
+                {!!confirmation.undoData && Date.now() < confirmation.expiresAt && (
                   <button
                     onClick={() => handleUndo(confirmation)}
                     className="flex items-center gap-1 text-xs underline opacity-70 hover:opacity-100"

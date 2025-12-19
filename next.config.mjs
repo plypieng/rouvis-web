@@ -9,12 +9,7 @@ const nextConfig = {
     pagesBufferLength: 5,
   },
   reactStrictMode: false,
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+
   transpilePackages: ['@openai/chatkit-react', '@openai/chatkit'],
   images: {
     remotePatterns: [

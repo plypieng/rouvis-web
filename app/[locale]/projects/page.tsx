@@ -59,7 +59,7 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
 
             // Refresh projects list
             fetchProjects();
-            alert(t('unarchived_success', { name: projects.find(p => p.id === projectId)?.name }));
+            alert(t('unarchived_success', { name: projects.find(p => p.id === projectId)?.name || '' }));
         } catch (error) {
             console.error('Unarchive error:', error);
             alert('復元に失敗しました');
@@ -150,7 +150,7 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <span className="material-symbols-outlined text-gray-400 text-base">calendar_today</span>
-                                                <span>{new Date(project.startDate).toLocaleDateString(locale)}</span>
+                                                <span>{new Date(project.startDate || Date.now()).toLocaleDateString(locale)}</span>
                                             </div>
                                         </div>
                                     </div>

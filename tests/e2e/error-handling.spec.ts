@@ -170,7 +170,7 @@ test.describe('Error Handling and Loading States', () => {
 
     // Check validation errors
     const validationErrors = modal.locator('[data-testid="validation-error"]');
-    await expect(validationErrors).toHaveCountGreaterThan(0);
+    expect(await validationErrors.count()).toBeGreaterThan(0);
 
     // Check specific field errors
     const typeError = modal.locator('[data-testid="type-error"]');

@@ -95,7 +95,7 @@ export default function ChatPage() {
                   {thread.title || 'New Conversation'}
                 </div>
                 <div className="flex items-center justify-between text-xs text-gray-400">
-                  <span>{new Date(thread.updatedAt || thread.createdAt).toLocaleDateString()}</span>
+                  <span>{new Date(thread.updatedAt || thread.createdAt || Date.now()).toLocaleDateString()}</span>
                   <svg className={`w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity ${selectedThreadId === thread.id ? 'text-emerald-400' : 'text-gray-300'
                     }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -124,7 +124,7 @@ export default function ChatPage() {
               initialThreadId={selectedThreadId}
               className="h-full w-full"
               density="comfortable"
-              onDiagnosisComplete={(result) => setDiagnosisResult(result)}
+              onDiagnosisComplete={(result) => setDiagnosisResult(result as DiagnosisResult)}
             />
           </div>
 

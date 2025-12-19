@@ -196,6 +196,7 @@ export function ActivityDashboard({
       .filter(task => task.dueAt >= now && task.dueAt <= nextWeek && task.status === 'pending')
       .map(task => ({
         ...task,
+        status: 'pending' as const,
         fieldName: task.fieldName || fields.find(f => f.id === task.fieldId)?.name
       }))
       .sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime())
