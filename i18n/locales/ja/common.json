@@ -32,11 +32,15 @@
     "create_project": "プロジェクト作成",
     "create_new_project": "新規プロジェクト作成",
     "my_projects": "マイプロジェクト",
+    "active_projects": "進行中のプロジェクト",
+    "view_all": "すべて見る",
+    "create_new": "新規作成",
     "projects_subtitle": "あなたのプロジェクト一覧",
     "today_focus": "今日のフォーカス",
     "all_caught_up": "すべてのタスクが完了しました",
     "tasks_remaining": "件の残りタスク",
-    "overdue": "期限切れ"
+    "overdue": "期限切れ",
+    "no_projects": "プロジェクトがありません"
   },
   "planner": {
     "title": "Crop Layout Planner",
