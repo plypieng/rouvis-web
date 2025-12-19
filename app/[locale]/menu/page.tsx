@@ -2,7 +2,8 @@ import Link from 'next/link';
 import { Calendar, TrendingUp, Book, Settings, ChevronRight, User } from 'lucide-react';
 import { getServerSessionFromToken } from '@/lib/server-auth';
 
-export default async function MenuPage({ params: { locale } }: { params: { locale: string } }) {
+export default async function MenuPage({ params }: { params: Promise<{ locale: string }> }) {
+    const { locale } = await params;
     const session = await getServerSessionFromToken();
     const displayName = session?.user?.name || session?.user?.email || 'ユーザー';
 

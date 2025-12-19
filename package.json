@@ -63,7 +63,8 @@
     "typescript": "^5.2.2"
   },
   "optionalDependencies": {
-    "@rollup/rollup-linux-x64-gnu": "*",
-    "@parcel/watcher-linux-x64-glibc": "*"
+    "@parcel/watcher": "^2.5.1",
+    "@parcel/watcher-linux-x64-glibc": "*",
+    "@rollup/rollup-linux-x64-gnu": "*"
   }
 }
