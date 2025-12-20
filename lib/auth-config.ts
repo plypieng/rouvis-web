@@ -52,6 +52,25 @@ export const authOptions: NextAuthOptions = {
         token.id = token.sub;
       }
 
+      // Self-healing: If ID is missing or looks numeric (Google Sub), force CUID lookup via Email
+      // This fixes the issue where users are identified by Sub ID instead of database CUID
+      const isNumericId = token.id && /^\d+$/.test(token.id as string);
+      if ((!token.id || isNumericId) && token.email) {
+        try {
+          console.log('[Auth-JWT] Self-healing ID check for:', token.email, 'Current ID:', token.id);
+          const dbUser = await prisma.user.findUnique({
+            where: { email: token.email as string },
+            select: { id: true }
+          });
+          if (dbUser && dbUser.id !== token.id) {
+            console.log('[Auth-JWT] Replaced numeric/missing ID', token.id, 'with CUID', dbUser.id);
+            token.id = dbUser.id;
+          }
+        } catch (error) {
+          console.error('[Auth-JWT] Self-healing failed:', error);
+        }
+      }
+
       // Check if user has completed onboarding
       if (token.id) {
         console.log('[Auth-JWT] User ID:', token.id, 'Sub:', token.sub, 'Email:', token.email);
