@@ -2,6 +2,7 @@
 
 import { useSession } from 'next-auth/react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useEffect } from 'react';
 import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
@@ -35,8 +36,11 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex items-center justify-center px-4">
       <div className="max-w-md w-full space-y-8">
         {/* ROuvis Logo */}
+        {/* ROuvis Logo - Click to go home */}
         <div className="text-center mb-6">
-          <h1 className="text-4xl font-bold text-emerald-600 tracking-tight mb-2">ROUVIS</h1>
+          <Link href={`/${locale}`} className="inline-block hover:opacity-80 transition-opacity">
+            <h1 className="text-4xl font-bold text-emerald-600 tracking-tight mb-2">ROUVIS</h1>
+          </Link>
           <p className="text-sm text-gray-500">農業チャットアシスタント</p>
         </div>
 

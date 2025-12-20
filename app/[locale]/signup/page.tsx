@@ -13,9 +13,11 @@ export default function SignupPage(props: { params: Promise<{ locale: string }> 
     return (
         <div className="container mx-auto px-4 py-12 flex flex-col items-center justify-center min-h-[60vh]">
             <div className="w-full max-w-lg bg-white dark:bg-gray-800 shadow-xl rounded-2xl p-10 text-center">
-                <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <Mail className="w-8 h-8" />
-                </div>
+                <Link href={`/${locale}`} className="inline-block hover:opacity-80 transition-opacity">
+                    <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Mail className="w-8 h-8" />
+                    </div>
+                </Link>
 
                 <h1 className="text-3xl font-bold mb-4 text-gray-900 dark:text-white">
                     {t('title')}
