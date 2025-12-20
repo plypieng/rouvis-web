@@ -334,6 +334,11 @@
   "projects": {
     "title": "プロジェクト",
     "create_new": "新規プロジェクト作成",
+    "delete": "削除",
+    "delete_confirm_title": "プロジェクトを削除しますか？",
+    "delete_confirm_message": "プロジェクト「{name}」を削除してもよろしいですか？この操作は取り消せません。",
+    "delete_success": "プロジェクトを削除しました",
+    "delete_error": "プロジェクトの削除に失敗しました",
     "list_title": "プロジェクト一覧",
     "no_projects": "プロジェクトがまだありません。新しいプロジェクトを作成して始めましょう。",
     "create": {

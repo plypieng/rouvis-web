@@ -7,6 +7,7 @@ import CropAnalysisCard from './CropAnalysisCard';
 import FieldSelector from './FieldSelector';
 import ProjectTypeSelector from './ProjectTypeSelector';
 import PlantingHistoryInput from './PlantingHistoryInput';
+import AIProcessingOverlay from './AIProcessingOverlay';
 
 type WizardStep = 'project-type' | 'selection' | 'crop-analysis' | 'planting-history' | 'field-context';
 
@@ -28,6 +29,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
     const [cropAnalysis, setCropAnalysis] = useState<CropAnalysis | null>(null);
     const [selectedField, setSelectedField] = useState<{ id: string } | null>(null);
     const [loading, setLoading] = useState(false);
+    const [loadingMode, setLoadingMode] = useState<'scan' | 'manual' | null>(null);
 
     // State for new workflow
     const [projectType, setProjectType] = useState<'new' | 'existing' | null>(null);
@@ -46,6 +48,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
     // Step 1: Selection (Scan or Manual) - Modified to handle flow
     const handleScanImage = async (file: File) => {
         setLoading(true);
+        setLoadingMode('scan');
         const reader = new FileReader();
 
         reader.onloadend = async () => {
@@ -89,6 +92,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                 alert(`画像の読み込みに失敗しました。\n詳細: ${error instanceof Error ? error.message : 'Unknown error'}`);
             } finally {
                 setLoading(false);
+                setLoadingMode(null);
             }
         };
 
@@ -98,6 +102,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
     const handleManualCropInput = async (cropName: string) => {
         if (!cropName) return;
         setLoading(true);
+        setLoadingMode('manual');
 
         try {
             const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
@@ -132,6 +137,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
             console.error('Analysis error:', error);
         } finally {
             setLoading(false);
+            setLoadingMode(null);
         }
     };
 
@@ -193,7 +199,10 @@ export default function ProjectWizard({ locale }: { locale: string }) {
     // Render based on step
     if (step === 'selection') {
         return (
-            <div className="space-y-6">
+            <div className="space-y-6 relative min-h-[400px]">
+                {loading && loadingMode && (
+                    <AIProcessingOverlay mode={loadingMode} />
+                )}
                 <div className="flex items-center justify-between mb-4">
                     <button
                         onClick={() => setStep('project-type')}

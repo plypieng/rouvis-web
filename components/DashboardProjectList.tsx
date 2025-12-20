@@ -162,7 +162,7 @@ export default async function DashboardProjectList({ locale }: { locale: string 
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {projects.slice(0, 6).map((project) => (
-                                <Link key={project.id} href={`/${locale}/projects/${project.id}`} className="block group">
+                                <Link key={project.id} href={`/${locale}/projects/${project.id}`} className="block group h-full">
                                     <div className="border rounded-xl p-5 hover:shadow-md transition bg-white h-full flex flex-col border-gray-200 group-hover:border-green-200">
                                         <div className="flex justify-between items-start mb-3">
                                             <h3 className="text-lg font-semibold text-gray-900 group-hover:text-green-700 transition line-clamp-1">

@@ -66,6 +66,36 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
         }
     };
 
+    const handleDelete = async (project: Project, e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (!confirm(t('delete_confirm_message', { name: project.name }))) {
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/v1/projects/${project.id}`, {
+                method: 'DELETE',
+            });
+
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error || 'Delete failed');
+            }
+
+            // Refresh projects list
+            fetchProjects();
+            alert(t('delete_success'));
+        } catch (error) {
+            console.error('Delete error:', error);
+
+            // Show detailed error if available
+            const errorMessage = error instanceof Error ? error.message : t('delete_error');
+            alert(errorMessage.startsWith('Failed') ? errorMessage : t('delete_error'));
+        }
+    };
+
     // Filter projects based on showArchived toggle
     const activeProjects = projects.filter(p => p.status !== 'archived');
     const archivedProjects = projects.filter(p => p.status === 'archived');
@@ -127,8 +157,8 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
                     {displayProjects.map((project) => {
                         const isArchived = project.status === 'archived';
                         return (
-                            <div key={project.id} className="relative">
-                                <Link href={`/${locale}/projects/${project.id}`} className="block group">
+                            <div key={project.id} className="relative h-full">
+                                <Link href={`/${locale}/projects/${project.id}`} className="block group h-full">
                                     <div className={`border rounded-xl p-5 hover:shadow-md transition bg-white h-full flex flex-col border-gray-200 group-hover:border-green-200 ${isArchived ? 'opacity-60' : ''
                                         }`}>
                                         <div className="flex justify-between items-start mb-3">
@@ -166,6 +196,15 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
                                         {t('unarchive')}
                                     </button>
                                 )}
+
+                                {/* Delete Button */}
+                                <button
+                                    onClick={(e) => handleDelete(project, e)}
+                                    className="absolute bottom-3 right-3 z-10 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition"
+                                    title={t('delete')}
+                                >
+                                    <span className="material-symbols-outlined text-xl">delete</span>
+                                </button>
                             </div>
                         );
                     })}
