@@ -48,9 +48,10 @@ interface ProjectHeaderProps {
         status: string;
         notes?: string;
     };
+    compact?: boolean;
 }
 
-export default function ProjectHeader({ project }: ProjectHeaderProps) {
+export default function ProjectHeader({ project, compact }: ProjectHeaderProps) {
     const t = useTranslations('projects');
     const router = useRouter();
     const params = useParams<{ locale: string }>();
@@ -62,6 +63,8 @@ export default function ProjectHeader({ project }: ProjectHeaderProps) {
     const [showUndoSnackbar, setShowUndoSnackbar] = useState(false);
     const [archiving, setArchiving] = useState(false);
     const [lastArchivedId, setLastArchivedId] = useState<string | null>(null);
+
+    const [isExpanded, setIsExpanded] = useState(false);
 
     // Calculate progress
     const start = new Date(project.startDate).getTime();
@@ -140,16 +143,16 @@ export default function ProjectHeader({ project }: ProjectHeaderProps) {
                 }
 
                 const data = await res.json() as CropKnowledgeResponse;
-                const dbStages = data.knowledge?.stages;
-                if (!Array.isArray(dbStages) || dbStages.length === 0) {
+                const knowledgeStages = data.knowledge?.stages;
+                if (!Array.isArray(knowledgeStages) || knowledgeStages.length === 0) {
                     setStages(DEFAULT_STAGES);
                     return;
                 }
 
-                const totalDuration = dbStages.reduce((acc, s) => acc + s.duration, 0);
+                const totalDuration = knowledgeStages.reduce((acc, s) => acc + s.duration, 0);
                 let currentDuration = 0;
 
-                const mappedStages: StageConfig = dbStages.map((s) => {
+                const mappedStages: StageConfig = knowledgeStages.map((s) => {
                     currentDuration += s.duration;
                     return {
                         key: s.key,
@@ -189,6 +192,134 @@ export default function ProjectHeader({ project }: ProjectHeaderProps) {
     };
 
     const stage = getCurrentStage(progress, stages);
+
+    if (compact) {
+        return (
+            <>
+                <div className={`transition-all duration-300 ease-in-out bg-white border border-gray-200 shadow-sm ${isExpanded ? 'rounded-2xl p-4 w-full' : 'rounded-full px-4 py-2 flex items-center gap-4'}`}>
+
+                    {/* Header Top Row (Always visible or adapted) */}
+                    <div className={`flex items-center justify-between ${isExpanded ? 'mb-4' : 'w-full gap-4'}`}>
+
+                        {/* Left: Title & Back */}
+                        <div className="flex items-center gap-3 min-w-0 shrink-0">
+                            <h1 className="text-sm font-bold text-gray-900 whitespace-nowrap">{project.name}</h1>
+                            {!isExpanded && (
+                                <span className="text-xs text-gray-500 hidden lg:inline-block">
+                                    {project.crop}
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Middle: Compact Progress (Spans entirely) */}
+                        {!isExpanded && (
+                            <div className="flex-1 flex items-center gap-3 min-w-0 px-4">
+                                <div className="flex items-center gap-1.5 text-xs font-medium text-gray-700 shrink-0">
+                                    <span className="text-lg leading-none">{getStageIcon(stage)}</span>
+                                    <span className="hidden sm:inline">{stages.find(s => s.key === stage)?.label || stage}</span>
+                                </div>
+                                <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-green-500 transition-all duration-500"
+                                        style={{ width: `${Math.min(100, progress)}%` }}
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Right: Actions */}
+                        <div className="flex items-center gap-2 shrink-0 ml-auto">
+                            {/* Expand Toggle */}
+                            <button
+                                onClick={() => setIsExpanded(!isExpanded)}
+                                className="p-1 text-gray-400 hover:text-gray-900 rounded-full hover:bg-gray-100 transition-colors"
+                            >
+                                <span className="material-symbols-outlined text-[20px]">
+                                    {isExpanded ? 'expand_less' : 'expand_more'}
+                                </span>
+                            </button>
+
+                            {/* Menu Trigger */}
+                            <div className="relative border-l border-gray-200 pl-2 ml-1">
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
+                                    className="p-1 text-gray-400 hover:text-gray-900 rounded-full hover:bg-gray-100 transition-colors"
+                                >
+                                    <span className="material-symbols-outlined text-[20px]">more_vert</span>
+                                </button>
+                                {showMenu && (
+                                    <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-lg border border-gray-200 shadow-lg py-1 z-50">
+                                        <button
+                                            onClick={() => { setShowMenu(false); setShowEditModal(true); }}
+                                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                        >
+                                            {t('edit_project')}
+                                        </button>
+                                        <button
+                                            onClick={() => { setShowMenu(false); setShowArchiveDialog(true); }}
+                                            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                                        >
+                                            {t('confirm_archive_title')}
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Expanded Content (Full Analysis) */}
+                    {isExpanded && (
+                        <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                            <div className="flex items-center justify-between text-xs mb-2 mt-2">
+                                <span className="text-gray-500">
+                                    {dayCount}日目 {totalDays ? `/ ${totalDays}日` : ''} · {project.crop} {project.variety && `(${project.variety})`}
+                                </span>
+                                <span className="text-green-600 font-medium text-sm flex items-center gap-1">
+                                    {getStageIcon(stage)} {stages.find(s => s.key === stage)?.label || stage}
+                                </span>
+                            </div>
+
+                            <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-2">
+                                <div
+                                    className="h-full bg-green-500 transition-all duration-500"
+                                    style={{ width: `${Math.min(100, progress)}%` }}
+                                />
+                            </div>
+
+                            <div className="flex justify-between text-[11px] text-gray-400">
+                                {stages.map((s) => (
+                                    <div key={s.key} className={`flex flex-col items-center gap-1 ${stage === s.key ? 'text-green-600 font-bold' : ''}`}>
+                                        <span>{s.label || s.key}</span>
+                                        {stage === s.key && <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <ProjectEditModal
+                    project={project}
+                    isOpen={showEditModal}
+                    onClose={() => setShowEditModal(false)}
+                />
+
+                <ArchiveConfirmation
+                    projectName={project.name}
+                    isOpen={showArchiveDialog}
+                    onConfirm={handleArchive}
+                    onCancel={() => setShowArchiveDialog(false)}
+                    isLoading={archiving}
+                />
+
+                <UndoSnackbar
+                    message={t('archived_success', { name: project.name })}
+                    onUndo={handleUndo}
+                    show={showUndoSnackbar}
+                />
+            </>
+        );
+    }
 
     return (
         <>

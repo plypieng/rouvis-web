@@ -46,15 +46,16 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
         window.scrollTo(0, 0);
     }, []);
 
-    /*
-    const handleAiReschedule = () => {
+    const handleRescheduleRequest = () => {
         if (chatRef.current) {
-            chatRef.current.sendMessage('向こう1週間のスケジュールと天気予報を確認して、変更が必要な点があれば提案してください。');
-        } else {
-            alert(t('ai_reschedule_alert'));
+            // Set specific suggestions for rescheduling context
+            chatRef.current.setSuggestions([
+                { label: 'スケジュールと天気を再確認', message: '今後のスケジュールと直近の天気を再確認し、必要な変更があれば提案して。' },
+                { label: '作業の優先順位を見直す', message: '作業の優先順位を見直したいです。どれから手をつけるべき？' },
+                { label: 'キャンセル', message: '', isCancel: true }
+            ]);
         }
     };
-    */
 
     const handleTaskComplete = async (taskId: string, status: string) => {
         try {
@@ -81,12 +82,17 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
     return (
         <div className="min-h-[calc(100vh-64px)] bg-gray-50/50 flex flex-col">
             <div className="container mx-auto px-4 py-2 max-w-7xl flex-1 flex flex-col">
-                {/* Back Link */}
-                <div className="flex-none mb-1">
-                    <Link href={`/${locale}/projects`} className="inline-flex items-center gap-1 text-gray-500 hover:text-gray-900 transition font-medium text-sm">
+                {/* Top Bar: Back Link + Compact ProjectHeader */}
+                <div className="flex-none mb-3 flex items-start gap-4">
+                    <Link href={`/${locale}/projects`} className="flex-none inline-flex items-center gap-1 text-gray-500 hover:text-gray-900 transition font-medium text-sm mt-2">
                         <span className="material-symbols-outlined text-lg">arrow_back</span>
                         {t('back_to_projects')}
                     </Link>
+
+                    {/* Compact Status Bar (Grow) */}
+                    <div className="flex-1">
+                        <ProjectHeader project={project} compact={true} />
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch mb-2 h-[calc(100vh-120px)]">
@@ -118,22 +124,13 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
                                     targetHarvestDate={project.targetHarvestDate}
                                     tasks={project.tasks}
                                     project={project}
-                                    onAskAI={() => {
-                                        if (chatRef.current) {
-                                            chatRef.current.sendMessage('このプロジェクトへのアドバイスをお願いします。');
-                                        }
-                                    }}
+                                    onRescheduleRequest={handleRescheduleRequest}
                                     onTaskComplete={handleTaskComplete}
                                     onTaskCreate={handleTaskCreate}
                                 />
                             </div>
                         )}
                     </div>
-                </div>
-
-                {/* FOOTER: Project Header (Progress Tool) */}
-                <div className="flex-none pb-8">
-                    <ProjectHeader project={project} />
                 </div>
             </div>
 

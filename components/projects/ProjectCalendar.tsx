@@ -26,6 +26,8 @@ interface ProjectCalendarProps {
         crop: string;
         currentStage?: string;
     };
+    onRescheduleRequest?: () => void;
+    // onAskAI deprecated in favor of onRescheduleRequest, but kept for compatibility if needed.
     onAskAI?: () => void;
     onTaskComplete?: (taskId: string, status: string) => void;
     onTaskCreate?: (date: Date) => void;
@@ -36,6 +38,7 @@ export default function ProjectCalendar({
     targetHarvestDate,
     tasks,
     project,
+    onRescheduleRequest,
     onAskAI,
     onTaskComplete,
     onTaskCreate
@@ -106,34 +109,57 @@ export default function ProjectCalendar({
                             </button>
                         </div>
 
-                        {/* Right: AI Button */}
-                        <div className="col-span-4 flex justify-end">
+                        {/* Right: AI Buttons */}
+                        <div className="col-span-4 flex justify-end gap-2">
+                            {/* Chat / Reschedule Button */}
                             <button
-                                onClick={() => setShowAdvice(!showAdvice)}
-                                className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold transition shadow-sm border ${showAdvice ? 'bg-green-50 border-green-200 text-green-700' : 'bg-white border-green-600 text-green-700 hover:bg-green-50'}`}
+                                onClick={onRescheduleRequest}
+                                className="flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-bold transition shadow-sm bg-white border border-green-600 text-green-700 hover:bg-green-50"
                             >
-                                <span className="material-symbols-outlined text-[14px]">smart_toy</span>
+                                <span className="material-symbols-outlined text-[16px]">smart_toy</span>
                                 <span>{t('ask_ai_reschedule')}</span>
-                                <span className="material-symbols-outlined text-[14px]">
-                                    {showAdvice ? 'expand_less' : 'expand_more'}
-                                </span>
+                            </button>
+
+                            {/* Insights Button */}
+                            <button
+                                onClick={() => setShowAdvice(true)}
+                                className="flex items-center justify-center w-8 h-8 rounded-full transition shadow-sm bg-indigo-50 border border-indigo-200 text-indigo-600 hover:bg-indigo-100"
+                                title={t('view_insights')}
+                            >
+                                <span className="material-symbols-outlined text-[18px]">lightbulb</span>
                             </button>
                         </div>
                     </div>
 
-                    {/* AI Insights Panel (Collapsible) */}
-                    <div className={`transition-all duration-300 ease-in-out relative z-10 bg-gray-50/50 ${showAdvice ? 'max-h-[500px] border-b border-gray-100' : 'max-h-0 overflow-hidden'}`}>
-                        <div className="p-4">
-                            <ProjectInsightsPanel
-                                project={{
-                                    id: project.id,
-                                    crop: project.crop,
-                                    stage: project.currentStage
-                                }}
-                                onAskAI={onAskAI || (() => { })}
-                            />
+                    {/* AI Insights Modal */}
+                    {showAdvice && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm" onClick={() => setShowAdvice(false)}>
+                            <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                                <div className="sticky top-0 z-10 flex items-center justify-between p-4 border-b border-gray-100 bg-white/95 backdrop-blur">
+                                    <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-indigo-600">auto_awesome</span>
+                                        {t('ai_insights_title')}
+                                    </h3>
+                                    <button onClick={() => setShowAdvice(false)} className="p-1 hover:bg-gray-100 rounded-full transition">
+                                        <span className="material-symbols-outlined text-gray-500">close</span>
+                                    </button>
+                                </div>
+                                <div className="p-6">
+                                    <ProjectInsightsPanel
+                                        project={{
+                                            id: project.id,
+                                            crop: project.crop,
+                                            stage: project.currentStage
+                                        }}
+                                        onAskAI={() => {
+                                            setShowAdvice(false);
+                                            if (onRescheduleRequest) onRescheduleRequest();
+                                        }}
+                                    />
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* Grid Content */}
                     <div className="flex-1 relative z-0">

@@ -5,6 +5,7 @@ import { Send, Loader2, RefreshCw, Undo2, Paperclip, X } from 'lucide-react';
 
 export interface RouvisChatKitRef {
   sendMessage: (message: string) => void;
+  setSuggestions: (suggestions: { label: string; message: string; isCancel?: boolean }[]) => void;
 }
 
 interface ActionConfirmation {
@@ -401,7 +402,15 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     }, 100);
   }, [messages, sendMessage]);
 
-  useImperativeHandle(ref, () => ({ sendMessage }));
+  const [customSuggestions, setCustomSuggestions] = useState<{ label: string; message: string }[] | null>(null);
+
+  useImperativeHandle(ref, () => ({
+    sendMessage,
+    setSuggestions: (suggestions) => {
+      setCustomSuggestions(suggestions);
+      setIsUserNearBottom(true); // Scroll down to show them
+    }
+  }));
 
   useEffect(() => {
     if (isUserNearBottom) {
@@ -434,7 +443,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   }, [onTaskUpdate]);
 
   const greeting = getGreeting(weather);
-  const suggestions = getQuickSuggestions(growthStage);
+  const suggestions = customSuggestions || getQuickSuggestions(growthStage);
   const isCompact = density === 'compact';
 
   return (
@@ -549,16 +558,26 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
           </div>
         )}
 
-        {/* Quick Suggestions (text links, not pill buttons) */}
-        {messages.length === 0 && !isLoading && (
-          <div className="flex gap-4 px-4 pt-3 text-sm">
+        {/* Quick Suggestions (Vertical Cards) */}
+        {(messages.length === 0 || customSuggestions) && !isLoading && (
+          <div className="flex flex-col gap-2 px-4 pt-3 pb-2">
             {suggestions.map((s) => (
               <button
                 key={s.label}
-                onClick={() => sendMessage(s.message)}
-                className="text-muted-foreground hover:text-primary underline-offset-2 hover:underline transition-colors min-h-[44px]"
+                onClick={() => {
+                  if ((s as any).isCancel) {
+                    setCustomSuggestions(null);
+                  } else {
+                    sendMessage(s.message);
+                    setCustomSuggestions(null); // Clear after selection
+                  }
+                }}
+                className={`w-full text-left px-4 py-3 text-sm font-medium bg-white border border-gray-200 rounded-xl shadow-sm transition-all flex items-center justify-between group ${(s as any).isCancel ? 'text-gray-500 hover:bg-gray-100 hover:text-gray-700' : 'hover:border-green-500 hover:text-green-700 hover:bg-green-50/30'}`}
               >
-                {s.label}
+                <span>{s.label}</span>
+                <span className={`material-symbols-outlined text-[18px] ${(s as any).isCancel ? 'text-gray-400 group-hover:text-gray-600' : 'text-gray-300 group-hover:text-green-500'}`}>
+                  {(s as any).isCancel ? 'close' : 'arrow_forward'}
+                </span>
               </button>
             ))}
           </div>

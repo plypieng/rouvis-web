@@ -137,7 +137,10 @@
     "calendar": {
       "view_month": "月表示",
       "view_year": "年表示",
+      "year_view": "年間カレンダー",
       "ask_ai_reschedule": "AIに相談・変更",
+      "ai_insights_title": "AIインサイト",
+      "view_insights": "インサイトを表示",
       "todays_focus": "今日の作業",
       "tasks_for_date": "この日の作業",
       "no_tasks_for_date": "予定されている作業はありません",
