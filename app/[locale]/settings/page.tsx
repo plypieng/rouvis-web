@@ -6,7 +6,8 @@ import { useState, useEffect } from 'react';
 
 type ThemeMode = 'light' | 'dark' | 'system';
 
-export default function SettingsPage({ params: { locale } }: { params: { locale: string } }) {
+export default async function SettingsPage({ params }: { params: Promise<{ locale: string }> }) {
+    const { locale } = await params;
     const t = useTranslations('pages.settings');
     const [theme, setTheme] = useState<ThemeMode>('system');
     const [emailNotif, setEmailNotif] = useState(true);
