@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { usePathname } from 'next/navigation';
 import { X } from 'lucide-react';
 
 interface TourStep {
@@ -37,6 +38,10 @@ export default function OnboardingTour() {
     const [currentStep, setCurrentStep] = useState(0);
     const [isVisible, setIsVisible] = useState(false);
     const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
+    const pathname = usePathname();
+
+    // Only show tour on the main projects list page
+    const shouldShowTour = pathname?.endsWith('/projects');
 
     const highlightCurrentStep = useCallback(() => {
         const step = TOUR_STEPS[currentStep];
@@ -52,6 +57,8 @@ export default function OnboardingTour() {
 
     // Check if tour should show
     useEffect(() => {
+        if (!shouldShowTour) return;
+
         const tourCompleted = localStorage.getItem(TOUR_STORAGE_KEY);
         if (!tourCompleted) {
             // Delay tour start for page to load
@@ -61,7 +68,7 @@ export default function OnboardingTour() {
             }, 1000);
             return () => clearTimeout(timer);
         }
-    }, [highlightCurrentStep]);
+    }, [highlightCurrentStep, shouldShowTour]);
 
     useEffect(() => {
         if (isVisible) {
