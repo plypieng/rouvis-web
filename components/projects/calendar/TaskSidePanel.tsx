@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { format, isSameDay, isToday } from 'date-fns';
+import { format, isSameDay } from 'date-fns';
 import { ja } from 'date-fns/locale';
 
 import TaskDetailModal from '../TaskDetailModal';
@@ -35,7 +35,7 @@ export default function TaskSidePanel({ selectedDate, tasks, onAddTask, onTaskCo
     const tProject = useTranslations('projects');
 
     const selectedTasks = tasks.filter(task => isSameDay(new Date(task.dueDate), selectedDate));
-    const isTodaySelected = isToday(selectedDate);
+    // const isTodaySelected = isToday(selectedDate);
 
     const [forecast, setForecast] = useState<ForecastDay[]>([]);
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);

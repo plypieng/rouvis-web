@@ -72,7 +72,7 @@ test.describe('Complete Chat→Action→Analytics Pipeline', () => {
   });
 
   test('should handle field-specific actions through chat', async ({ page }) => {
-    const testUserId = `field-test-${Date.now()}`;
+    // const testUserId = `field-test-${Date.now()}`;
 
     // First create a field
     await page.goto('http://localhost:3002/ja/planner');
@@ -125,7 +125,7 @@ test.describe('Complete Chat→Action→Analytics Pipeline', () => {
     await page.waitForLoadState('networkidle');
 
     // Record initial activity count
-    const initialActivityCount = await page.locator('[data-testid="total-activities"]').textContent();
+    // const initialActivityCount = await page.locator('[data-testid="total-activities"]').textContent();
 
     // Perform action via chat
     await page.goto('http://localhost:3002/ja/chat');
@@ -149,7 +149,7 @@ test.describe('Complete Chat→Action→Analytics Pipeline', () => {
     await page.waitForTimeout(3000);
 
     // Check if analytics updated (this may require real-time updates to be implemented)
-    const updatedActivityCount = await page.locator('[data-testid="total-activities"]').textContent();
+    // const updatedActivityCount = await page.locator('[data-testid="total-activities"]').textContent();
 
     // At minimum, analytics should still load without errors
     const analyticsContainer = page.locator('[data-testid="analytics-container"]');

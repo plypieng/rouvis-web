@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { X } from 'lucide-react';
 
 interface TourStep {
@@ -38,6 +38,18 @@ export default function OnboardingTour() {
     const [isVisible, setIsVisible] = useState(false);
     const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
 
+    const highlightCurrentStep = useCallback(() => {
+        const step = TOUR_STEPS[currentStep];
+        if (!step) return;
+
+        const element = document.querySelector(step.target);
+        if (element) {
+            const rect = element.getBoundingClientRect();
+            setTargetRect(rect);
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }, [currentStep]);
+
     // Check if tour should show
     useEffect(() => {
         const tourCompleted = localStorage.getItem(TOUR_STORAGE_KEY);
@@ -49,25 +61,13 @@ export default function OnboardingTour() {
             }, 1000);
             return () => clearTimeout(timer);
         }
-    }, []);
-
-    const highlightCurrentStep = () => {
-        const step = TOUR_STEPS[currentStep];
-        if (!step) return;
-
-        const element = document.querySelector(step.target);
-        if (element) {
-            const rect = element.getBoundingClientRect();
-            setTargetRect(rect);
-            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-    };
+    }, [highlightCurrentStep]);
 
     useEffect(() => {
         if (isVisible) {
             highlightCurrentStep();
         }
-    }, [currentStep, isVisible]);
+    }, [currentStep, isVisible, highlightCurrentStep]);
 
     const handleNext = () => {
         if (currentStep < TOUR_STEPS.length - 1) {

@@ -179,7 +179,7 @@ test.describe('Analytics Dashboard Functionality', () => {
 
   test('should display real-time updates', async ({ page }) => {
     // Record initial values
-    const initialKpiValue = await page.locator('[data-testid="kpi-card"]').first().textContent();
+    // const initialKpiValue = await page.locator('[data-testid="kpi-card"]').first().textContent();
 
     // Simulate new activity being logged (would need API call or mock)
     // For now, check that update indicators exist

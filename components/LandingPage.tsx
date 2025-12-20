@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { ArrowRight, Sprout, BookOpen, Calendar, MessageCircle } from 'lucide-react';
+import { ArrowRight, BookOpen, Calendar, MessageCircle } from 'lucide-react';
 import { Logo } from './Logo';
 import { useTranslations } from 'next-intl';
 
@@ -13,7 +13,7 @@ interface LandingPageProps {
 
 export default function LandingPage({ locale }: LandingPageProps) {
     const t = useTranslations('landing');
-    const tCommon = useTranslations('common');
+    // const tCommon = useTranslations('common');
 
     const features = [
         {

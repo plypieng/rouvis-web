@@ -57,11 +57,11 @@ export default function ProjectCalendar({
         else setCurrentDate(prev => addYears(prev, 1));
     };
 
-    const handleToday = () => {
-        const today = new Date();
-        setCurrentDate(today);
-        setSelectedDate(today);
-    };
+    // const handleToday = () => {
+    //     const today = new Date();
+    //     setCurrentDate(today);
+    //     setSelectedDate(today);
+    // };
 
     return (
 

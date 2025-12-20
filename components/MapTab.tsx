@@ -23,7 +23,7 @@ export default function MapTab() {
     const polygonsRef = useRef<{ [key: string]: google.maps.Polygon }>({});
     const [map, setMap] = useState<google.maps.Map | null>(null);
     const [fields, setFields] = useState<Field[]>([]);
-    const [selectedField, setSelectedField] = useState<Field | null>(null);
+    // const [selectedField, setSelectedField] = useState<Field | null>(null);
 
     // Edit/Add Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -192,7 +192,7 @@ export default function MapTab() {
                 const center = fieldBounds.getCenter();
 
                 polygon.addListener('click', () => {
-                    setSelectedField(field);
+                    // setSelectedField(field);
 
                     if (infoWindowRef.current) {
                         const content = `
@@ -249,7 +249,7 @@ export default function MapTab() {
             });
         }
 
-    }, [map, fields]);
+    }, [map, fields, t]);
 
     const handleRecenter = () => {
         if (!map || fields.length === 0) return;

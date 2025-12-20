@@ -78,7 +78,7 @@ async function fetchWithCookies(
   return new Promise((resolve, reject) => {
     const urlObj = new URL(url);
     const isHttps = urlObj.protocol === 'https:';
-    const httpModule = isHttps ? https : require('http');
+    const httpModule = isHttps ? https : require('http'); // eslint-disable-line @typescript-eslint/no-require-imports
 
     const requestOptions: any = {
       hostname: urlObj.hostname,
@@ -153,27 +153,27 @@ async function fetchWithCookies(
   });
 }
 
-async function testWithRetry(
-  testName: string,
-  testFn: () => Promise<void>,
-  maxRetries = 2
-): Promise<boolean> {
-  for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
-    try {
-      await testFn();
-      return true;
-    } catch (error) {
-      if (attempt <= maxRetries) {
-        logWarning(`${testName} failed (attempt ${attempt}/${maxRetries + 1}), retrying...`);
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-      } else {
-        logError(testName, 'Test failed after all retries', error);
-        return false;
-      }
-    }
-  }
-  return false;
-}
+// async function testWithRetry(
+//   testName: string,
+//   testFn: () => Promise<void>,
+//   maxRetries = 2
+// ): Promise<boolean> {
+//   for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+//     try {
+//       await testFn();
+//       return true;
+//     } catch (error) {
+//       if (attempt <= maxRetries) {
+//         logWarning(`${testName} failed (attempt ${attempt}/${maxRetries + 1}), retrying...`);
+//         await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+//       } else {
+//         logError(testName, 'Test failed after all retries', error);
+//         return false;
+//       }
+//     }
+//   }
+//   return false;
+// }
 
 // Test cases
 class AuthIntegrationTests {
@@ -378,11 +378,11 @@ class AuthIntegrationTests {
     log('MockAuth', 'Testing mock authentication flow...');
 
     // Create a mock user session
-    const mockUser = {
-      email: 'test@example.com',
-      name: 'Test User',
-      id: 'test-user-id',
-    };
+    // const mockUser = {
+    //   email: 'test@example.com',
+    //   name: 'Test User',
+    //   id: 'test-user-id',
+    // };
 
     // Note: This requires backend support for mock auth
     // For now, we'll just log the intent

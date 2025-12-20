@@ -46,6 +46,7 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
         window.scrollTo(0, 0);
     }, []);
 
+    /*
     const handleAiReschedule = () => {
         if (chatRef.current) {
             chatRef.current.sendMessage('向こう1週間のスケジュールと天気予報を確認して、変更が必要な点があれば提案してください。');
@@ -53,6 +54,7 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
             alert(t('ai_reschedule_alert'));
         }
     };
+    */
 
     const handleTaskComplete = async (taskId: string, status: string) => {
         try {

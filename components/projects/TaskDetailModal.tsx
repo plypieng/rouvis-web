@@ -1,6 +1,6 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
+// import { useTranslations } from 'next-intl';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -21,7 +21,7 @@ interface TaskDetailModalProps {
 }
 
 export default function TaskDetailModal({ isOpen, onClose, task }: TaskDetailModalProps) {
-    const t = useTranslations('projects.calendar');
+    // const t = useTranslations('projects.calendar');
 
     return (
         <AnimatePresence>

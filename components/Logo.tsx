@@ -1,5 +1,5 @@
 import React from 'react';
-import Image from 'next/image';
+// import Image from 'next/image';
 
 export const Logo = ({ className }: { className?: string }) => {
     // Use the logo.svg located in the public directory
