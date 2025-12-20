@@ -54,10 +54,12 @@ export const authOptions: NextAuthOptions = {
 
       // Check if user has completed onboarding
       if (token.id) {
+        console.log('[Auth-JWT] User ID:', token.id, 'Sub:', token.sub, 'Email:', token.email);
         const userProfile = await prisma.userProfile.findUnique({
           where: { userId: token.id as string },
         });
         token.onboardingComplete = !!userProfile;
+        console.log('[Auth-JWT] onboardingComplete:', token.onboardingComplete);
       }
 
       return token;
@@ -71,6 +73,7 @@ export const authOptions: NextAuthOptions = {
         session.user.id = (token.id as string | undefined) ?? (token.sub as string) ?? '';
         session.user.email = token.email as string;
         session.user.name = token.name as string;
+        console.log('[Auth-Session] Active session user ID:', session.user.id);
       }
       return session;
     },

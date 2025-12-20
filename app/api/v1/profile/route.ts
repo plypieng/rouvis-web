@@ -16,6 +16,7 @@ export async function GET(req: NextRequest) {
     }
 
     try {
+        console.log('[Profile Proxy] Fetching for userId:', userId, 'from:', BACKEND_URL);
         const res = await fetch(`${BACKEND_URL}/api/v1/profile`, {
             headers: {
                 'Content-Type': 'application/json',
