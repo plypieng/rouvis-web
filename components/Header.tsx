@@ -353,6 +353,11 @@ export default function Header({ locale, user = null, alerts = [], kpis }: Heade
     );
   };
 
+  // Hide header on login/signup pages
+  if (pathname?.includes('/login') || pathname?.includes('/signup')) {
+    return null;
+  }
+
   // Hide header on landing page for unauthenticated users (after session check completes)
   if (!isSessionLoading && !currentUser && (pathname === `/${locale}` || pathname === '/')) {
     return null;

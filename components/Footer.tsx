@@ -20,7 +20,11 @@ export default function Footer({ locale, user }: FooterProps) {
   // Hide global footer on landing page for unauthenticated users
   // Landing page path is usually `/${locale}` or just `/`
   const isLandingPage = pathname === `/${locale}` || pathname === '/';
-  if (!user && isLandingPage) {
+
+  // Also hide on auth pages for a cleaner look
+  const isAuthPage = pathname?.includes('/login') || pathname?.includes('/signup');
+
+  if ((!user && isLandingPage) || isAuthPage) {
     return null;
   }
 
