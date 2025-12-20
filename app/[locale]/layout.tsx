@@ -2,7 +2,8 @@ import { Inter, Outfit } from 'next/font/google';
 import '../../styles/globals.css';
 import { NextIntlClientProvider } from 'next-intl';
 import { notFound } from 'next/navigation';
-import getMessages, { locales } from '../../i18n';
+import { getMessages } from 'next-intl/server';
+import { locales } from '../../i18n';
 import { BottomNav } from '../../components/BottomNav';
 // import LanguageSwitcher from '../../components/LanguageSwitcher';
 import Header from '../../components/Header';
@@ -56,7 +57,7 @@ export default async function RootLayout(props: {
   }
 
   // Get messages for the locale
-  const messages = await getMessages(locale);
+  const messages = await getMessages();
   const session = await getServerSessionFromToken();
 
   // Debug: log server session
