@@ -95,7 +95,7 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
                 <div className="flex-none mb-3 flex items-start gap-4">
                     <Link href={`/${locale}/projects`} className="flex-none inline-flex items-center gap-1 text-gray-500 hover:text-gray-900 transition font-medium text-sm mt-2">
                         <span className="material-symbols-outlined text-lg">arrow_back</span>
-                        {t('back_to_projects')}
+                        <span className="hidden sm:inline">{t('back_to_projects')}</span>
                     </Link>
 
                     {/* Compact Status Bar (Grow) */}
