@@ -7,6 +7,7 @@
 
 import { type NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { prisma, authPrisma } from "./prisma";
 
@@ -30,6 +31,38 @@ export const authOptions: NextAuthOptions = {
           access_type: 'offline',
           prompt: 'consent',
         },
+      },
+    }),
+    CredentialsProvider({
+      id: "demo-device",
+      name: "Demo Device",
+      credentials: {
+        deviceId: { label: "Device ID", type: "text" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.deviceId) return null;
+
+        const deviceId = credentials.deviceId;
+        const email = `${deviceId}@demo.local`;
+
+        // 1. Find existing user
+        let user = await prisma.user.findUnique({
+          where: { email },
+        });
+
+        // 2. Create if not exists
+        if (!user) {
+          console.log(`[Demo Mode] Creating new user for device: ${deviceId}`);
+          user = await prisma.user.create({
+            data: {
+              email,
+              name: `Demo User (${deviceId.slice(0, 4)})`,
+              image: `https://api.dicebear.com/7.x/shapes/svg?seed=${deviceId}`,
+            },
+          });
+        }
+
+        return user;
       },
     }),
   ],

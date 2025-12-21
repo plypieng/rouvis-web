@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 import { z } from 'zod';
 import { Loader2, ChevronDown, Info, Check, ArrowRight } from 'lucide-react';
 import { PREFECTURES, EXPERIENCE_OPTIONS, FARMING_TYPES, COMMON_CROPS } from '../../../lib/prefectures';
+import FieldMapEditor from '@/components/fields/FieldMapEditor';
 
 // Validation schemas
 const profileSchema = z.object({
@@ -140,10 +141,13 @@ export default function OnboardingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: fieldData.name,
-          area: fieldData.area,
+          area: (fieldData.area || 0) * 10000, // Convert Ha to SqM for storage
           crop: selectedCrop?.label || fieldData.crop,
           planting_date: fieldData.plantingDate || null,
-          geojson: null,
+          // @ts-ignore
+          polygon: fieldData.polygon,
+          // @ts-ignore
+          location: fieldData.location,
         }),
       });
 
@@ -330,111 +334,135 @@ export default function OnboardingPage() {
             <p className="text-sm text-gray-500">AIがスケジュールを作成するために必要です</p>
           </div>
 
-          <div className="space-y-4">
-            {/* Field Name */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">畑の名前</label>
+
+
+          {/* Map Editor for Field Creation */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              畑の場所と形
+              <span className="text-gray-400 font-normal ml-2">地図をタップして囲むと面積が自動計算されます</span>
+            </label>
+
+            <FieldMapEditor
+              onFieldChange={(data) => {
+                setFieldData(prev => ({
+                  ...prev,
+                  area: data.area,
+                  // Store polygon/location for API
+                  // @ts-ignore - straightforward extension of state
+                  polygon: data.polygon,
+                  // @ts-ignore
+                  location: data.location
+                }));
+              }}
+            />
+          </div>
+
+          {/* Area (Read-only / Manual Override) */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              面積
+              <span className="text-gray-400 font-normal ml-2">ヘクタール（ha）</span>
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              value={fieldData.area?.toString() || ''}
+              onChange={(e) => setFieldData({ ...fieldData, area: parseFloat(e.target.value) || 0 })}
+              placeholder="地図から自動計算"
+              className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${errors.area ? 'border-red-500' : 'border-gray-200'
+                }`}
+            />
+            <p className="mt-1 text-xs text-gray-400">地図で囲むと自動入力されます（手動修正も可）</p>
+            {errors.area && <p className="mt-1 text-sm text-red-600">{errors.area}</p>}
+          </div>
+
+          {/* Field Name */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">畑の名前</label>
+            <input
+              type="text"
+              value={fieldData.name || ''}
+              onChange={(e) => setFieldData({ ...fieldData, name: e.target.value })}
+              placeholder="例：家の前の畑、第1圃場"
+              className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${errors.name ? 'border-red-500' : 'border-gray-200'
+                }`}
+            />
+            {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
+          </div>
+
+          {/* Crop */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">今育てている作物</label>
+            <SelectField
+              value={fieldData.crop || ''}
+              onChange={(value) => setFieldData({ ...fieldData, crop: value })}
+              options={COMMON_CROPS}
+              placeholder="選択してください"
+              error={errors.crop}
+            />
+          </div>
+
+          {/* Planting Date */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              定植日・播種日
+              <span className="text-gray-400 font-normal ml-2">任意</span>
+            </label>
+            <div className="flex gap-2">
               <input
-                type="text"
-                value={fieldData.name || ''}
-                onChange={(e) => setFieldData({ ...fieldData, name: e.target.value })}
-                placeholder="例：家の前の畑、第1圃場"
-                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${errors.name ? 'border-red-500' : 'border-gray-200'
-                  }`}
+                type="date"
+                value={fieldData.plantingDate || ''}
+                onChange={(e) => setFieldData({ ...fieldData, plantingDate: e.target.value })}
+                className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               />
-              {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
-            </div>
-
-            {/* Area */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                面積
-                <span className="text-gray-400 font-normal ml-2">ヘクタール（ha）</span>
-              </label>
-              <input
-                type="number"
-                step="0.1"
-                value={fieldData.area?.toString() || ''}
-                onChange={(e) => setFieldData({ ...fieldData, area: parseFloat(e.target.value) || 0 })}
-                placeholder="0.5"
-                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${errors.area ? 'border-red-500' : 'border-gray-200'
-                  }`}
-              />
-              <p className="mt-1 text-xs text-gray-400">おおよそでOK・1反 ≒ 0.1ha</p>
-              {errors.area && <p className="mt-1 text-sm text-red-600">{errors.area}</p>}
-            </div>
-
-            {/* Crop */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">今育てている作物</label>
-              <SelectField
-                value={fieldData.crop || ''}
-                onChange={(value) => setFieldData({ ...fieldData, crop: value })}
-                options={COMMON_CROPS}
-                placeholder="選択してください"
-                error={errors.crop}
-              />
-            </div>
-
-            {/* Planting Date */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                定植日・播種日
-                <span className="text-gray-400 font-normal ml-2">任意</span>
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="date"
-                  value={fieldData.plantingDate || ''}
-                  onChange={(e) => setFieldData({ ...fieldData, plantingDate: e.target.value })}
-                  className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                />
-                <button
-                  type="button"
-                  onClick={setTodayDate}
-                  className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition-colors text-sm font-medium"
-                >
-                  今日
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={setTodayDate}
+                className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition-colors text-sm font-medium"
+              >
+                今日
+              </button>
             </div>
           </div>
 
-          <div className="pt-4 space-y-3">
-            <button
-              onClick={handleFieldSubmit}
-              disabled={isSubmitting}
-              className="w-full px-6 py-4 bg-emerald-600 text-white rounded-xl hover:bg-emerald-500 transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  作成中...
-                </>
-              ) : (
-                <>
-                  登録して続ける
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
+        </div>
 
-            <div className="flex justify-between items-center">
-              <button
-                onClick={() => setStep(2)}
-                disabled={isSubmitting}
-                className="text-gray-500 hover:text-gray-700 text-sm"
-              >
-                戻る
-              </button>
-              <button
-                onClick={handleSkipField}
-                disabled={isSubmitting}
-                className="text-gray-400 hover:text-gray-600 text-sm"
-              >
-                後で登録する →
-              </button>
-            </div>
+        <div className="pt-4 space-y-3">
+          {/* ... buttons ... */}
+          <button
+            onClick={handleFieldSubmit}
+            disabled={isSubmitting}
+            className="w-full px-6 py-4 bg-emerald-600 text-white rounded-xl hover:bg-emerald-500 transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                作成中...
+              </>
+            ) : (
+              <>
+                登録して続ける
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
+          </button>
+
+          <div className="flex justify-between items-center">
+            <button
+              onClick={() => setStep(2)}
+              disabled={isSubmitting}
+              className="text-gray-500 hover:text-gray-700 text-sm"
+            >
+              戻る
+            </button>
+            <button
+              onClick={handleSkipField}
+              disabled={isSubmitting}
+              className="text-gray-400 hover:text-gray-600 text-sm"
+            >
+              後で登録する →
+            </button>
           </div>
         </div>
       </OnboardingLayout>

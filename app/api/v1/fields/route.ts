@@ -45,11 +45,9 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    // Ensure polygon and location are properly serialized if they're objects
     const payload = {
       ...body,
-      polygon: typeof body.polygon === 'object' ? JSON.stringify(body.polygon) : body.polygon,
-      location: typeof body.location === 'object' ? JSON.stringify(body.location) : body.location,
+      // Pass objects directly to backend - let body parser and Prisma handle serialization
     };
 
     const res = await fetch(`${BACKEND_URL}/api/v1/fields`, {

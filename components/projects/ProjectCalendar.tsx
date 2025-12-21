@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { format, addMonths, subMonths, addYears, subYears } from 'date-fns';
 import { ja } from 'date-fns/locale';
@@ -26,12 +26,18 @@ interface ProjectCalendarProps {
         crop: string;
         currentStage?: string;
     };
-    onRescheduleRequest?: () => void;
+    onRescheduleRequest?: (message?: string) => void;
     // onAskAI deprecated in favor of onRescheduleRequest, but kept for compatibility if needed.
     onAskAI?: () => void;
     onTaskComplete?: (taskId: string, status: string) => void;
     onTaskCreate?: (date: Date) => void;
 }
+
+type RescheduleSuggestion = {
+    summary: string;
+    prompt: string;
+    affectedTasks?: Array<{ id: string; title: string; dueDate: string }>;
+};
 
 export default function ProjectCalendar({
     startDate,
@@ -49,6 +55,26 @@ export default function ProjectCalendar({
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [showAdvice, setShowAdvice] = useState(false);
+    const [rescheduleSuggestion, setRescheduleSuggestion] = useState<RescheduleSuggestion | null>(null);
+
+    const taskSignature = tasks.map(task => `${task.id}:${task.dueDate}:${task.status}`).join('|');
+
+    useEffect(() => {
+        let isActive = true;
+        const fetchSuggestion = async () => {
+            try {
+                const res = await fetch(`/api/v1/projects/${project.id}/reschedule-suggestion`);
+                if (!res.ok) return;
+                const data = await res.json();
+                if (!isActive) return;
+                setRescheduleSuggestion(data.suggestion || null);
+            } catch (error) {
+                console.warn('Failed to fetch reschedule suggestion:', error);
+            }
+        };
+        fetchSuggestion();
+        return () => { isActive = false; };
+    }, [project.id, taskSignature]);
 
     const handlePrev = () => {
         if (view === 'month') setCurrentDate(prev => subMonths(prev, 1));
@@ -73,6 +99,24 @@ export default function ProjectCalendar({
             <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0">
                 {/* Left: Calendar Main Area (Header + Grid) */}
                 <div className="lg:col-span-2 h-full flex flex-col bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                    {rescheduleSuggestion && (
+                        <div className="flex items-center justify-between gap-3 px-4 py-2 bg-amber-50 border-b border-amber-100 text-amber-900 text-xs">
+                            <div className="flex items-start gap-2">
+                                <span className="material-symbols-outlined text-[16px] text-amber-600">event_busy</span>
+                                <div className="flex-1">
+                                    <p className="font-semibold">AIスケジュール提案</p>
+                                    <p className="text-amber-800/80">{rescheduleSuggestion.summary}</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => onRescheduleRequest?.(rescheduleSuggestion.prompt)}
+                                className="flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-bold bg-white border border-amber-300 text-amber-700 hover:bg-amber-100 transition"
+                            >
+                                <span className="material-symbols-outlined text-[16px]">smart_toy</span>
+                                <span>AIに相談</span>
+                            </button>
+                        </div>
+                    )}
                     {/* Integrated Header */}
                     <div className="grid grid-cols-12 items-center px-3 py-2 border-b border-gray-100 bg-white z-20 relative min-h-[52px]">
                         {/* Left: View Switcher */}
@@ -113,7 +157,7 @@ export default function ProjectCalendar({
                         <div className="col-span-4 flex justify-end gap-2">
                             {/* Chat / Reschedule Button */}
                             <button
-                                onClick={onRescheduleRequest}
+                                onClick={() => onRescheduleRequest?.()}
                                 className="flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-bold transition shadow-sm bg-white border border-green-600 text-green-700 hover:bg-green-50"
                             >
                                 <span className="material-symbols-outlined text-[16px]">smart_toy</span>

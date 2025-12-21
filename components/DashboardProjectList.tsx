@@ -4,7 +4,7 @@ import DashboardHeader from './DashboardHeader';
 
 import { cookies } from 'next/headers';
 
-async function getProjects() {
+async function getProjects(userId?: string) {
     try {
         const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
         const cookieStore = await cookies();
@@ -13,7 +13,8 @@ async function getProjects() {
         const res = await fetch(`${baseUrl}/api/v1/projects`, {
             cache: 'no-store',
             headers: {
-                Cookie: cookieHeader
+                ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+                ...(userId ? { 'x-user-id': userId } : {}),
             }
         });
 
@@ -60,7 +61,7 @@ async function getWeather() {
     }
 }
 
-async function getDashboardTasks() {
+async function getDashboardTasks(userId?: string) {
     try {
         const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 
@@ -78,7 +79,8 @@ async function getDashboardTasks() {
         const res = await fetch(`${baseUrl}/api/v1/tasks?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}&status=pending`, {
             cache: 'no-store',
             headers: {
-                Cookie: cookieHeader
+                ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+                ...(userId ? { 'x-user-id': userId } : {}),
             }
         });
 
@@ -115,11 +117,11 @@ import TodayFocus from './TodayFocus';
 
 // ... (existing imports)
 
-export default async function DashboardProjectList({ locale }: { locale: string }) {
+export default async function DashboardProjectList({ locale, userId }: { locale: string; userId: string }) {
     const t = await getTranslations({ locale, namespace: 'dashboard' });
-    const projects: Project[] = await getProjects();
+    const projects: Project[] = await getProjects(userId);
     const weather = await getWeather();
-    const dashboardTasks = await getDashboardTasks(); // All pending tasks for view
+    const dashboardTasks = await getDashboardTasks(userId); // All pending tasks for view
 
     // Filter for "Today's Focus" list (Today and Overdue)
     const today = new Date();

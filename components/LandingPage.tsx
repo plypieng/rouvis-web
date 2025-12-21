@@ -3,7 +3,10 @@
 import React from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { ArrowRight, BookOpen, Calendar, MessageCircle } from 'lucide-react';
+import { ArrowRight, BookOpen, Calendar, MessageCircle, PlayCircle } from 'lucide-react';
+import { signIn } from 'next-auth/react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { Logo } from './Logo';
 import { useTranslations } from 'next-intl';
 
@@ -14,6 +17,46 @@ interface LandingPageProps {
 export default function LandingPage({ locale }: LandingPageProps) {
     const t = useTranslations('landing');
     // const tCommon = useTranslations('common');
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const [isDemoLoading, setIsDemoLoading] = useState(false);
+
+    console.log('DEMO MODE CHECK:', process.env.NEXT_PUBLIC_DEMO_MODE);
+    const demoModeEnabled = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+
+    // Auto-start demo if ?demo=true is present
+    useEffect(() => {
+        if (searchParams.get('demo') === 'true' && demoModeEnabled) {
+            handleStartDemo();
+        }
+    }, [searchParams]);
+
+    const handleStartDemo = async () => {
+        setIsDemoLoading(true);
+        try {
+            // Get or create a device ID
+            let deviceId = localStorage.getItem('rouvis_demo_device_id');
+            if (!deviceId) {
+                deviceId = crypto.randomUUID();
+                localStorage.setItem('rouvis_demo_device_id', deviceId);
+            }
+
+            // Sign in with device credentials
+            const result = await signIn('demo-device', {
+                deviceId,
+                callbackUrl: `/${locale}/onboarding`,
+                redirect: true,
+            });
+
+            if (result?.error) {
+                console.error('Demo login failed:', result.error);
+                setIsDemoLoading(false);
+            }
+        } catch (error) {
+            console.error('Demo error:', error);
+            setIsDemoLoading(false);
+        }
+    };
 
     const features = [
         {
@@ -93,13 +136,30 @@ export default function LandingPage({ locale }: LandingPageProps) {
                                     >
                                         {t('hero.cta_login')}
                                     </Link>
-                                    <Link
-                                        href={`/${locale}/auth/signup`}
-                                        className="w-full sm:w-auto px-8 py-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-full transition-all transform hover:scale-105 shadow-lg hover:shadow-green-500/25 flex items-center justify-center gap-2"
-                                    >
-                                        {t('hero.cta_start')}
-                                        <ArrowRight className="w-5 h-5" />
-                                    </Link>
+                                    {demoModeEnabled ? (
+                                        <button
+                                            onClick={handleStartDemo}
+                                            disabled={isDemoLoading}
+                                            className="w-full sm:w-auto px-8 py-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-full transition-all transform hover:scale-105 shadow-lg hover:shadow-green-500/25 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                                        >
+                                            {isDemoLoading ? (
+                                                <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                            ) : (
+                                                <>
+                                                    <PlayCircle className="w-5 h-5" />
+                                                    <span>Start Demo</span>
+                                                </>
+                                            )}
+                                        </button>
+                                    ) : (
+                                        <Link
+                                            href={`/${locale}/auth/signup`}
+                                            className="w-full sm:w-auto px-8 py-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-full transition-all transform hover:scale-105 shadow-lg hover:shadow-green-500/25 flex items-center justify-center gap-2"
+                                        >
+                                            {t('hero.cta_start')}
+                                            <ArrowRight className="w-5 h-5" />
+                                        </Link>
+                                    )}
                                 </div>
                             </motion.div>
 

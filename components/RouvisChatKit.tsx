@@ -1,11 +1,15 @@
 'use client';
 
 import { forwardRef, useImperativeHandle, useRef, useEffect, useState, useCallback } from 'react';
-import { Send, Loader2, RefreshCw, Undo2, Paperclip, X } from 'lucide-react';
+import { Send, Loader2, RefreshCw, Undo2, Paperclip, X, ArrowRight } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+
+export type ChatMode = 'default' | 'reschedule' | 'diagnosis' | 'logging';
 
 export interface RouvisChatKitRef {
-  sendMessage: (message: string) => void;
+  sendMessage: (message: string, overrideMode?: ChatMode) => void;
   setSuggestions: (suggestions: { label: string; message: string; isCancel?: boolean }[]) => void;
+  setChatMode: (mode: ChatMode) => void;
 }
 
 interface ActionConfirmation {
@@ -40,6 +44,7 @@ interface RouvisChatKitProps {
   initialThreadId?: string;
   onTaskUpdate?: () => void;
   onDiagnosisComplete?: (result: unknown) => void;
+  onDraftCreate?: (draft: any) => void;
   density?: 'compact' | 'comfortable';
   growthStage?: string;
 }
@@ -50,8 +55,39 @@ const FRIENDLY_STATUS: Record<string, string> = {
   'jma.getForecast': '天気を確認中...',
   'plant_doctor.diagnose': '見てみますね...',
   'scheduler.createTask': '予定に追加中...',
+  'scheduler.reschedulePlan': '予定を見直し中...',
+  'scheduler.updateTask': '予定を調整中...',
   'activities.log': '記録中...',
 };
+
+const MODE_CONFIG: Record<ChatMode, { label: string; color: string; bg: string; border: string }> = {
+  default: { label: '', color: '', bg: '', border: '' },
+  reschedule: {
+    label: 'スケジュール調整モード: 日程変更や優先順位の相談承ります',
+    color: 'text-amber-700',
+    bg: 'bg-amber-50',
+    border: 'border-amber-200'
+  },
+  diagnosis: {
+    label: '診断モード: 写真を送ってください。AIが診断します',
+    color: 'text-teal-700',
+    bg: 'bg-teal-50',
+    border: 'border-teal-200'
+  },
+  logging: {
+    label: '作業記録モード: 作業内容を教えてください',
+    color: 'text-blue-700',
+    bg: 'bg-blue-50',
+    border: 'border-blue-200'
+  },
+};
+
+function stripHiddenBlocks(content: string): string {
+  if (!content) return content;
+  return content
+    .replace(/\[\[(RESCHEDULE_PLAN|UPDATE_TASK|CHOICE):[\s\S]*?\]\]/g, '')
+    .trim();
+}
 
 // Time-aware greetings
 function getGreeting(weather?: { condition?: string }): { main: string; sub: string } {
@@ -72,20 +108,20 @@ function getGreeting(weather?: { condition?: string }): { main: string; sub: str
 }
 
 // Quick action suggestions (text links, not buttons)
-function getQuickSuggestions(growthStage?: string): { label: string; message: string }[] {
+function getQuickSuggestions(growthStage?: string): { label: string; message: string; mode?: ChatMode }[] {
   const hour = new Date().getHours();
-  const suggestions: { label: string; message: string }[] = [];
+  const suggestions: { label: string; message: string; mode?: ChatMode }[] = [];
 
   if (hour >= 5 && hour < 12) {
     suggestions.push({ label: '今日の予定は？', message: '今日の作業予定を教えて' });
   }
 
   if (growthStage?.toLowerCase().includes('seedling') || growthStage?.includes('育苗')) {
-    suggestions.push({ label: '水やり記録', message: '水やりを記録したい' });
+    suggestions.push({ label: '水やり記録', message: '水やりを記録したい', mode: 'logging' });
   } else if (growthStage?.toLowerCase().includes('harvest') || growthStage?.includes('収穫')) {
-    suggestions.push({ label: '収穫記録', message: '収穫を記録したい' });
+    suggestions.push({ label: '収穫記録', message: '収穫を記録したい', mode: 'logging' });
   } else {
-    suggestions.push({ label: '作業を記録', message: '作業を記録したい' });
+    suggestions.push({ label: '作業を記録', message: '作業を記録したい', mode: 'logging' });
   }
 
   suggestions.push({ label: '天気', message: '今日の天気は？' });
@@ -99,6 +135,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   initialThreadId,
   onTaskUpdate,
   onDiagnosisComplete,
+  onDraftCreate,
   density = 'comfortable',
   growthStage,
 }, ref) => {
@@ -112,6 +149,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isUserNearBottom, setIsUserNearBottom] = useState(true);
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
+  const [chatMode, setChatModeState] = useState<ChatMode>('default'); // New state
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -207,7 +245,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     if (nearBottom) setHasUnreadMessages(false);
   }, []);
 
-  const sendMessage = useCallback(async (content: string) => {
+  const sendMessage = useCallback(async (content: string, overrideMode?: ChatMode) => {
     if ((!content.trim() && !selectedImage) || isLoading) return;
 
     // Capture image before clearing state
@@ -255,6 +293,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
           messages: apiMessages,
           projectId,
           threadId,
+          mode: overrideMode || chatMode, // Send active mode (prefer override if provided)
         }),
       });
 
@@ -305,6 +344,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
               action?: { type?: string; undoData?: unknown };
               toolName?: string;
               result?: unknown;
+              data?: { type: string; options?: any[]; action?: string };
             };
 
             // Simple status update (no complex thinking UI)
@@ -372,6 +412,25 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
             if (event.type === 'diagnosis_result') {
               onDiagnosisComplete?.(event.result);
             }
+
+            // Draft Created (Re-added)
+            if (event.type === 'draft_created' && (event as any).draft) {
+              onDraftCreate?.((event as any).draft);
+            }
+
+            // Custom UI Events (Choices, Refreshes)
+            if (event.type === 'custom_ui' && event.data) {
+              if (event.data.type === 'choice' && event.data.options) {
+                const mappedOptions = event.data.options.map(opt => ({
+                  label: opt.label,
+                  message: opt.value,
+                }));
+                setCustomSuggestions(mappedOptions);
+              }
+              if (event.data.type === 'refresh_tasks') {
+                onTaskUpdate?.();
+              }
+            }
           }
         }
       }
@@ -388,7 +447,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
       setIsLoading(false);
       setCurrentStatus('');
     }
-  }, [messages, projectId, threadId, isLoading, selectedImage, onTaskUpdate, onDiagnosisComplete]);
+  }, [messages, projectId, threadId, isLoading, selectedImage, onTaskUpdate, onDiagnosisComplete, chatMode]);
 
   const handleRetry = useCallback(() => {
     setMessages(prev => {
@@ -409,6 +468,10 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     setSuggestions: (suggestions) => {
       setCustomSuggestions(suggestions);
       setIsUserNearBottom(true); // Scroll down to show them
+    },
+    setChatMode: (mode: ChatMode) => {
+      setChatModeState(mode);
+      setIsUserNearBottom(true);
     }
   }));
 
@@ -445,6 +508,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   const greeting = getGreeting(weather);
   const suggestions = customSuggestions || getQuickSuggestions(growthStage);
   const isCompact = density === 'compact';
+  const modeConfig = MODE_CONFIG[chatMode];
 
   return (
     <div className={`flex flex-col h-full bg-card ${className}`}>
@@ -483,7 +547,17 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
                     />
                   </div>
                 )}
-                <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                <div className="prose prose-sm prose-invert max-w-none">
+                  <ReactMarkdown
+                    components={{
+                      p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
+                      ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
+                      li: ({ children }) => <li className="mb-1">{children}</li>,
+                    }}
+                  >
+                    {stripHiddenBlocks(message.content)}
+                  </ReactMarkdown>
+                </div>
 
                 {/* Retry for errors */}
                 {message.hasError && !isLoading && (
@@ -534,7 +608,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
       </div>
 
       {/* Input Area */}
-      <div className="border-t border-border">
+      <div className={`border-t border-border ${chatMode !== 'default' ? modeConfig.bg : ''}`}>
         {/* Action Confirmations (simplified) */}
         {actionConfirmations.length > 0 && (
           <div className="px-4 pt-3 space-y-2">
@@ -558,26 +632,29 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
           </div>
         )}
 
-        {/* Quick Suggestions (Vertical Cards) */}
+        {/* Quick Suggestions (Compact Grid) */}
         {(messages.length === 0 || customSuggestions) && !isLoading && (
-          <div className="flex flex-col gap-2 px-4 pt-3 pb-2">
+          <div className="grid grid-cols-2 gap-2 px-4 pt-3 pb-2">
             {suggestions.map((s) => (
               <button
                 key={s.label}
                 onClick={() => {
                   if ((s as any).isCancel) {
                     setCustomSuggestions(null);
+                    setChatModeState('default'); // Also exit mode on cancel
                   } else {
-                    sendMessage(s.message);
+                    const mode = (s as any).mode;
+                    if (mode) setChatModeState(mode);
+                    sendMessage(s.message, mode);
                     setCustomSuggestions(null); // Clear after selection
                   }
                 }}
-                className={`w-full text-left px-4 py-3 text-sm font-medium bg-white border border-gray-200 rounded-xl shadow-sm transition-all flex items-center justify-between group ${(s as any).isCancel ? 'text-gray-500 hover:bg-gray-100 hover:text-gray-700' : 'hover:border-green-500 hover:text-green-700 hover:bg-green-50/30'}`}
+                className={`w-full text-left px-3 py-2 text-xs font-medium bg-background border border-border/60 hover:border-primary/50 hover:bg-muted/50 rounded-md transition-all flex items-center justify-between group ${(s as any).isCancel ? 'text-muted-foreground' : 'text-foreground'}`}
               >
-                <span>{s.label}</span>
-                <span className={`material-symbols-outlined text-[18px] ${(s as any).isCancel ? 'text-gray-400 group-hover:text-gray-600' : 'text-gray-300 group-hover:text-green-500'}`}>
-                  {(s as any).isCancel ? 'close' : 'arrow_forward'}
-                </span>
+                <span className="truncate">{s.label}</span>
+                {!((s as any).isCancel) && (
+                  <ArrowRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-primary transition-colors" />
+                )}
               </button>
             ))}
           </div>
@@ -604,7 +681,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
 
         {/* Input Form */}
         <form onSubmit={handleSubmit} className="p-4 pt-3">
-          <div className="flex items-center gap-2 bg-background rounded-full border border-border p-1 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all">
+          <div className={`flex items-center gap-2 bg-background rounded-full border p-1 focus-within:ring-2 transition-all ${chatMode !== 'default' ? modeConfig.border + ' focus-within:' + modeConfig.border : 'border-border focus-within:ring-primary/20 focus-within:border-primary'}`}>
             <input
               type="file"
               ref={fileInputRef}
@@ -624,14 +701,14 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="メッセージ..."
+              placeholder={chatMode !== 'default' ? modeConfig.label.split(':')[0] + 'でメッセージ...' : 'メッセージ...'}
               className={`flex-1 bg-transparent border-none px-2 py-2 min-h-[44px] focus:outline-none placeholder:text-muted-foreground ${isCompact ? 'text-sm' : 'text-base'}`}
               disabled={isLoading}
             />
             <button
               type="submit"
               disabled={isLoading || (!input.trim() && !selectedImage)}
-              className="bg-primary text-primary-foreground rounded-full p-3 min-w-[44px] min-h-[44px] flex items-center justify-center hover:opacity-90 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              className={`text-primary-foreground rounded-full p-3 min-w-[44px] min-h-[44px] flex items-center justify-center hover:opacity-90 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed transition-all ${chatMode !== 'default' ? chatMode === 'reschedule' ? 'bg-amber-600' : chatMode === 'diagnosis' ? 'bg-teal-600' : 'bg-blue-600' : 'bg-primary'}`}
             >
               {isLoading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -641,6 +718,24 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
             </button>
           </div>
         </form>
+
+        {/* Context Banner (Sticky Bottom) - Placed BELOW Input */}
+        {chatMode !== 'default' && (
+          <div className={`px-4 py-2 flex items-center justify-between text-xs font-medium border-t ${modeConfig.color} ${modeConfig.bg} ${modeConfig.border}`}>
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[16px]">
+                {chatMode === 'reschedule' ? 'calendar_today' : chatMode === 'diagnosis' ? 'stethoscope' : 'edit_note'}
+              </span>
+              <span>{modeConfig.label}</span>
+            </div>
+            <button
+              onClick={() => setChatModeState('default')}
+              className="hover:underline opacity-80 hover:opacity-100 uppercase tracking-wider text-[10px]"
+            >
+              終了
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

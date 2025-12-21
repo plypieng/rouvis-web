@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Regular chat message - forward to agents/run
-    const { messages, threadId, projectId } = body;
+    const { messages, threadId, projectId, mode } = body;
 
     const response = await fetch(`${backendUrl}/api/v1/agents/run`, {
       method: 'POST',
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'application/json',
         'x-user-id': userId,
       },
-      body: JSON.stringify({ messages, threadId, projectId }),
+      body: JSON.stringify({ messages, threadId, projectId, mode }),
     });
 
     if (!response.ok) {

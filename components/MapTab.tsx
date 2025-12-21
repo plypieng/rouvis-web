@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { googleMapsLoader } from '@/lib/google-maps';
 import { useTranslations } from 'next-intl';
+import FieldMapEditor from './fields/FieldMapEditor';
 
 type LatLng = { lat: number; lng: number };
 
@@ -367,7 +368,7 @@ export default function MapTab() {
             {/* Edit/Create Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-md shadow-2xl p-6 relative">
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-2xl shadow-2xl p-6 relative max-h-[90vh] overflow-y-auto">
                         <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
                             {editingField ? t('edit_field') : t('add_new')}
                         </h2>
@@ -385,41 +386,58 @@ export default function MapTab() {
                                 />
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('crop_label')}</label>
-                                <input
-                                    type="text"
-                                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 outline-none"
-                                    value={formData.crop}
-                                    onChange={e => setFormData({ ...formData, crop: e.target.value })}
-                                    placeholder={t('crop_placeholder')}
+                            {/* Map Editor */}
+                            <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                                <FieldMapEditor
+                                    initialPolygon={editingField?.polygon}
+                                    onFieldChange={(data) => {
+                                        setFormData(prev => ({
+                                            ...prev,
+                                            area: data.area,
+                                            // @ts-ignore
+                                            polygon: data.polygon,
+                                            // @ts-ignore
+                                            location: data.location
+                                        }));
+                                    }}
                                 />
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('area_label')}</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('area_label')} (ha)</label>
                                     <input
                                         type="number"
-                                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 outline-none"
+                                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 outline-none bg-gray-50"
                                         value={formData.area}
-                                        onChange={e => setFormData({ ...formData, area: parseFloat(e.target.value) || 0 })}
-                                        placeholder="0"
+                                        readOnly
+                                        placeholder="Auto-calculated"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('color_label')}</label>
-                                    <div className="flex gap-2 mt-1">
-                                        {['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6'].map(color => (
-                                            <button
-                                                key={color}
-                                                type="button"
-                                                onClick={() => setFormData({ ...formData, color })}
-                                                className={`w-8 h-8 rounded-full border-2 transition ${formData.color === color ? 'border-gray-600 dark:border-gray-300 scale-110' : 'border-transparent'}`}
-                                                style={{ backgroundColor: color }}
-                                            />
-                                        ))}
-                                    </div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('crop_label')}</label>
+                                    <input
+                                        type="text"
+                                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 outline-none"
+                                        value={formData.crop}
+                                        onChange={e => setFormData({ ...formData, crop: e.target.value })}
+                                        placeholder={t('crop_placeholder')}
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('color_label')}</label>
+                                <div className="flex gap-2 mt-1">
+                                    {['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6'].map(color => (
+                                        <button
+                                            key={color}
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, color })}
+                                            className={`w-8 h-8 rounded-full border-2 transition ${formData.color === color ? 'border-gray-600 dark:border-gray-300 scale-110' : 'border-transparent'}`}
+                                            style={{ backgroundColor: color }}
+                                        />
+                                    ))}
                                 </div>
                             </div>
 

@@ -40,20 +40,28 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
     const router = useRouter();
     const [showTaskCreateModal, setShowTaskCreateModal] = useState(false);
     const [selectedDateForTask, setSelectedDateForTask] = useState<Date | undefined>(undefined);
+    const [taskInitialData, setTaskInitialData] = useState<{ title: string; description?: string } | undefined>(undefined);
     const chatRef = useRef<RouvisChatKitRef>(null);
 
     useEffect(() => {
         window.scrollTo(0, 0);
     }, []);
 
-    const handleRescheduleRequest = () => {
+    const handleRescheduleRequest = (message?: string) => {
         if (chatRef.current) {
+            // Activate Reschedule Mode with visual banner
+            chatRef.current.setChatMode('reschedule');
+
             // Set specific suggestions for rescheduling context
             chatRef.current.setSuggestions([
                 { label: 'スケジュールと天気を再確認', message: '今後のスケジュールと直近の天気を再確認し、必要な変更があれば提案して。' },
                 { label: '作業の優先順位を見直す', message: '作業の優先順位を見直したいです。どれから手をつけるべき？' },
                 { label: 'キャンセル', message: '', isCancel: true }
             ]);
+
+            if (message) {
+                chatRef.current.sendMessage(message, 'reschedule');
+            }
         }
     };
 
@@ -74,8 +82,9 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
         }
     };
 
-    const handleTaskCreate = (date: Date) => {
+    const handleTaskCreate = (date: Date, initialData?: { title: string; description?: string }) => {
         setSelectedDateForTask(date);
+        setTaskInitialData(initialData);
         setShowTaskCreateModal(true);
     };
 
@@ -103,6 +112,7 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
                             className="flex-1 border border-gray-200 rounded-2xl shadow-sm overflow-hidden bg-white h-full"
                             projectId={project.id}
                             onTaskUpdate={() => router.refresh()}
+                            onDraftCreate={(draft) => handleTaskCreate(new Date(), draft)}
                             density="compact"
                             growthStage={project.currentStage}
                         />
@@ -139,6 +149,7 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
                 isOpen={showTaskCreateModal}
                 onClose={() => setShowTaskCreateModal(false)}
                 initialDate={selectedDateForTask}
+                initialData={taskInitialData}
             />
         </div>
     );

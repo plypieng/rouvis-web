@@ -10,9 +10,14 @@ interface TaskCreateModalProps {
     isOpen: boolean;
     onClose: () => void;
     initialDate?: Date;
+    initialData?: {
+        title?: string;
+        description?: string;
+        priority?: string;
+    };
 }
 
-export default function TaskCreateModal({ projectId, isOpen, onClose, initialDate }: TaskCreateModalProps) {
+export default function TaskCreateModal({ projectId, isOpen, onClose, initialDate, initialData }: TaskCreateModalProps) {
     const t = useTranslations('projects.task_create');
     const router = useRouter();
     const [saving, setSaving] = useState(false);
@@ -25,13 +30,16 @@ export default function TaskCreateModal({ projectId, isOpen, onClose, initialDat
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     useEffect(() => {
-        if (isOpen && initialDate) {
+        if (isOpen) {
             setFormData(prev => ({
                 ...prev,
-                dueDate: format(initialDate, 'yyyy-MM-dd')
+                title: initialData?.title || '',
+                description: initialData?.description || '',
+                priority: initialData?.priority || 'medium',
+                dueDate: initialDate ? format(initialDate, 'yyyy-MM-dd') : prev.dueDate,
             }));
         }
-    }, [isOpen, initialDate]);
+    }, [isOpen, initialDate, initialData]);
 
     const handleSave = async () => {
         // Validation
