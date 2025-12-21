@@ -5,37 +5,48 @@
 @layer base {
   :root {
     /* Warm Confidence Palette - Farmer-first design */
-    --background: 40 20% 99%;           /* Warm white */
-    --foreground: 30 15% 15%;           /* Deep warm black */
+    --background: 40 20% 99%;
+    /* Warm white */
+    --foreground: 30 15% 15%;
+    /* Deep warm black */
     --card: 40 15% 99%;
     --card-foreground: 30 15% 15%;
     --popover: 40 15% 99%;
     --popover-foreground: 30 15% 15%;
-    
+
     /* Primary - Forest green (earthier than emerald) */
-    --primary: 152 45% 32%;             /* #2d6a4f */
+    --primary: 152 45% 32%;
+    /* #2d6a4f */
     --primary-foreground: 40 20% 98%;
-    --primary-light: 152 30% 94%;       /* Soft sage for backgrounds */
-    
+    --primary-light: 152 30% 94%;
+    /* Soft sage for backgrounds */
+
     /* Secondary - Warm neutrals */
-    --secondary: 40 15% 95%;            /* Soft cream */
+    --secondary: 40 15% 95%;
+    /* Soft cream */
     --secondary-foreground: 30 15% 20%;
-    
+
     /* Muted - Warmer grays */
     --muted: 40 10% 94%;
-    --muted-foreground: 30 10% 45%;     /* Warm gray text */
-    
+    --muted-foreground: 30 10% 45%;
+    /* Warm gray text */
+
     /* Accent - Terracotta/amber for warmth */
-    --accent: 38 90% 50%;               /* Warm amber */
+    --accent: 38 90% 50%;
+    /* Warm amber */
     --accent-foreground: 30 15% 15%;
-    --accent-soft: 45 80% 94%;          /* Wheat/cream */
-    
+    --accent-soft: 45 80% 94%;
+    /* Wheat/cream */
+
     /* Status colors - Softer, less alarming */
-    --destructive: 0 55% 50%;           /* Softer red */
+    --destructive: 0 55% 50%;
+    /* Softer red */
     --destructive-foreground: 40 20% 98%;
-    --success: 152 45% 40%;             /* Muted green */
-    --warning: 38 85% 50%;              /* Warm amber */
-    
+    --success: 152 45% 40%;
+    /* Muted green */
+    --warning: 38 85% 50%;
+    /* Warm amber */
+
     --border: 40 15% 90%;
     --input: 40 15% 90%;
     --ring: 152 45% 32%;
@@ -73,6 +84,7 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
@@ -81,12 +93,14 @@
 
 /* Custom Animations */
 @layer utilities {
+
   /* Fade In Animation */
   @keyframes fadeIn {
     from {
       opacity: 0;
       transform: translateY(-10px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
@@ -102,18 +116,17 @@
     0% {
       background-position: -200% 0;
     }
+
     100% {
       background-position: 200% 0;
     }
   }
 
   .animate-shimmer {
-    background: linear-gradient(
-      90deg,
-      transparent 0%,
-      rgba(255, 255, 255, 0.3) 50%,
-      transparent 100%
-    );
+    background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.3) 50%,
+        transparent 100%);
     background-size: 200% 100%;
     animation: shimmer 2s infinite;
   }
@@ -124,6 +137,7 @@
       transform: translateX(-100%);
       opacity: 0;
     }
+
     to {
       transform: translateX(0);
       opacity: 1;
@@ -140,6 +154,7 @@
       transform: scale(0.9);
       opacity: 0;
     }
+
     to {
       transform: scale(1);
       opacity: 1;
@@ -152,9 +167,12 @@
 
   /* Pulse for Agent Thinking */
   @keyframes pulse {
-    0%, 100% {
+
+    0%,
+    100% {
       opacity: 1;
     }
+
     50% {
       opacity: 0.5;
     }
@@ -193,6 +211,11 @@
     @apply backdrop-blur-md bg-white/30 dark:bg-gray-900/30 border border-white/20 dark:border-gray-700/20;
   }
 
+  /* Header Glass Panel - More opaque for better visibility */
+  .glass-panel {
+    @apply backdrop-blur-md bg-white/90 dark:bg-gray-900/90 border-b border-gray-200/50 dark:border-gray-800/50;
+  }
+
   /* Agriculture Theme Utilities */
   .bg-earth-gradient {
     background: linear-gradient(135deg, #f5efe2 0%, #e8ddc4 100%);
@@ -213,12 +236,10 @@
 
   /* Text Shimmer for Loading States */
   .text-shimmer {
-    background: linear-gradient(
-      90deg,
-      currentColor 0%,
-      rgba(255, 255, 255, 0.5) 50%,
-      currentColor 100%
-    );
+    background: linear-gradient(90deg,
+        currentColor 0%,
+        rgba(255, 255, 255, 0.5) 50%,
+        currentColor 100%);
     background-size: 200% 100%;
     -webkit-background-clip: text;
     background-clip: text;
@@ -274,8 +295,8 @@ iframe[src*="__nextjs_dev_override__"],
 [class*="dev-overlay"],
 div[style*="position: fixed"][style*="bottom"],
 /* Universal error overlay hiding */
-body > div[style*="bottom"],
-body > div[style*="fixed"],
+body>div[style*="bottom"],
+body>div[style*="fixed"],
 div[style*="z-index: 2147483647"],
 iframe[style*="border: none"][style*="width"] {
   display: none !important;
