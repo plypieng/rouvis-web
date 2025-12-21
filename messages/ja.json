@@ -102,6 +102,8 @@
     "create_project": "プロジェクト作成",
     "create_new_project": "新規プロジェクト作成",
     "my_projects": "マイプロジェクト",
+    "active_projects": "進行中のプロジェクト",
+    "view_all": "すべて見る",
     "projects_subtitle": "あなたのプロジェクト一覧",
     "today_focus": "今日のフォーカス",
     "all_caught_up": "すべてのタスクが完了しました",

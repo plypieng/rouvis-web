@@ -92,6 +92,8 @@
     "yield_forecast": "Yield Forecast",
     "view_details": "View Details",
     "my_projects": "My Projects",
+    "active_projects": "Active Projects",
+    "view_all": "View All",
     "projects_subtitle": "Your projects list",
     "today_focus": "Today's Focus",
     "all_caught_up": "All tasks completed",
