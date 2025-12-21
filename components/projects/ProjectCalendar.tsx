@@ -161,7 +161,7 @@ export default function ProjectCalendar({
                                 className="flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-bold transition shadow-sm bg-white border border-green-600 text-green-700 hover:bg-green-50"
                             >
                                 <span className="material-symbols-outlined text-[16px]">smart_toy</span>
-                                <span>{t('ask_ai_reschedule')}</span>
+                                <span className="hidden sm:inline">{t('ask_ai_reschedule')}</span>
                             </button>
 
                             {/* Insights Button */}
