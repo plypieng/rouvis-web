@@ -94,11 +94,11 @@ export default function ProjectCalendar({
 
     return (
 
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col lg:h-full">
             {/* Main Content Area - Split View */}
             <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0">
                 {/* Left: Calendar Main Area (Header + Grid) */}
-                <div className="lg:col-span-2 h-full flex flex-col bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="lg:col-span-2 lg:h-full h-auto min-h-[400px] flex flex-col bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                     {rescheduleSuggestion && (
                         <div className="flex items-center justify-between gap-3 px-4 py-2 bg-amber-50 border-b border-amber-100 text-amber-900 text-xs">
                             <div className="flex items-start gap-2">

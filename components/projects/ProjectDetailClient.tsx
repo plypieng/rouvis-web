@@ -104,7 +104,7 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch mb-2 h-[calc(100vh-120px)]">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch mb-2 lg:h-[calc(100vh-120px)] h-auto">
                     {/* LEFT COLUMN: Companion Sidebar */}
                     <div id="project-chat-kit" className="lg:col-span-4 order-2 lg:order-1 flex flex-col h-full min-h-0">
                         <RouvisChatKit
