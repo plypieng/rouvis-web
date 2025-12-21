@@ -379,7 +379,7 @@ export default function Header({ locale, user = null, alerts = [], kpis }: Heade
           <SettingsMenu />
           <AuthMenu />
         </div>
-        <div className="md:hidden flex items-center gap-2">
+        <div className="hidden">
           <button type="button" className="inline-flex items-center justify-center p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600" aria-label={mobileOpen ? t('header.a11y.close_menu') : t('header.a11y.open_menu')} aria-expanded={mobileOpen} aria-controls="mobile-menu" onClick={() => setMobileOpen(v => !v)}>
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               {mobileOpen ? (<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />) : (<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />)}
@@ -388,8 +388,8 @@ export default function Header({ locale, user = null, alerts = [], kpis }: Heade
         </div>
       </div>
       {mobileOpen && (
-        <div className="md:hidden fixed inset-0 z-40 bg-black/20" onClick={closeOnOutsideClick} aria-hidden="true">
-          <div id="mobile-menu" ref={panelRef} role="dialog" aria-modal="true" className="absolute top-0 right-0 w-80 max-w-[85vw] h-full bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 shadow-xl p-4 flex flex-col gap-4">
+        <div className="md:hidden fixed inset-0 z-50 bg-black/20" onClick={closeOnOutsideClick} aria-hidden="true">
+          <div id="mobile-menu" ref={panelRef} role="dialog" aria-modal="true" className="absolute top-0 right-0 w-80 max-w-[85vw] h-full shadow-xl p-4 flex flex-col gap-4 border-l border-gray-200 dark:border-gray-800" style={{ backgroundColor: '#ffffff' }}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Image src="/logo.svg" alt={t('header.logo_alt')} width={28} height={28} />
