@@ -13,7 +13,7 @@ const intlMiddleware = createMiddleware({
 });
 
 // Public routes that don't require authentication
-const publicRoutes = ['/login', '/signup', '/api/auth'];
+const publicRoutes = ['/login', '/signup', '/api/auth', '/privacy', '/terms'];
 
 // Export a custom middleware function to handle auth + i18n
 export default async function middleware(request: NextRequest) {
