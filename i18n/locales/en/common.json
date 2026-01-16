@@ -546,5 +546,61 @@
       "privacy": "Privacy Policy",
       "terms": "Terms of Service"
     }
+  },
+  "privacy_policy": {
+    "title": "Privacy Policy",
+    "last_updated": "Last Updated: January 17, 2026",
+    "sections": [
+      {
+        "heading": "1. Introduction",
+        "content": "Welcome to Rouvis. We respect your privacy and are committed to protecting your personal data. This privacy policy will inform you as to how we look after your personal data when you visit our website (regardless of where you visit it from) and tell you about your privacy rights and how the law protects you."
+      },
+      {
+        "heading": "2. Information We Collect",
+        "content": "We may collect, use, store and transfer different kinds of personal data about you which we have grouped together follows: Identity Data (includes first name, last name, username or similar identifier), Contact Data (includes email address), and Technical Data (includes internet protocol (IP) address, your login data, browser type and version)."
+      },
+      {
+        "heading": "3. How We Use Your Information",
+        "content": "We will only use your personal data when the law allows us to. Most commonly, we will use your personal data in the following circumstances: Where we need to perform the contract we are about to enter into or have entered into with you. Where it is necessary for our legitimate interests (or those of a third party) and your interests and fundamental rights do not override those interests."
+      },
+      {
+        "heading": "4. Google User Data",
+        "content": "Our application accesses Google user data via OAuth authentication. We use this strictly for authentication purposes to allow you to log in to our service. We do not share this data with any third parties or use it for any other purpose."
+      },
+      {
+        "heading": "5. Data Security",
+        "content": "We have put in place appropriate security measures to prevent your personal data from being accidentally lost, used or accessed in an unauthorized way, altered or disclosed."
+      },
+      {
+        "heading": "6. Contact Us",
+        "content": "If you have any questions about this privacy policy or our privacy practices, please contact us."
+      }
+    ]
+  },
+  "terms_of_service": {
+    "title": "Terms of Service",
+    "last_updated": "Last Updated: January 17, 2026",
+    "sections": [
+      {
+        "heading": "1. Acceptance of Terms",
+        "content": "By accessing and using Rouvis, you accept and agree to be bound by the terms and provision of this agreement. In addition, when using these particular services, you shall be subject to any posted guidelines or rules applicable to such services."
+      },
+      {
+        "heading": "2. Description of Service",
+        "content": "Rouvis provides an AI-powered agricultural management platform. You understand and agree that the Service is provided 'AS-IS' and that Rouvis assumes no responsibility for the timeliness, deletion, mis-delivery or failure to store any user communications or personalization settings."
+      },
+      {
+        "heading": "3. User Conduct",
+        "content": "You agree to use the Service only for purposes that are legal, proper and in accordance with these Terms and any applicable policies or guidelines. You agree that you will not engage in any activity that interferes with or disrupts the Service or servers or networks connected to the Service."
+      },
+      {
+        "heading": "4. Termination",
+        "content": "We may terminate or suspend access to our Service immediately, without prior notice or liability, for any reason whatsoever, including without limitation if you breach the Terms."
+      },
+      {
+        "heading": "5. Disclaimer of Warranties",
+        "content": "The sites and the content and services provided via the sites are provided on an 'as is' and 'as available' basis. Rouvis expressly disclaims all warranties of any kind, whether express or implied, including, but not limited to, the implied warranties of merchantability, fitness for a particular purpose and non-infringement."
+      }
+    ]
   }
 }

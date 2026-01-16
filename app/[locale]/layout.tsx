@@ -27,9 +27,10 @@ const outfit = Outfit({
 });
 
 // Generate static params for all supported locales
-export function generateStaticParams() {
-  return locales.map(locale => ({ locale }));
-}
+// Generate static params removed to allow dynamic rendering for auth and search params
+// export function generateStaticParams() {
+//   return locales.map(locale => ({ locale }));
+// }
 
 /**
  * Root Layout - Farmer-first navigation

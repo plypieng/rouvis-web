@@ -254,8 +254,8 @@ export default function LandingPage({ locale }: LandingPageProps) {
                     <Logo className="h-8 w-auto mx-auto mb-6 opacity-50 grayscale hover:grayscale-0 transition-all font-mono" />
                     <p className="text-slate-500 text-sm mb-4">{t('footer.copyright')}</p>
                     <div className="flex justify-center gap-6 text-sm text-slate-400">
-                        <span className="hover:text-slate-600 cursor-pointer transition-colors">{t('footer.privacy')}</span>
-                        <span className="hover:text-slate-600 cursor-pointer transition-colors">{t('footer.terms')}</span>
+                        <Link href={`/${locale}/privacy`} className="hover:text-slate-600 cursor-pointer transition-colors">{t('footer.privacy')}</Link>
+                        <Link href={`/${locale}/terms`} className="hover:text-slate-600 cursor-pointer transition-colors">{t('footer.terms')}</Link>
                     </div>
                 </div>
             </footer>

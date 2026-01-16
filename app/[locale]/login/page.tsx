@@ -4,10 +4,10 @@ import { useSession } from 'next-auth/react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
 
-export default function LoginPage() {
+function LoginPageContent() {
   const t = useTranslations('auth.signIn');
   const { status } = useSession();
   const params = useParams<{ locale: string }>();
@@ -36,7 +36,6 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex items-center justify-center px-4">
       <div className="max-w-md w-full space-y-8">
         {/* ROuvis Logo */}
-        {/* ROuvis Logo - Click to go home */}
         <div className="text-center mb-6">
           <Link href={`/${locale}`} className="inline-block hover:opacity-80 transition-opacity">
             <h1 className="text-4xl font-bold text-emerald-600 tracking-tight mb-2">ROUVIS</h1>
@@ -57,10 +56,15 @@ export default function LoginPage() {
             <p>{t('terms')}</p>
           </div>
         </div>
-
-        {/* Optional: Add illustration or feature highlights */}
-
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-green-50 to-white"><div className="text-gray-600">Loading...</div></div>}>
+      <LoginPageContent />
+    </Suspense>
   );
 }
