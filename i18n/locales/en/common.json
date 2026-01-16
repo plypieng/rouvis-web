@@ -512,5 +512,39 @@
   "kpis": {
     "overall_health": "Overall Health",
     "yield_forecast": "Yield Forecast"
+  },
+  "landing": {
+    "hero": {
+      "title": "Data-Driven Farming for Niigata",
+      "subtitle": "ROUVIS combines local agricultural wisdom with advanced AI to help you plan, manage, and optimize your crops with precision.",
+      "cta_start": "Start for Free",
+      "cta_login": "Sign In",
+      "cta_demo": "Try Demo"
+    },
+    "features": {
+      "ai_advisor": {
+        "title": "AI Cultivation Concierge",
+        "desc": "Specialized for Niigata rice & vegetables. Ask about pests, growth stages, or organic farming methods anytime."
+      },
+      "precision_calendar": {
+        "title": "Dynamic Work Calendar",
+        "desc": "Schedules that adapt to real-time JMA weather data. Never miss the perfect window for planting or harvesting."
+      },
+      "field_monitoring": {
+        "title": "Field & Weather Map",
+        "desc": "Visualize all your fields on a map with overlayed weather forecasts. Monitor growth progress specific to Niigata's micro-climates."
+      }
+    },
+    "trust": {
+      "trusted_by": "Powered by Verified Agricultural Data",
+      "stat_1": "3 AI Agents",
+      "stat_2": "JMA Weather Sync",
+      "stat_3": "Niigata Optimized"
+    },
+    "footer": {
+      "copyright": "© 2024 Rouvis. Empowering Niigata Agriculture.",
+      "privacy": "Privacy Policy",
+      "terms": "Terms of Service"
+    }
   }
 }

@@ -33,82 +33,84 @@ export const authOptions: NextAuthOptions = {
         },
       },
     }),
-    CredentialsProvider({
-      id: "demo-device",
-      name: "Demo Device",
-      credentials: {
-        deviceId: { label: "Device ID", type: "text" },
-      },
-      async authorize(credentials) {
-        if (!credentials?.deviceId) return null;
+    ...(process.env.NEXT_PUBLIC_DEMO_MODE === 'true' ? [
+      CredentialsProvider({
+        id: "demo-device",
+        name: "Demo Device",
+        credentials: {
+          deviceId: { label: "Device ID", type: "text" },
+        },
+        async authorize(credentials) {
+          if (!credentials?.deviceId) return null;
 
-        const deviceId = credentials.deviceId;
-        const email = `${deviceId}@demo.local`;
+          const deviceId = credentials.deviceId;
+          const email = `${deviceId}@demo.local`;
 
-        // 1. Find existing user
-        let user = await prisma.user.findUnique({
-          where: { email },
-        });
-
-        // 2. Create if not exists
-        if (!user) {
-          console.log(`[Demo Mode] Creating new user for device: ${deviceId}`);
-          user = await prisma.user.create({
-            data: {
-              email,
-              name: `Demo User (${deviceId.slice(0, 4)})`,
-              image: `https://api.dicebear.com/7.x/shapes/svg?seed=${deviceId}`,
-            },
+          // 1. Find existing user
+          let user = await prisma.user.findUnique({
+            where: { email },
           });
 
-          // Seed Demo Project
-          const today = new Date();
-          const targetHarvest = new Date(today);
-          targetHarvest.setDate(today.getDate() + 120);
+          // 2. Create if not exists
+          if (!user) {
+            // Demo user creation logic
+            user = await prisma.user.create({
+              data: {
+                email,
+                name: `Demo User (${deviceId.slice(0, 4)})`,
+                image: `https://api.dicebear.com/7.x/shapes/svg?seed=${deviceId}`,
+              },
+            });
 
-          await prisma.userProfile.create({
-            data: {
-              userId: user.id,
-              farmingType: 'conventional',
-              experienceLevel: 'beginner',
-              region: 'Demo Region',
-            }
-          });
+            // Seed Demo Project
+            const today = new Date();
+            const targetHarvest = new Date(today);
+            targetHarvest.setDate(today.getDate() + 120);
 
-          const project = await prisma.project.create({
-            data: {
-              userId: user.id,
-              name: 'Demo Farm 2025',
-              crop: 'Rice',
-              startDate: today,
-              targetHarvestDate: targetHarvest,
-              status: 'active',
-            }
-          });
+            await prisma.userProfile.create({
+              data: {
+                userId: user.id,
+                farmingType: 'conventional',
+                experienceLevel: 'beginner',
+                region: 'Demo Region',
+              }
+            });
 
-          await prisma.task.create({
-            data: {
-              projectId: project.id,
-              title: 'Check water level',
-              dueDate: today,
-              status: 'pending',
-              priority: 'high',
-            }
-          });
+            const project = await prisma.project.create({
+              data: {
+                userId: user.id,
+                name: 'Demo Farm 2025',
+                crop: 'Rice',
+                startDate: today,
+                targetHarvestDate: targetHarvest,
+                status: 'active',
+              }
+            });
 
-          await prisma.activity.create({
-            data: {
-              projectId: project.id,
-              type: 'inspection',
-              note: 'Initial demo inspection',
-              performedAt: today,
-            }
-          });
-        }
+            await prisma.task.create({
+              data: {
+                projectId: project.id,
+                title: 'Check water level',
+                dueDate: today,
+                status: 'pending',
+                priority: 'high',
+              }
+            });
 
-        return user;
-      },
-    }),
+            await prisma.activity.create({
+              data: {
+                projectId: project.id,
+                type: 'inspection',
+                note: 'Initial demo inspection',
+                performedAt: today,
+              }
+            });
+          }
+
+          return user;
+        },
+      })
+    ] : []),
   ],
   session: {
     strategy: "jwt",
@@ -134,13 +136,11 @@ export const authOptions: NextAuthOptions = {
       const isNumericId = token.id && /^\d+$/.test(token.id as string);
       if ((!token.id || isNumericId) && token.email) {
         try {
-          console.log('[Auth-JWT] Self-healing ID check for:', token.email, 'Current ID:', token.id);
           const dbUser = await prisma.user.findUnique({
             where: { email: token.email as string },
             select: { id: true }
           });
           if (dbUser && dbUser.id !== token.id) {
-            console.log('[Auth-JWT] Replaced numeric/missing ID', token.id, 'with CUID', dbUser.id);
             token.id = dbUser.id;
           }
         } catch (error) {
@@ -150,12 +150,10 @@ export const authOptions: NextAuthOptions = {
 
       // Check if user has completed onboarding
       if (token.id) {
-        console.log('[Auth-JWT] User ID:', token.id, 'Sub:', token.sub, 'Email:', token.email);
         const userProfile = await prisma.userProfile.findUnique({
           where: { userId: token.id as string },
         });
         token.onboardingComplete = !!userProfile;
-        console.log('[Auth-JWT] onboardingComplete:', token.onboardingComplete);
       }
 
       return token;
@@ -169,7 +167,6 @@ export const authOptions: NextAuthOptions = {
         session.user.id = (token.id as string | undefined) ?? (token.sub as string) ?? '';
         session.user.email = token.email as string;
         session.user.name = token.name as string;
-        console.log('[Auth-Session] Active session user ID:', session.user.id);
       }
       return session;
     },
