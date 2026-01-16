@@ -10,6 +10,9 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Rouvis - Strategic Planning",
   description: "Strategic farm planning and analytics for farmers in Niigata, Japan",
+  verification: {
+    google: "_buOY562UV8w8naqEGmYVp8nt4J1s05tU4ugpWlyFcI",
+  },
 };
 
 export default function RootLayout({
