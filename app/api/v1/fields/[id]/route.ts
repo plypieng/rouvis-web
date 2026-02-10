@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
+import { getBackendAuth } from '../../../../../lib/backend-proxy-auth';
 
 const BACKEND_URL = process.env.BACKEND_URL
   || process.env.NEXT_PUBLIC_API_BASE_URL
@@ -13,9 +13,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid field id' }, { status: 400 });
   }
 
-  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-  const userId = (token?.id as string | undefined) ?? token?.sub;
-  if (!userId) {
+  const auth = await getBackendAuth(request);
+  if (!auth.headers) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -23,7 +22,7 @@ export async function GET(request: NextRequest) {
     const res = await fetch(`${BACKEND_URL}/api/v1/fields/${fieldId}`, {
       headers: {
         'Content-Type': 'application/json',
-        'x-user-id': userId,
+        ...auth.headers,
       },
     });
 
@@ -41,9 +40,8 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid field id' }, { status: 400 });
   }
 
-  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-  const userId = (token?.id as string | undefined) ?? token?.sub;
-  if (!userId) {
+  const auth = await getBackendAuth(request);
+  if (!auth.headers) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -55,7 +53,7 @@ export async function PUT(request: NextRequest) {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        'x-user-id': userId,
+        ...auth.headers,
       },
       body: JSON.stringify(payload),
     });
@@ -74,9 +72,8 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid field id' }, { status: 400 });
   }
 
-  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-  const userId = (token?.id as string | undefined) ?? token?.sub;
-  if (!userId) {
+  const auth = await getBackendAuth(request);
+  if (!auth.headers) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -88,7 +85,7 @@ export async function PATCH(request: NextRequest) {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
-        'x-user-id': userId,
+        ...auth.headers,
       },
       body: JSON.stringify(payload),
     });
@@ -107,9 +104,8 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid field id' }, { status: 400 });
   }
 
-  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-  const userId = (token?.id as string | undefined) ?? token?.sub;
-  if (!userId) {
+  const auth = await getBackendAuth(request);
+  if (!auth.headers) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -118,7 +114,7 @@ export async function DELETE(request: NextRequest) {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
-        'x-user-id': userId,
+        ...auth.headers,
       },
     });
 

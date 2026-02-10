@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
+import { getBackendAuth } from '../../../../../lib/backend-proxy-auth';
 
 const BACKEND_URL = process.env.BACKEND_URL
   || process.env.NEXT_PUBLIC_API_BASE_URL
@@ -14,9 +14,8 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid activity id' }, { status: 400 });
   }
 
-  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-  const userId = (token?.id as string | undefined) ?? token?.sub;
-  if (!userId) {
+  const auth = await getBackendAuth(request);
+  if (!auth.headers) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -25,7 +24,7 @@ export async function DELETE(request: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-user-id': userId,
+        ...auth.headers,
       },
       body: JSON.stringify({ type: 'delete_activity', activityId }),
     });

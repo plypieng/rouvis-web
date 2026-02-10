@@ -21,7 +21,7 @@ type BackendProject = {
   tasks?: BackendTask[];
 };
 
-async function getProjects(userId?: string) {
+async function getProjects() {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
   try {
     const cookieStore = await cookies();
@@ -31,7 +31,6 @@ async function getProjects(userId?: string) {
       cache: 'no-store',
       headers: {
         ...(cookieHeader ? { Cookie: cookieHeader } : {}),
-        ...(userId ? { 'x-user-id': userId } : {}),
       },
     });
     if (!res.ok) {
@@ -50,8 +49,8 @@ export default async function CalendarPage(props: { params: Promise<{ locale: st
   const params = await props.params;
   const { locale } = params;
   const t = await getTranslations({ locale, namespace: 'calendar' });
-  const session = await getServerSessionFromToken();
-  const projects = await getProjects(session?.user?.id);
+  await getServerSessionFromToken();
+  const projects = await getProjects();
 
   const tasks = projects.flatMap((project) => {
     const projectTasks = Array.isArray(project.tasks) ? project.tasks : [];

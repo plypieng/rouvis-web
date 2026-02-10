@@ -4,7 +4,7 @@ import DashboardHeader from './DashboardHeader';
 
 import { cookies } from 'next/headers';
 
-async function getProjects(userId?: string) {
+async function getProjects() {
     try {
         const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
         const cookieStore = await cookies();
@@ -14,7 +14,6 @@ async function getProjects(userId?: string) {
             cache: 'no-store',
             headers: {
                 ...(cookieHeader ? { Cookie: cookieHeader } : {}),
-                ...(userId ? { 'x-user-id': userId } : {}),
             }
         });
 
@@ -61,7 +60,7 @@ async function getWeather() {
     }
 }
 
-async function getDashboardTasks(userId?: string) {
+async function getDashboardTasks() {
     try {
         const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 
@@ -80,7 +79,6 @@ async function getDashboardTasks(userId?: string) {
             cache: 'no-store',
             headers: {
                 ...(cookieHeader ? { Cookie: cookieHeader } : {}),
-                ...(userId ? { 'x-user-id': userId } : {}),
             }
         });
 
@@ -117,11 +115,11 @@ import TodayFocus from './TodayFocus';
 
 // ... (existing imports)
 
-export default async function DashboardProjectList({ locale, userId }: { locale: string; userId: string }) {
+export default async function DashboardProjectList({ locale, userId: _userId }: { locale: string; userId: string }) {
     const t = await getTranslations({ locale, namespace: 'dashboard' });
-    const projects: Project[] = await getProjects(userId);
+    const projects: Project[] = await getProjects();
     const weather = await getWeather();
-    const dashboardTasks = await getDashboardTasks(userId); // All pending tasks for view
+    const dashboardTasks = await getDashboardTasks(); // All pending tasks for view
 
     // Filter for "Today's Focus" list (Today and Overdue)
     const today = new Date();

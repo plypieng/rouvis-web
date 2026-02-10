@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getToken } from 'next-auth/jwt';
+import { getBackendAuth } from '../../../lib/backend-proxy-auth';
 
 export const runtime = 'edge';
 
@@ -9,9 +9,8 @@ export async function POST(req: NextRequest) {
     const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
     if (!backendUrl) throw new Error('BACKEND_URL or NEXT_PUBLIC_API_BASE_URL is not defined');
 
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-    const userId = (token?.id as string | undefined) ?? token?.sub;
-    if (!userId) {
+    const auth = await getBackendAuth(req);
+    if (!auth.headers) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' },
@@ -23,7 +22,7 @@ export async function POST(req: NextRequest) {
       const res = await fetch(`${backendUrl}/api/v1/threads`, {
         headers: {
           'Content-Type': 'application/json',
-          'x-user-id': userId,
+          ...auth.headers,
         },
       });
       const data = await res.json();
@@ -37,7 +36,7 @@ export async function POST(req: NextRequest) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-id': userId,
+          ...auth.headers,
         },
         body: JSON.stringify(body.payload || {}),
       });
@@ -52,7 +51,7 @@ export async function POST(req: NextRequest) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-id': userId,
+          ...auth.headers,
         },
         body: JSON.stringify(body.payload || {}),
       });
@@ -70,7 +69,7 @@ export async function POST(req: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-user-id': userId,
+        ...auth.headers,
       },
       body: JSON.stringify({ messages, threadId, projectId, mode }),
     });
@@ -191,9 +190,8 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-    const userId = (token?.id as string | undefined) ?? token?.sub;
-    if (!userId) {
+    const auth = await getBackendAuth(req);
+    if (!auth.headers) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' },
@@ -203,7 +201,7 @@ export async function GET(req: NextRequest) {
     const res = await fetch(`${backendUrl}/api/v1/threads/${threadId}`, {
       headers: {
         'Content-Type': 'application/json',
-        'x-user-id': userId,
+        ...auth.headers,
       },
     });
     if (!res.ok) {

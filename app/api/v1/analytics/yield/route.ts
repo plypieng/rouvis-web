@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
+import { getBackendAuth } from '../../../../../lib/backend-proxy-auth';
 
 const BACKEND_URL = process.env.BACKEND_URL
   || process.env.NEXT_PUBLIC_API_BASE_URL
@@ -8,9 +8,8 @@ const BACKEND_URL = process.env.BACKEND_URL
     : 'http://localhost:4000');
 
 export async function GET(request: NextRequest) {
-  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-  const userId = (token?.id as string | undefined) ?? token?.sub;
-  if (!userId) {
+  const auth = await getBackendAuth(request);
+  if (!auth.headers) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -18,7 +17,7 @@ export async function GET(request: NextRequest) {
     const res = await fetch(`${BACKEND_URL}/api/v1/analytics/yield`, {
       headers: {
         'Content-Type': 'application/json',
-        'x-user-id': userId,
+        ...auth.headers,
       },
       cache: 'no-store',
     });
