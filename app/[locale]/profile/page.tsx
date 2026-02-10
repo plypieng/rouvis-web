@@ -36,12 +36,13 @@ export default function ProfilePage() {
             const res = await fetch('/api/v1/profile');
             if (res.ok) {
                 const data = await res.json();
-                setProfile(data);
+                const profileData = data?.profile ?? data;
+                setProfile(profileData);
                 setFormData({
-                    displayName: data.displayName || '',
-                    region: data.region || '',
-                    farmingType: data.farmingType || 'conventional',
-                    experienceLevel: data.experienceLevel || 'intermediate',
+                    displayName: profileData?.displayName || '',
+                    region: profileData?.region || '',
+                    farmingType: profileData?.farmingType || 'conventional',
+                    experienceLevel: profileData?.experienceLevel || 'intermediate',
                 });
             }
         } catch (error) {
@@ -62,7 +63,7 @@ export default function ProfilePage() {
 
             if (res.ok) {
                 const updated = await res.json();
-                setProfile(updated);
+                setProfile(updated?.profile ?? updated);
                 setIsEditing(false);
             }
         } catch (error) {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
+import { getBackendAuth } from '../../../../lib/backend-proxy-auth';
 
 // Use explicit production URL as fallback
 const BACKEND_URL = process.env.BACKEND_URL
@@ -7,10 +7,8 @@ const BACKEND_URL = process.env.BACKEND_URL
     || (process.env.NODE_ENV === 'production' ? 'https://localfarm-backend.vercel.app' : 'http://localhost:4000');
 
 export async function GET(req: NextRequest) {
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-
-    const userId = (token?.id as string | undefined) ?? token?.sub;
-    if (!userId) {
+    const auth = await getBackendAuth(req);
+    if (!auth.headers) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -18,7 +16,7 @@ export async function GET(req: NextRequest) {
         const res = await fetch(`${BACKEND_URL}/api/v1/projects`, {
             headers: {
                 'Content-Type': 'application/json',
-                'x-user-id': userId,
+                ...auth.headers,
             },
         });
 
@@ -31,10 +29,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-
-    const userId = (token?.id as string | undefined) ?? token?.sub;
-    if (!userId) {
+    const auth = await getBackendAuth(req);
+    if (!auth.headers) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -45,7 +41,7 @@ export async function POST(req: NextRequest) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'x-user-id': userId,
+                ...auth.headers,
             },
             body: JSON.stringify(body),
         });

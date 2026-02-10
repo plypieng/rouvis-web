@@ -5,7 +5,17 @@ import { decode } from 'next-auth/jwt';
 import type { Session } from 'next-auth';
 
 export async function getServerSessionFromToken(token?: string) {
-  if (!token) {
+  let sessionToken = token;
+  if (!sessionToken) {
+    const cookieStore = await cookies();
+    sessionToken =
+      cookieStore.get('__Secure-next-auth.session-token')?.value
+      ?? cookieStore.get('next-auth.session-token')?.value
+      ?? cookieStore.get('__Secure-authjs.session-token')?.value
+      ?? cookieStore.get('authjs.session-token')?.value;
+  }
+
+  if (!sessionToken) {
     return null;
   }
 
@@ -17,7 +27,7 @@ export async function getServerSessionFromToken(token?: string) {
 
     // Use NextAuth's decode function
     const decoded = await decode({
-      token,
+      token: sessionToken,
       secret,
     });
 
