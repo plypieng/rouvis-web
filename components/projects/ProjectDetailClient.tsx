@@ -17,6 +17,16 @@ type ProjectTask = {
     status: string;
 };
 
+type ProjectSchedulingPreferences = {
+    preferredWorkStartHour?: number;
+    preferredWorkEndHour?: number;
+    maxTasksPerDay?: number;
+    avoidWeekdays?: number[];
+    riskTolerance?: 'conservative' | 'balanced' | 'aggressive';
+    irrigationStyle?: 'manual' | 'reminder' | 'strict';
+    constraintsNote?: string;
+} | null;
+
 type Project = {
     id: string;
     name: string;
@@ -28,6 +38,7 @@ type Project = {
     notes?: string;
     tasks?: ProjectTask[];
     currentStage?: string;
+    schedulingPreferences?: ProjectSchedulingPreferences;
 };
 
 interface ProjectDetailClientProps {
@@ -126,6 +137,7 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
                                 projectId={project.id}
                                 crop={project.crop}
                                 startDate={project.startDate}
+                                initialPreferences={project.schedulingPreferences || null}
                             />
                         ) : (
                             <div className="flex flex-col h-full min-h-0">

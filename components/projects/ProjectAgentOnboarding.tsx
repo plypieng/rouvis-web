@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 type GeneratedTask = {
@@ -33,25 +33,150 @@ type TaskPayload = {
     isBackfilled?: boolean;
 };
 
+type SchedulingPreferences = {
+    preferredWorkStartHour: number;
+    preferredWorkEndHour: number;
+    maxTasksPerDay: number;
+    avoidWeekdays: number[];
+    riskTolerance: 'conservative' | 'balanced' | 'aggressive';
+    irrigationStyle: 'manual' | 'reminder' | 'strict';
+    constraintsNote: string;
+};
+
+type SchedulingPreferencesInput = Partial<SchedulingPreferences> | null;
+
+const weekdayLabels = ['日', '月', '火', '水', '木', '金', '土'];
+
+function normalizePreferences(input?: SchedulingPreferencesInput): SchedulingPreferences {
+    const base: SchedulingPreferences = {
+        preferredWorkStartHour: 6,
+        preferredWorkEndHour: 18,
+        maxTasksPerDay: 4,
+        avoidWeekdays: [],
+        riskTolerance: 'balanced',
+        irrigationStyle: 'reminder',
+        constraintsNote: '',
+    };
+
+    if (!input) return base;
+
+    const startHour = Number.isFinite(input.preferredWorkStartHour)
+        ? Math.max(0, Math.min(23, Number(input.preferredWorkStartHour)))
+        : base.preferredWorkStartHour;
+    const endHourRaw = Number.isFinite(input.preferredWorkEndHour)
+        ? Math.max(1, Math.min(24, Number(input.preferredWorkEndHour)))
+        : base.preferredWorkEndHour;
+    const endHour = endHourRaw <= startHour ? startHour + 1 : endHourRaw;
+
+    return {
+        preferredWorkStartHour: startHour,
+        preferredWorkEndHour: endHour,
+        maxTasksPerDay: Number.isFinite(input.maxTasksPerDay)
+            ? Math.max(1, Math.min(12, Number(input.maxTasksPerDay)))
+            : base.maxTasksPerDay,
+        avoidWeekdays: Array.isArray(input.avoidWeekdays)
+            ? [...new Set(input.avoidWeekdays)]
+                .filter((day): day is number => Number.isInteger(day) && day >= 0 && day <= 6)
+                .sort((a, b) => a - b)
+            : base.avoidWeekdays,
+        riskTolerance: input.riskTolerance === 'conservative' || input.riskTolerance === 'aggressive'
+            ? input.riskTolerance
+            : 'balanced',
+        irrigationStyle: input.irrigationStyle === 'manual' || input.irrigationStyle === 'strict'
+            ? input.irrigationStyle
+            : 'reminder',
+        constraintsNote: (input.constraintsNote || '').trim(),
+    };
+}
+
+function toPreferencePayload(input: SchedulingPreferences): SchedulingPreferences {
+    const normalized = normalizePreferences(input);
+    return {
+        ...normalized,
+        constraintsNote: normalized.constraintsNote.slice(0, 300),
+    };
+}
+
 export default function ProjectAgentOnboarding({
     projectId,
     crop,
     startDate,
-    onGenerate
+    onGenerate,
+    initialPreferences,
 }: {
     projectId: string;
     crop: string;
     startDate?: string;
     onGenerate?: () => void;
+    initialPreferences?: SchedulingPreferencesInput;
 }) {
     const t = useTranslations('projects.agent_onboarding');
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isSavingPreferences, setIsSavingPreferences] = useState(false);
     const [progressMessage, setProgressMessage] = useState('');
+    const [preferences, setPreferences] = useState<SchedulingPreferences>(() => normalizePreferences(initialPreferences));
+    const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
     const router = useRouter();
+
+    const preferencePayload = useMemo(() => toPreferencePayload(preferences), [preferences]);
+
+    const savePreferences = async (silent = false): Promise<boolean> => {
+        if (!silent) {
+            setIsSavingPreferences(true);
+            setProgressMessage('⚙️ 設定を保存しています...');
+        }
+
+        try {
+            const saveRes = await fetch(`/api/v1/projects/${projectId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    schedulingPreferences: preferencePayload,
+                }),
+            });
+
+            if (!saveRes.ok) {
+                throw new Error('Failed to save scheduling preferences');
+            }
+
+            setLastSavedAt(new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }));
+            if (!silent) {
+                setProgressMessage('✅ 設定を保存しました');
+                setTimeout(() => setProgressMessage(''), 1200);
+            }
+            return true;
+        } catch (error) {
+            console.error('Preference save error:', error);
+            if (!silent) {
+                setProgressMessage('');
+                alert('設定の保存に失敗しました');
+            }
+            return false;
+        } finally {
+            if (!silent) {
+                setIsSavingPreferences(false);
+            }
+        }
+    };
+
+    const handleToggleAvoidWeekday = (day: number) => {
+        setPreferences(prev => {
+            const exists = prev.avoidWeekdays.includes(day);
+            const nextDays = exists
+                ? prev.avoidWeekdays.filter(item => item !== day)
+                : [...prev.avoidWeekdays, day].sort((a, b) => a - b);
+            return { ...prev, avoidWeekdays: nextDays };
+        });
+    };
 
     const handleGenerate = async () => {
         setIsGenerating(true);
         try {
+            const saved = await savePreferences(true);
+            if (!saved) {
+                throw new Error('Failed to persist preferences before generation');
+            }
+
             setProgressMessage('🤖 スケジュール生成を開始します...');
 
             // 1. Determine which endpoint to use based on start date
@@ -67,6 +192,8 @@ export default function ProjectAgentOnboarding({
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(isBackfilled ? {
+                    projectId,
+                    schedulingPreferences: preferencePayload,
                     cropAnalysis: {
                         crop,
                         startDate: startDate || new Date().toISOString().split('T')[0],
@@ -75,6 +202,8 @@ export default function ProjectAgentOnboarding({
                     plantingDate: startDate,
                     currentDate: new Date().toISOString().split('T')[0],
                 } : {
+                    projectId,
+                    schedulingPreferences: preferencePayload,
                     cropAnalysis: {
                         crop,
                         startDate: startDate || new Date().toISOString().split('T')[0],
@@ -118,11 +247,14 @@ export default function ProjectAgentOnboarding({
 
             setProgressMessage(`💾 ${tasks.length}個のタスクを保存中...`);
 
-            // 4. Save Tasks to Project
+            // 4. Save Tasks and Preferences
             const saveRes = await fetch(`/api/v1/projects/${projectId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ tasks }),
+                body: JSON.stringify({
+                    tasks,
+                    schedulingPreferences: preferencePayload,
+                }),
             });
 
             if (!saveRes.ok) throw new Error('Failed to save tasks');
@@ -145,7 +277,7 @@ export default function ProjectAgentOnboarding({
     };
 
     return (
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8 border-2 border-blue-100 text-center max-w-2xl mx-auto my-8">
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8 border-2 border-blue-100 text-center max-w-3xl mx-auto my-8">
             <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-md">
                 <span className="material-symbols-outlined text-4xl text-blue-600">smart_toy</span>
             </div>
@@ -154,9 +286,126 @@ export default function ProjectAgentOnboarding({
                 {t('welcome_title', { crop })}
             </h2>
 
-            <p className="text-gray-600 mb-8 leading-relaxed">
+            <p className="text-gray-600 mb-6 leading-relaxed">
                 {t('welcome_message')}
             </p>
+
+            <div className="bg-white/85 backdrop-blur rounded-xl border border-blue-100 p-5 text-left mb-6">
+                <h3 className="font-bold text-gray-900 mb-4">初回ドラフト前の作業設定</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <label className="text-sm text-gray-700">
+                        <span className="block mb-1 font-medium">作業開始時刻</span>
+                        <input
+                            type="number"
+                            min={0}
+                            max={23}
+                            value={preferences.preferredWorkStartHour}
+                            onChange={(e) => setPreferences(prev => ({
+                                ...prev,
+                                preferredWorkStartHour: Number(e.target.value),
+                                preferredWorkEndHour: Math.max(Number(e.target.value) + 1, prev.preferredWorkEndHour),
+                            }))}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                        />
+                    </label>
+                    <label className="text-sm text-gray-700">
+                        <span className="block mb-1 font-medium">作業終了時刻</span>
+                        <input
+                            type="number"
+                            min={1}
+                            max={24}
+                            value={preferences.preferredWorkEndHour}
+                            onChange={(e) => setPreferences(prev => ({
+                                ...prev,
+                                preferredWorkEndHour: Math.max(Number(e.target.value), prev.preferredWorkStartHour + 1),
+                            }))}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                        />
+                    </label>
+                    <label className="text-sm text-gray-700">
+                        <span className="block mb-1 font-medium">1日の最大作業数</span>
+                        <input
+                            type="number"
+                            min={1}
+                            max={12}
+                            value={preferences.maxTasksPerDay}
+                            onChange={(e) => setPreferences(prev => ({
+                                ...prev,
+                                maxTasksPerDay: Math.max(1, Math.min(12, Number(e.target.value))),
+                            }))}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                        />
+                    </label>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <label className="text-sm text-gray-700">
+                        <span className="block mb-1 font-medium">リスク許容度</span>
+                        <select
+                            value={preferences.riskTolerance}
+                            onChange={(e) => setPreferences(prev => ({
+                                ...prev,
+                                riskTolerance: e.target.value as SchedulingPreferences['riskTolerance'],
+                            }))}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                        >
+                            <option value="conservative">慎重</option>
+                            <option value="balanced">標準</option>
+                            <option value="aggressive">積極</option>
+                        </select>
+                    </label>
+                    <label className="text-sm text-gray-700">
+                        <span className="block mb-1 font-medium">灌水スタイル</span>
+                        <select
+                            value={preferences.irrigationStyle}
+                            onChange={(e) => setPreferences(prev => ({
+                                ...prev,
+                                irrigationStyle: e.target.value as SchedulingPreferences['irrigationStyle'],
+                            }))}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                        >
+                            <option value="manual">手動判断</option>
+                            <option value="reminder">リマインダー重視</option>
+                            <option value="strict">厳密運用</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div className="mb-4">
+                    <span className="block mb-2 text-sm font-medium text-gray-700">避けたい曜日</span>
+                    <div className="flex flex-wrap gap-2">
+                        {weekdayLabels.map((label, day) => {
+                            const selected = preferences.avoidWeekdays.includes(day);
+                            return (
+                                <button
+                                    key={day}
+                                    type="button"
+                                    onClick={() => handleToggleAvoidWeekday(day)}
+                                    className={`px-3 py-1.5 rounded-full text-sm border transition ${
+                                        selected
+                                            ? 'bg-blue-600 text-white border-blue-600'
+                                            : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400'
+                                    }`}
+                                >
+                                    {label}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                <label className="text-sm text-gray-700">
+                    <span className="block mb-1 font-medium">補足条件</span>
+                    <textarea
+                        rows={3}
+                        value={preferences.constraintsNote}
+                        onChange={(e) => setPreferences(prev => ({ ...prev, constraintsNote: e.target.value }))}
+                        placeholder="例: 雨天翌日は重作業を避けたい、午前中中心にしたい"
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                        maxLength={300}
+                    />
+                </label>
+            </div>
 
             {/* Progress Message */}
             {progressMessage && (
@@ -165,10 +414,23 @@ export default function ProjectAgentOnboarding({
                 </div>
             )}
 
+            {lastSavedAt && (
+                <p className="text-xs text-gray-500 mb-4">最終保存: {lastSavedAt}</p>
+            )}
+
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <button
+                    onClick={() => savePreferences(false)}
+                    disabled={isGenerating || isSavingPreferences}
+                    className="px-6 py-3 bg-white text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50 transition flex items-center justify-center gap-2 font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                    <span className="material-symbols-outlined">save</span>
+                    設定だけ保存
+                </button>
+
+                <button
                     onClick={handleGenerate}
-                    disabled={isGenerating}
+                    disabled={isGenerating || isSavingPreferences}
                     className="px-8 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2 font-bold disabled:bg-blue-400 disabled:cursor-not-allowed"
                 >
                     {isGenerating ? (
@@ -179,17 +441,9 @@ export default function ProjectAgentOnboarding({
                     ) : (
                         <>
                             <span className="material-symbols-outlined">auto_awesome</span>
-                            {t('generate_schedule')}
+                            初回ドラフトを生成
                         </>
                     )}
-                </button>
-
-                <button
-                    className="px-8 py-3 bg-white text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50 transition flex items-center justify-center gap-2 font-medium"
-                    disabled={isGenerating}
-                >
-                    <span className="material-symbols-outlined">edit_calendar</span>
-                    {t('customize_manually')}
                 </button>
             </div>
         </div>
