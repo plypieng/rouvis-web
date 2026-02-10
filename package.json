@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "postinstall": "prisma generate",
     "test:auth": "npx tsx scripts/test-auth-integration.ts",
     "test:auth:verbose": "VERBOSE=true npx tsx scripts/test-auth-integration.ts"

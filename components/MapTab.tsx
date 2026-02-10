@@ -17,6 +17,15 @@ interface Field {
     area?: number;
 }
 
+interface FieldFormData {
+    name: string;
+    crop: string;
+    color: string;
+    area: number;
+    polygon?: string | LatLng[] | null;
+    location?: string | LatLng | null;
+}
+
 export default function MapTab() {
     const t = useTranslations('fields');
     const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
@@ -29,7 +38,7 @@ export default function MapTab() {
     // Edit/Add Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingField, setEditingField] = useState<Field | null>(null);
-    const [formData, setFormData] = useState({ name: '', crop: '', color: '#10B981', area: 0 });
+    const [formData, setFormData] = useState<FieldFormData>({ name: '', crop: '', color: '#10B981', area: 0 });
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Refresh fields helper
@@ -52,7 +61,9 @@ export default function MapTab() {
                 name: field.name,
                 crop: field.crop || '',
                 color: field.color || '#10B981',
-                area: field.area || 0
+                area: field.area || 0,
+                polygon: field.polygon || null,
+                location: field.location || null
             });
         } else {
             setEditingField(null);
@@ -75,8 +86,8 @@ export default function MapTab() {
                 ...formData,
                 area: Number(formData.area),
                 // Preserve existing polygon if editing, or null for new
-                polygon: editingField?.polygon || null,
-                location: editingField?.location || null,
+                polygon: formData.polygon ?? editingField?.polygon ?? null,
+                location: formData.location ?? editingField?.location ?? null,
             };
 
             const res = await fetch(url, {
@@ -394,9 +405,7 @@ export default function MapTab() {
                                         setFormData(prev => ({
                                             ...prev,
                                             area: data.area,
-                                            // @ts-ignore
                                             polygon: data.polygon,
-                                            // @ts-ignore
                                             location: data.location
                                         }));
                                     }}

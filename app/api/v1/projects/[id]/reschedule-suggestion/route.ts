@@ -9,9 +9,11 @@ const BACKEND_URL = process.env.BACKEND_URL
 
 function extractProjectId(request: NextRequest): string | null {
   const segments = request.nextUrl.pathname.split('/').filter(Boolean);
-  const markerIndex = segments.lastIndexOf('reschedule-suggestion');
-  if (markerIndex <= 0) return null;
-  return segments[markerIndex - 1] ?? null;
+  const projectsIndex = segments.lastIndexOf('projects');
+  if (projectsIndex === -1 || projectsIndex + 1 >= segments.length) {
+    return null;
+  }
+  return segments[projectsIndex + 1] || null;
 }
 
 export async function GET(request: NextRequest) {

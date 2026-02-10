@@ -13,26 +13,32 @@ import { prisma, authPrisma } from "./prisma";
 
 const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim();
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
+const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+const hasGoogleOAuth = !!googleClientId && !!googleClientSecret;
 
-if (!googleClientId || !googleClientSecret) {
+if (!hasGoogleOAuth && !isDemoMode) {
   throw new Error('Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET');
 }
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(authPrisma),
   providers: [
-    GoogleProvider({
-      clientId: googleClientId,
-      clientSecret: googleClientSecret,
-      authorization: {
-        params: {
-          // Request calendar scope for Google Calendar integration
-          scope: 'openid email profile https://www.googleapis.com/auth/calendar',
-          access_type: 'offline',
-          prompt: 'consent',
-        },
-      },
-    }),
+    ...(hasGoogleOAuth
+      ? [
+        GoogleProvider({
+          clientId: googleClientId!,
+          clientSecret: googleClientSecret!,
+          authorization: {
+            params: {
+              // Request calendar scope for Google Calendar integration
+              scope: 'openid email profile https://www.googleapis.com/auth/calendar',
+              access_type: 'offline',
+              prompt: 'consent',
+            },
+          },
+        })
+      ]
+      : []),
     ...(process.env.NEXT_PUBLIC_DEMO_MODE === 'true' ? [
       CredentialsProvider({
         id: "demo-device",

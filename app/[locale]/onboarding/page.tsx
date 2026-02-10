@@ -25,7 +25,11 @@ const fieldSchema = z.object({
 });
 
 type ProfileData = z.infer<typeof profileSchema>;
-type FieldData = z.infer<typeof fieldSchema>;
+type LatLng = { lat: number; lng: number };
+type FieldData = z.infer<typeof fieldSchema> & {
+  polygon?: LatLng[];
+  location?: LatLng | null;
+};
 
 export default function OnboardingPage() {
   const t = useTranslations('auth.onboarding');
@@ -144,9 +148,7 @@ export default function OnboardingPage() {
           area: (fieldData.area || 0) * 10000, // Convert Ha to SqM for storage
           crop: selectedCrop?.label || fieldData.crop,
           planting_date: fieldData.plantingDate || null,
-          // @ts-ignore
           polygon: fieldData.polygon,
-          // @ts-ignore
           location: fieldData.location,
         }),
       });
@@ -349,9 +351,7 @@ export default function OnboardingPage() {
                   ...prev,
                   area: data.area,
                   // Store polygon/location for API
-                  // @ts-ignore - straightforward extension of state
                   polygon: data.polygon,
-                  // @ts-ignore
                   location: data.location
                 }));
               }}

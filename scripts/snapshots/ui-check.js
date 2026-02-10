@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 // Quick UI snapshot using Playwright (installed as devDependency)
 // Usage: node web/scripts/snapshots/ui-check.js
 
@@ -33,4 +34,3 @@ async function snap(url, outPath) {
     process.exitCode = 1;
   }
 })();
-
