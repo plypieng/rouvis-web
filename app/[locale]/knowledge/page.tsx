@@ -1,12 +1,15 @@
-'use client';
-
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
 import { BookOpen, MessageCircle } from 'lucide-react';
+import { notFound } from 'next/navigation';
+import { getWebFeatureFlags } from '@/lib/feature-flags';
 
-export default function KnowledgePage() {
-  const params = useParams<{ locale: string }>();
-  const locale = params?.locale || 'ja';
+export default async function KnowledgePage({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params;
+  const featureFlags = getWebFeatureFlags();
+
+  if (!featureFlags.knowledgePage) {
+    notFound();
+  }
 
   return (
     <div className="container mx-auto py-6 px-4 space-y-6">

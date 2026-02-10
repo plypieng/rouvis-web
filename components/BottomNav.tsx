@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Home, Users, Store, Menu, Map as MapIcon } from 'lucide-react';
+import type { WebFeatureFlags } from '../lib/feature-flags';
 
 /**
  * Bottom Navigation - Mobile-first, thumb-zone optimized
@@ -21,7 +22,15 @@ import { Home, Users, Store, Menu, Map as MapIcon } from 'lucide-react';
  * - 市場 (Market): Sales/Inventory
  * - メニュー (Menu): Planning/Records/Knowledge
  */
-export function BottomNav({ locale, user }: { locale: string; user?: unknown }) {
+export function BottomNav({
+  locale,
+  user,
+  featureFlags,
+}: {
+  locale: string;
+  user?: unknown;
+  featureFlags?: WebFeatureFlags;
+}) {
   const pathname = usePathname();
 
   // Hide bottom nav on landing page for unauthenticated users
@@ -52,20 +61,20 @@ export function BottomNav({ locale, user }: { locale: string; user?: unknown }) 
       href: `/${locale}/map`,
       description: 'Field Map',
     },
-    {
+    ...(featureFlags?.teamPage ? [{
       id: 'team',
       label: 'チーム',
       icon: Users,
       href: `/${locale}/team`,
       description: 'Team & Experts',
-    },
-    {
+    }] : []),
+    ...(featureFlags?.marketPage ? [{
       id: 'market',
       label: '市場',
       icon: Store,
       href: `/${locale}/market`,
       description: 'Market & Sales',
-    },
+    }] : []),
     {
       id: 'menu',
       label: 'メニュー',

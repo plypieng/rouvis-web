@@ -1,10 +1,12 @@
 import Link from 'next/link';
 import { Calendar, TrendingUp, Book, Settings, ChevronRight, User } from 'lucide-react';
 import { getServerSessionFromToken } from '@/lib/server-auth';
+import { getWebFeatureFlags } from '@/lib/feature-flags';
 
 export default async function MenuPage({ params }: { params: Promise<{ locale: string }> }) {
     const { locale } = await params;
     const session = await getServerSessionFromToken();
+    const featureFlags = getWebFeatureFlags();
     const displayName = session?.user?.name || session?.user?.email || 'ユーザー';
 
     const menuItems = [
@@ -24,14 +26,14 @@ export default async function MenuPage({ params }: { params: Promise<{ locale: s
             color: 'text-green-600',
             bg: 'bg-green-100',
         },
-        {
+        ...(featureFlags.knowledgePage ? [{
             title: '知識・マニュアル (Knowledge)',
             description: '栽培ガイドとコミュニティ',
             icon: Book,
             href: `/${locale}/knowledge`,
             color: 'text-purple-600',
             bg: 'bg-purple-100',
-        },
+        }] : []),
     ];
 
     return (

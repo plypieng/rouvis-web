@@ -12,6 +12,7 @@ import { Providers } from '../../components/Providers';
 import FeedbackButton from '../../components/FeedbackButton';
 import OnboardingTour from '../../components/OnboardingTour';
 import { getServerSessionFromToken } from '../../lib/server-auth';
+import { getWebFeatureFlags } from '../../lib/feature-flags';
 import type { Locale } from '../../i18n/config';
 
 const inter = Inter({
@@ -60,6 +61,7 @@ export default async function RootLayout(props: {
   // Get messages for the locale
   const messages = await getMessages();
   const session = await getServerSessionFromToken();
+  const featureFlags = getWebFeatureFlags();
 
   // Debug: log server session
   console.log('[Layout] Server session:', session);
@@ -81,7 +83,7 @@ export default async function RootLayout(props: {
         {/* Full-height layout with mobile optimizations */}
         <div className={`${inter.variable} ${outfit.variable} font-sans mobile-viewport bg-background flex flex-col`} lang={locale}>
           {/* New sticky header */}
-          <Header locale={typedLocale} user={headerUser} />
+          <Header locale={typedLocale} user={headerUser} featureFlags={featureFlags} />
 
           {/* Main Content - Full height minus bottom nav on mobile */}
           <main id="main-content" className="flex-1 overflow-auto mobile-scroll safe-bottom pb-20 lg:pb-0">
@@ -99,7 +101,7 @@ export default async function RootLayout(props: {
 
           {/* Bottom Navigation - Mobile Only - Enhanced */}
           <div className="mobile-nav-height">
-            <BottomNav locale={typedLocale} user={session?.user} />
+            <BottomNav locale={typedLocale} user={session?.user} featureFlags={featureFlags} />
           </div>
         </div>
       </Providers>

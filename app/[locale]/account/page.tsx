@@ -2,26 +2,15 @@
 
 import { useTranslations } from 'next-intl';
 import { useSession } from 'next-auth/react';
-import { useState } from 'react';
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
+import { Lock, Download, Trash2, Clock3 } from 'lucide-react';
 
 export default function AccountPage() {
     const t = useTranslations('pages.account');
     const { data: session } = useSession();
-    const [isDeleting, setIsDeleting] = useState(false);
-
-    const handleExport = () => {
-        alert('Data export started. You will receive an email when it is ready.');
-    };
-
-    const handleDelete = () => {
-        if (confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
-            setIsDeleting(true);
-            setTimeout(() => {
-                setIsDeleting(false);
-                alert('Account deletion request submitted.');
-            }, 1000);
-        }
-    };
+    const params = useParams<{ locale: string }>();
+    const locale = params?.locale || 'ja';
 
     if (!session?.user) {
         return null;
@@ -57,15 +46,24 @@ export default function AccountPage() {
                 {/* Data Management */}
                 <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
                     <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Data Management</h2>
+                    <div className="mb-4 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-900">
+                        <Clock3 className="mt-0.5 h-4 w-4 shrink-0" />
+                        <p className="text-sm">
+                            Data export and account deletion workflows are not available yet.
+                            We will enable these once compliance processing is ready.
+                        </p>
+                    </div>
+
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="font-medium text-gray-900 dark:text-white">Export Personal Data</p>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Download a copy of your data.</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Download a copy of your data (coming soon).</p>
                         </div>
                         <button
-                            onClick={handleExport}
-                            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+                            disabled
+                            className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 disabled:opacity-60 disabled:cursor-not-allowed"
                         >
+                            <Download className="h-4 w-4" />
                             Export Data
                         </button>
                     </div>
@@ -77,16 +75,28 @@ export default function AccountPage() {
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="font-medium text-red-700 dark:text-red-400">Delete Account</p>
-                            <p className="text-sm text-red-600/80 dark:text-red-400/80">Permanently delete your account and all data.</p>
+                            <p className="text-sm text-red-600/80 dark:text-red-400/80">
+                                Permanently delete your account and all data (currently unavailable).
+                            </p>
                         </div>
                         <button
-                            onClick={handleDelete}
-                            disabled={isDeleting}
-                            className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+                            disabled
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
                         >
-                            {isDeleting ? 'Deleting...' : 'Delete Account'}
+                            <Trash2 className="h-4 w-4" />
+                            Delete Account
                         </button>
                     </div>
+                </div>
+
+                <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 flex items-start gap-3">
+                    <Lock className="mt-0.5 h-4 w-4 shrink-0 text-gray-500" />
+                    <p>
+                        Need urgent account assistance? Contact support from chat and include your user ID.
+                        <Link href={`/${locale}/chat`} className="ml-1 text-emerald-700 underline underline-offset-2">
+                            Open chat
+                        </Link>
+                    </p>
                 </div>
             </div>
         </div>

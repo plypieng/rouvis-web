@@ -8,6 +8,7 @@ import { useTranslations } from 'next-intl';
 import { Locale } from '../i18n/config';
 import LanguageSwitcher from './LanguageSwitcher';
 import { signOut, useSession } from 'next-auth/react';
+import type { WebFeatureFlags } from '../lib/feature-flags';
 
 type ThemeMode = 'light' | 'dark' | 'system';
 
@@ -49,6 +50,7 @@ interface HeaderProps {
   } | null;
   alerts?: Alert[];
   kpis?: KPIs;
+  featureFlags?: WebFeatureFlags;
 }
 
 function useTheme(): [ThemeMode, (m: ThemeMode) => void] {
@@ -93,7 +95,7 @@ function useTheme(): [ThemeMode, (m: ThemeMode) => void] {
   return [mode, set];
 }
 
-export default function Header({ locale, user = null, alerts = [], kpis }: HeaderProps) {
+export default function Header({ locale, user = null, alerts = [], kpis, featureFlags }: HeaderProps) {
   const t = useTranslations();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [theme, setTheme] = useTheme();
@@ -171,8 +173,12 @@ export default function Header({ locale, user = null, alerts = [], kpis }: Heade
         <li><Link href={`${base}/projects`} className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600" onClick={handle}>マイプロジェクト</Link></li>
         <li><Link href={`${base}/map`} className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600" onClick={handle}>マップ</Link></li>
         <li><Link href={`${base}/calendar`} className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600" onClick={handle}>{t('header.nav.calendar')}</Link></li>
-        <li><Link href={`${base}/team`} className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600" onClick={handle}>{t('header.nav.team')}</Link></li>
-        <li><Link href={`${base}/market`} className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600" onClick={handle}>{t('header.nav.market')}</Link></li>
+        {featureFlags?.teamPage && (
+          <li><Link href={`${base}/team`} className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600" onClick={handle}>{t('header.nav.team')}</Link></li>
+        )}
+        {featureFlags?.marketPage && (
+          <li><Link href={`${base}/market`} className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600" onClick={handle}>{t('header.nav.market')}</Link></li>
+        )}
       </ul>
     );
   };

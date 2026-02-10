@@ -1,8 +1,16 @@
 import { Users, CalendarDays, CheckSquare, UserPlus } from 'lucide-react';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
+import { getWebFeatureFlags } from '@/lib/feature-flags';
 
 export default async function TeamPage({ params }: { params: Promise<{ locale: string }> }) {
     const { locale } = await params;
+    const featureFlags = getWebFeatureFlags();
+
+    if (!featureFlags.teamPage) {
+        notFound();
+    }
+
     return (
         <div className="min-h-screen bg-gray-50 pb-24">
             <header className="bg-white border-b border-gray-200 px-4 py-4 sticky top-0 z-10">
