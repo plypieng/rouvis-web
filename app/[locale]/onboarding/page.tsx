@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useParams, useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
 import { z } from 'zod';
 import { Loader2, ChevronDown, Info, Check, ArrowRight } from 'lucide-react';
 import { PREFECTURES, EXPERIENCE_OPTIONS, FARMING_TYPES, COMMON_CROPS } from '../../../lib/prefectures';
@@ -41,7 +40,6 @@ function getErrorMessage(error: unknown, fallback: string): string {
 }
 
 export default function OnboardingPage() {
-  const t = useTranslations('auth.onboarding');
   const { data: session, status, update } = useSession();
   const params = useParams<{ locale: string }>();
   const locale = (params?.locale as string) || 'ja';

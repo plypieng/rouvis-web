@@ -8,7 +8,6 @@ import { useTranslations } from 'next-intl';
 import { Locale } from '../i18n/config';
 import LanguageSwitcher from './LanguageSwitcher';
 import { signOut, useSession } from 'next-auth/react';
-import type { WebFeatureFlags } from '../lib/feature-flags';
 
 type ThemeMode = 'light' | 'dark' | 'system';
 
@@ -50,7 +49,6 @@ interface HeaderProps {
   } | null;
   alerts?: Alert[];
   kpis?: KPIs;
-  featureFlags?: WebFeatureFlags;
 }
 
 function useTheme(): [ThemeMode, (m: ThemeMode) => void] {
@@ -95,7 +93,7 @@ function useTheme(): [ThemeMode, (m: ThemeMode) => void] {
   return [mode, set];
 }
 
-export default function Header({ locale, user = null, alerts = [], kpis, featureFlags: _featureFlags }: HeaderProps) {
+export default function Header({ locale, user = null, alerts = [], kpis }: HeaderProps) {
   const t = useTranslations();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [theme, setTheme] = useTheme();

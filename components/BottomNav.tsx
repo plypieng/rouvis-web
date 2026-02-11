@@ -3,7 +3,6 @@
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Home, Menu, Map as MapIcon } from 'lucide-react';
-import type { WebFeatureFlags } from '../lib/feature-flags';
 
 /**
  * Bottom Navigation - Mobile-first, thumb-zone optimized
@@ -23,11 +22,9 @@ import type { WebFeatureFlags } from '../lib/feature-flags';
 export function BottomNav({
   locale,
   user,
-  featureFlags: _featureFlags,
 }: {
   locale: string;
   user?: unknown;
-  featureFlags?: WebFeatureFlags;
 }) {
   const pathname = usePathname();
 
