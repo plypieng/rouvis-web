@@ -15,6 +15,11 @@ type Project = {
     status?: string | null;
 };
 
+type NoticeState = {
+    type: 'success' | 'error';
+    message: string;
+} | null;
+
 export default function ProjectsPage(props: { params: Promise<{ locale: string }> }) {
     const params = use(props.params);
     const { locale } = params;
@@ -22,10 +27,17 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
     const [projects, setProjects] = useState<Project[]>([]);
     const [showArchived, setShowArchived] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [notice, setNotice] = useState<NoticeState>(null);
 
     useEffect(() => {
         fetchProjects();
     }, []);
+
+    useEffect(() => {
+        if (!notice) return;
+        const timeout = setTimeout(() => setNotice(null), 4000);
+        return () => clearTimeout(timeout);
+    }, [notice]);
 
     const fetchProjects = async () => {
         try {
@@ -48,6 +60,7 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
     const handleUnarchive = async (projectId: string, e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
+        setNotice(null);
 
         try {
             const res = await fetch(`/api/v1/projects/${projectId}`, {
@@ -59,16 +72,23 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
 
             // Refresh projects list
             fetchProjects();
-            alert(t('unarchived_success', { name: projects.find(p => p.id === projectId)?.name || '' }));
+            setNotice({
+                type: 'success',
+                message: t('unarchived_success', { name: projects.find(p => p.id === projectId)?.name || '' }),
+            });
         } catch (error) {
             console.error('Unarchive error:', error);
-            alert('復元に失敗しました');
+            setNotice({
+                type: 'error',
+                message: '復元に失敗しました',
+            });
         }
     };
 
     const handleDelete = async (project: Project, e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
+        setNotice(null);
 
         if (!confirm(t('delete_confirm_message', { name: project.name }))) {
             return;
@@ -86,13 +106,19 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
 
             // Refresh projects list
             fetchProjects();
-            alert(t('delete_success'));
+            setNotice({
+                type: 'success',
+                message: t('delete_success'),
+            });
         } catch (error) {
             console.error('Delete error:', error);
 
             // Show detailed error if available
             const errorMessage = error instanceof Error ? error.message : t('delete_error');
-            alert(errorMessage.startsWith('Failed') ? errorMessage : t('delete_error'));
+            setNotice({
+                type: 'error',
+                message: errorMessage.startsWith('Failed') ? errorMessage : t('delete_error'),
+            });
         }
     };
 
@@ -113,6 +139,17 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
 
     return (
         <div className="container mx-auto px-4 py-8 max-w-5xl">
+            {notice && (
+                <div
+                    className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
+                        notice.type === 'success'
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                            : 'border-red-200 bg-red-50 text-red-700'
+                    }`}
+                >
+                    {notice.message}
+                </div>
+            )}
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold text-gray-900">{t('list_title')}</h1>
                 <div className="flex items-center gap-3">

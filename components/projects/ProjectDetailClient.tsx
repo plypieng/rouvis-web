@@ -46,17 +46,29 @@ interface ProjectDetailClientProps {
     locale: string;
 }
 
+type NoticeState = {
+    type: 'success' | 'error';
+    message: string;
+} | null;
+
 export default function ProjectDetailClient({ project, locale }: ProjectDetailClientProps) {
     const t = useTranslations('projects');
     const router = useRouter();
     const [showTaskCreateModal, setShowTaskCreateModal] = useState(false);
     const [selectedDateForTask, setSelectedDateForTask] = useState<Date | undefined>(undefined);
     const [taskInitialData, setTaskInitialData] = useState<{ title: string; description?: string } | undefined>(undefined);
+    const [notice, setNotice] = useState<NoticeState>(null);
     const chatRef = useRef<RouvisChatKitRef>(null);
 
     useEffect(() => {
         window.scrollTo(0, 0);
     }, []);
+
+    useEffect(() => {
+        if (!notice) return;
+        const timeout = setTimeout(() => setNotice(null), 4000);
+        return () => clearTimeout(timeout);
+    }, [notice]);
 
     const handleRescheduleRequest = (message?: string) => {
         if (chatRef.current) {
@@ -77,6 +89,7 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
     };
 
     const handleTaskComplete = async (taskId: string, status: string) => {
+        setNotice(null);
         try {
             const res = await fetch(`/api/v1/tasks/${taskId}`, {
                 method: 'PATCH',
@@ -87,9 +100,16 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
             if (!res.ok) throw new Error('Failed to update task');
 
             router.refresh();
+            setNotice({
+                type: 'success',
+                message: status === 'completed' ? 'タスクを完了にしました。' : 'タスクを更新しました。',
+            });
         } catch (error) {
             console.error('Failed to update task', error);
-            alert(t('update_failed'));
+            setNotice({
+                type: 'error',
+                message: t('update_failed'),
+            });
         }
     };
 
@@ -114,6 +134,18 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
                         <ProjectHeader project={project} compact={true} />
                     </div>
                 </div>
+
+                {notice && (
+                    <div
+                        className={`mb-3 rounded-lg border px-4 py-3 text-sm ${
+                            notice.type === 'success'
+                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                : 'border-red-200 bg-red-50 text-red-700'
+                        }`}
+                    >
+                        {notice.message}
+                    </div>
+                )}
 
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch mb-2 lg:h-[calc(100vh-120px)] h-auto">
                     {/* LEFT COLUMN: Companion Sidebar */}
