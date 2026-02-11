@@ -49,7 +49,7 @@ export default function Footer({ locale, user }: FooterProps) {
             <ul className="flex flex-wrap items-center gap-3 sm:gap-4">
               <li>
                 <Link
-                  href={`${base}/about`}
+                  href={`${base}/profile`}
                   className="text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white underline-offset-4 hover:underline focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-600 rounded"
                 >
                   {t('footer.about')}
@@ -57,7 +57,7 @@ export default function Footer({ locale, user }: FooterProps) {
               </li>
               <li>
                 <Link
-                  href={`${base}/explore`}
+                  href={`${base}/projects`}
                   className="text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white underline-offset-4 hover:underline focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-600 rounded"
                 >
                   {t('footer.explore')}
@@ -65,16 +65,15 @@ export default function Footer({ locale, user }: FooterProps) {
               </li>
               <li>
                 <Link
-                  href={`${base}/help`}
+                  href={`${base}/chat`}
                   className="text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white underline-offset-4 hover:underline focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-600 rounded"
                 >
                   {t('footer.help')}
                 </Link>
               </li>
               <li>
-                {/* TODO: replace with actual destination or a page aggregating secondary links */}
                 <Link
-                  href={`${base}/more`}
+                  href={`${base}/menu`}
                   className="text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white underline-offset-4 hover:underline focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-600 rounded"
                 >
                   {t('footer.more')}

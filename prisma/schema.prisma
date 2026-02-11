@@ -56,6 +56,8 @@ model User {
   projects      Project[]
   fields        Field[]
   userProfile   UserProfile?
+  accountDataRequests AccountDataRequest[]
+  auditEvents   AuditEvent[]
 }
 
 model UserProfile {
@@ -133,6 +135,7 @@ model Task {
   priority    String    @default("medium") // low, medium, high
   isBackfilled Boolean  @default(false)
   isAssumed    Boolean  @default(false)
+  idempotencyKey String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -143,6 +146,7 @@ model Task {
 
   @@index([projectId])
   @@index([dueDate])
+  @@unique([projectId, idempotencyKey])
 }
 
 model Activity {
@@ -152,6 +156,7 @@ model Activity {
   unit        String?
   note        String?
   performedAt DateTime @default(now())
+  idempotencyKey String?
   createdAt   DateTime @default(now())
 
   projectId String?
@@ -160,6 +165,7 @@ model Activity {
   fieldId   String?
 
   @@index([projectId])
+  @@unique([projectId, idempotencyKey])
 }
 
 model Field {
@@ -216,6 +222,60 @@ model AdviceCache {
   advice    Json
   createdAt DateTime @default(now())
   expiresAt DateTime
+}
+
+enum AccountDataRequestType {
+  EXPORT
+  DELETE
+}
+
+enum AccountDataRequestStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  REJECTED
+  CANCELED
+}
+
+model AccountDataRequest {
+  id              String                   @id @default(cuid())
+  userId          String
+  user            User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type            AccountDataRequestType
+  status          AccountDataRequestStatus @default(PENDING)
+  requestedAt     DateTime                 @default(now())
+  processedAt     DateTime?
+  completedAt     DateTime?
+  canceledAt      DateTime?
+  reason          String?
+  idempotencyKey  String?
+  resultUrl       String?
+  resultExpiresAt DateTime?
+  metadata        Json?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, createdAt])
+  @@index([userId, type, status])
+  @@index([status, requestedAt])
+}
+
+model AuditEvent {
+  id           String   @id @default(cuid())
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action       String
+  status       String   @default("SUCCESS")
+  resourceType String?
+  resourceId   String?
+  requestId    String?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@index([requestId])
 }
 
 model CropPerformanceLog {
