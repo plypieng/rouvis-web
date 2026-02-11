@@ -31,7 +31,12 @@ export async function GET(req: NextRequest) {
     });
 
     const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    const response = NextResponse.json(data, { status: res.status });
+    const requestId = res.headers.get('x-request-id');
+    if (requestId) {
+      response.headers.set('X-Request-Id', requestId);
+    }
+    return response;
   } catch (error) {
     console.error('Project proxy GET error:', error);
     return NextResponse.json({ error: 'Failed to fetch project' }, { status: 500 });
@@ -51,17 +56,27 @@ export async function PUT(req: NextRequest) {
 
   try {
     const body = await req.json();
+    const idempotencyKey = req.headers.get('idempotency-key')
+      || req.headers.get('x-idempotency-key');
+    const requestId = req.headers.get('x-request-id');
     const res = await fetch(`${BACKEND_URL}/api/v1/projects/${projectId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         ...auth.headers,
+        ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
+        ...(requestId ? { 'X-Request-Id': requestId } : {}),
       },
       body: JSON.stringify(body),
     });
 
     const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    const response = NextResponse.json(data, { status: res.status });
+    const backendRequestId = res.headers.get('x-request-id');
+    if (backendRequestId) {
+      response.headers.set('X-Request-Id', backendRequestId);
+    }
+    return response;
   } catch (error) {
     console.error('Project proxy PUT error:', error);
     return NextResponse.json({ error: 'Failed to update project' }, { status: 500 });
@@ -80,16 +95,26 @@ export async function DELETE(req: NextRequest) {
   }
 
   try {
+    const idempotencyKey = req.headers.get('idempotency-key')
+      || req.headers.get('x-idempotency-key');
+    const requestId = req.headers.get('x-request-id');
     const res = await fetch(`${BACKEND_URL}/api/v1/projects/${projectId}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
         ...auth.headers,
+        ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
+        ...(requestId ? { 'X-Request-Id': requestId } : {}),
       },
     });
 
     const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    const response = NextResponse.json(data, { status: res.status });
+    const backendRequestId = res.headers.get('x-request-id');
+    if (backendRequestId) {
+      response.headers.set('X-Request-Id', backendRequestId);
+    }
+    return response;
   } catch (error) {
     console.error('Project proxy DELETE error:', error);
     return NextResponse.json({ error: 'Failed to delete project' }, { status: 500 });
