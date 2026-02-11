@@ -11,6 +11,7 @@ import Footer from '../../components/Footer';
 import { Providers } from '../../components/Providers';
 import FeedbackButton from '../../components/FeedbackButton';
 import OnboardingTour from '../../components/OnboardingTour';
+import AlertToastBridge from '../../components/AlertToastBridge';
 import { getServerSessionFromToken } from '../../lib/server-auth';
 import type { Locale } from '../../i18n/config';
 
@@ -101,6 +102,9 @@ export default async function RootLayout(props: {
           <div className="mobile-nav-height">
             <BottomNav locale={typedLocale} user={session?.user} />
           </div>
+
+          {/* Global non-blocking replacement for window.alert() */}
+          <AlertToastBridge />
         </div>
       </Providers>
     </NextIntlClientProvider>

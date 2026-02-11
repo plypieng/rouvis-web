@@ -14,6 +14,7 @@ const intlMiddleware = createMiddleware({
 
 // Public routes that don't require authentication
 const publicRoutes = ['/login', '/signup', '/api/auth', '/privacy', '/terms'];
+const onboardingSafeRoutes = ['/onboarding'];
 
 // Export a custom middleware function to handle auth + i18n
 export default async function middleware(request: NextRequest) {
@@ -37,7 +38,8 @@ export default async function middleware(request: NextRequest) {
   let pathWithoutLocale = pathname.replace(/^\/(ja|en)/, '');
   if (pathWithoutLocale === '') pathWithoutLocale = '/';
 
-  const isPublicRoute = publicRoutes.some(route => pathWithoutLocale.startsWith(route)) || pathWithoutLocale === '/';
+  const isPublicRoute = publicRoutes.some(route => pathWithoutLocale.startsWith(route));
+  const isLandingRoute = pathWithoutLocale === '/';
 
   // For public routes that already have a locale prefix, just proceed without redirect
   // This prevents next-intl from interfering with client-side navigation (RSC requests)
@@ -50,13 +52,21 @@ export default async function middleware(request: NextRequest) {
     return intlMiddleware(request as any);
   }
 
-  // Check authentication only for protected routes
+  // Check authentication for protected routes and authenticated landing behavior
   const token = await getToken({ req: request as any, secret: process.env.NEXTAUTH_SECRET });
   const userId =
     (typeof (token as any)?.id === 'string' && (token as any).id) ||
     (typeof token?.sub === 'string' && token.sub) ||
     null;
   const isAuthenticated = Boolean(userId);
+
+  // Keep locale landing page public for signed-out users.
+  if (!isAuthenticated && isLandingRoute) {
+    if (localeMatch) {
+      return NextResponse.next();
+    }
+    return intlMiddleware(request as any);
+  }
 
   // Redirect to login if not authenticated and trying to access protected route
   if (!isAuthenticated) {
@@ -65,20 +75,16 @@ export default async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Soft onboarding enforcement for new users
+  // Onboarding enforcement for new users
   // Check if user has completed onboarding (has UserProfile)
   const onboardingComplete = (token as any)?.onboardingComplete;
-  const isOnboardingRoute = pathWithoutLocale.startsWith('/onboarding');
+  const isOnboardingRoute = onboardingSafeRoutes.some((route) => pathWithoutLocale.startsWith(route));
 
-  // If user hasn't completed onboarding and is trying to access main app routes,
-  // redirect them to onboarding (soft enforcement - only for dashboard)
+  // If user hasn't completed onboarding, keep them on onboarding flow
+  // to avoid inconsistent app state (missing profile/field context).
   if (!onboardingComplete && !isOnboardingRoute) {
-    // Only redirect from the main dashboard route, not for all routes
-    // This is "soft" enforcement - they can still access other pages
-    if (pathWithoutLocale === '/' || pathWithoutLocale === '/projects') {
-      const onboardingUrl = new URL(`/${locale}/onboarding`, request.url);
-      return NextResponse.redirect(onboardingUrl);
-    }
+    const onboardingUrl = new URL(`/${locale}/onboarding`, request.url);
+    return NextResponse.redirect(onboardingUrl);
   }
 
   // For authenticated users on protected routes that already have a locale prefix,
