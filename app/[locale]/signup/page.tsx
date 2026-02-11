@@ -1,6 +1,5 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { use } from 'react';
 import { Mail } from 'lucide-react';
@@ -8,7 +7,6 @@ import { Mail } from 'lucide-react';
 export default function SignupPage(props: { params: Promise<{ locale: string }> }) {
     const params = use(props.params);
     const locale = params.locale;
-    const t = useTranslations('pages.auth.signup');
 
     return (
         <div className="container mx-auto px-4 py-12 flex flex-col items-center justify-center min-h-[60vh]">
@@ -20,7 +18,7 @@ export default function SignupPage(props: { params: Promise<{ locale: string }> 
                 </Link>
 
                 <h1 className="text-3xl font-bold mb-4 text-gray-900 dark:text-white">
-                    {t('title')}
+                    Request Access
                 </h1>
 
                 <p className="text-lg text-gray-600 dark:text-gray-300 mb-8 leading-relaxed">

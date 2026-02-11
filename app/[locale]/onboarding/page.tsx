@@ -30,6 +30,15 @@ type FieldData = z.infer<typeof fieldSchema> & {
   polygon?: LatLng[];
   location?: LatLng | null;
 };
+type NoticeState = {
+  type: 'error' | 'success';
+  message: string;
+} | null;
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
+}
 
 export default function OnboardingPage() {
   const t = useTranslations('auth.onboarding');
@@ -55,6 +64,7 @@ export default function OnboardingPage() {
   });
   const [fieldData, setFieldData] = useState<Partial<FieldData>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [notice, setNotice] = useState<NoticeState>(null);
 
   // Pre-fill name from Google session
   useEffect(() => {
@@ -94,13 +104,14 @@ export default function OnboardingPage() {
   }
 
   const handleProfileNext = async () => {
+    setNotice(null);
     try {
       profileSchema.parse(profileData);
       setErrors({});
       setIsSubmitting(true);
 
       const selectedPrefecture = PREFECTURES.find(p => p.code === profileData.prefecture);
-      await fetch('/api/v1/profile', {
+      const response = await fetch('/api/v1/profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -110,14 +121,15 @@ export default function OnboardingPage() {
           farmingType: profileData.farmingType,
         }),
       });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload?.error || 'プロフィールの保存に失敗しました');
+      }
 
       // Trigger session update to refresh onboardingComplete flag
       await update();
-
-      setIsSubmitting(false);
       setStep(3);
     } catch (err) {
-      setIsSubmitting(false);
       if (err instanceof z.ZodError) {
         const newErrors: Record<string, string> = {};
         err.issues.forEach((issue) => {
@@ -127,12 +139,18 @@ export default function OnboardingPage() {
         });
         setErrors(newErrors);
       } else {
-        setStep(3); // Proceed anyway
+        setNotice({
+          type: 'error',
+          message: getErrorMessage(err, 'プロフィールの保存に失敗しました。時間をおいて再試行してください。'),
+        });
       }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleFieldSubmit = async () => {
+    setNotice(null);
     try {
       fieldSchema.parse(fieldData);
       setErrors({});
@@ -154,7 +172,8 @@ export default function OnboardingPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create field');
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload?.error || '圃場の登録に失敗しました');
       }
 
       setStep(4);
@@ -169,8 +188,12 @@ export default function OnboardingPage() {
         setErrors(newErrors);
       } else {
         console.error('Field creation error:', err);
-        setStep(4); // Proceed to completion anyway
+        setNotice({
+          type: 'error',
+          message: getErrorMessage(err, '圃場の登録に失敗しました。入力内容を確認して再試行してください。'),
+        });
       }
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -237,6 +260,12 @@ export default function OnboardingPage() {
             <h2 className="text-xl font-bold text-gray-900">基本情報</h2>
             <p className="text-sm text-gray-500">より正確なアドバイスのために教えてください</p>
           </div>
+
+          {notice?.type === 'error' && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {notice.message}
+            </div>
+          )}
 
           <div className="space-y-4">
             {/* Name - pre-filled from Google */}
@@ -335,6 +364,12 @@ export default function OnboardingPage() {
             <h2 className="text-xl font-bold text-gray-900">最初の畑を登録</h2>
             <p className="text-sm text-gray-500">AIがスケジュールを作成するために必要です</p>
           </div>
+
+          {notice?.type === 'error' && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {notice.message}
+            </div>
+          )}
 
 
 

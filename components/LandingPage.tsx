@@ -19,6 +19,7 @@ export default function LandingPage({ locale }: LandingPageProps) {
     const searchParams = useSearchParams();
     const [isDemoLoading, setIsDemoLoading] = useState(false);
     const demoModeEnabled = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+    const isClosedBeta = true;
 
     // Auto-start demo if ?demo=true is present
     useEffect(() => {
@@ -98,7 +99,7 @@ export default function LandingPage({ locale }: LandingPageProps) {
                             href={`/${locale}/signup`}
                             className="px-6 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-sm font-bold rounded-full hover:bg-slate-800 dark:hover:bg-slate-100 transition-all transform hover:scale-105 shadow-xl shadow-green-900/5"
                         >
-                            {t('hero.cta_start')}
+                            {isClosedBeta ? 'Request Access' : t('hero.cta_start')}
                         </Link>
                     </div>
                 </div>
@@ -155,19 +156,19 @@ export default function LandingPage({ locale }: LandingPageProps) {
                                         </button>
                                     ) : (
                                         <Link
-                                            href={`/${locale}/signup`}
+                                            href={`/${locale}/login`}
                                             className="w-full sm:w-auto px-8 py-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-full transition-all transform hover:scale-105 shadow-lg hover:shadow-green-500/25 flex items-center justify-center gap-2"
                                         >
-                                            {t('hero.cta_start')}
+                                            {t('hero.cta_login')}
                                             <ArrowRight className="w-5 h-5" />
                                         </Link>
                                     )}
 
                                     <Link
-                                        href={`/${locale}/login`}
+                                        href={`/${locale}/signup`}
                                         className="w-full sm:w-auto px-8 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-green-500 dark:hover:border-green-500 text-slate-900 dark:text-white font-bold rounded-full transition-all flex items-center justify-center"
                                     >
-                                        {t('hero.cta_login')}
+                                        {isClosedBeta ? 'Request Access' : t('hero.cta_start')}
                                     </Link>
                                 </div>
 

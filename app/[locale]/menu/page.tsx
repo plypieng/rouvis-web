@@ -27,10 +27,10 @@ export default async function MenuPage({ params }: { params: Promise<{ locale: s
             bg: 'bg-green-100',
         },
         ...(featureFlags.knowledgePage ? [{
-            title: '知識・マニュアル (Knowledge)',
-            description: '栽培ガイドとコミュニティ',
+            title: '知識相談 (Chat)',
+            description: 'マニュアル機能は準備中。今はチャットで相談できます',
             icon: Book,
-            href: `/${locale}/knowledge`,
+            href: `/${locale}/chat`,
             color: 'text-purple-600',
             bg: 'bg-purple-100',
         }] : []),

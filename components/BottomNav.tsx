@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Home, Users, Store, Menu, Map as MapIcon } from 'lucide-react';
+import { Home, Menu, Map as MapIcon } from 'lucide-react';
 import type { WebFeatureFlags } from '../lib/feature-flags';
 
 /**
@@ -18,14 +18,12 @@ import type { WebFeatureFlags } from '../lib/feature-flags';
  * Navigation Structure (Farmer-First Operational UX):
  * - 今日 (Today): Home/Chat view
  * - マップ (Map): Field Map
- * - チーム (Team): Members/Experts
- * - 市場 (Market): Sales/Inventory
  * - メニュー (Menu): Planning/Records/Knowledge
  */
 export function BottomNav({
   locale,
   user,
-  featureFlags,
+  featureFlags: _featureFlags,
 }: {
   locale: string;
   user?: unknown;
@@ -61,20 +59,6 @@ export function BottomNav({
       href: `/${locale}/map`,
       description: 'Field Map',
     },
-    ...(featureFlags?.teamPage ? [{
-      id: 'team',
-      label: 'チーム',
-      icon: Users,
-      href: `/${locale}/team`,
-      description: 'Team & Experts',
-    }] : []),
-    ...(featureFlags?.marketPage ? [{
-      id: 'market',
-      label: '市場',
-      icon: Store,
-      href: `/${locale}/market`,
-      description: 'Market & Sales',
-    }] : []),
     {
       id: 'menu',
       label: 'メニュー',

@@ -19,6 +19,7 @@ export default function PlantingHistoryInput({
     const [approximateDate, setApproximateDate] = useState('');
     const [photoPreview, setPhotoPreview] = useState<string | null>(null);
     const [analyzing, setAnalyzing] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const handleDateSubmit = () => {
         if (dateInput) {
@@ -38,10 +39,11 @@ export default function PlantingHistoryInput({
     const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+        setErrorMessage(null);
 
         // Check file size (5MB limit)
         if (file.size > 5 * 1024 * 1024) {
-            alert('画像ファイルは5MB以下にしてください');
+            setErrorMessage('画像ファイルは5MB以下にしてください');
             return;
         }
 
@@ -71,11 +73,11 @@ export default function PlantingHistoryInput({
                 });
             } else {
                 const error = await res.json();
-                alert(`分析に失敗しました: ${error.message || error.error}`);
+                setErrorMessage(`分析に失敗しました: ${error.message || error.error || 'Unknown error'}`);
             }
         } catch (error) {
             console.error('Photo analysis error:', error);
-            alert('写真の分析中にエラーが発生しました。もう一度お試しください。');
+            setErrorMessage('写真の分析中にエラーが発生しました。もう一度お試しください。');
         } finally {
             setAnalyzing(false);
         }
@@ -125,6 +127,12 @@ export default function PlantingHistoryInput({
                 <h3 className="text-xl font-bold text-gray-900 mb-2">{t('title')}</h3>
                 <p className="text-gray-600">{t('description')}</p>
             </div>
+
+            {errorMessage && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {errorMessage}
+                </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Method A: Date Input */}

@@ -21,6 +21,52 @@ type CropAnalysis = {
     knowledge?: unknown;
 };
 
+type GeneratedTask = {
+    title: string;
+    description?: string;
+    dueDate?: string;
+    priority?: string;
+};
+
+type GeneratedWeek = { tasks?: GeneratedTask[] };
+
+type GeneratedSchedule = {
+    weeks?: GeneratedWeek[];
+    pastTasks?: GeneratedWeek[];
+    currentWeekTasks?: GeneratedTask[];
+    futureTasks?: GeneratedWeek[];
+};
+
+type TaskPayload = {
+    title: string;
+    description?: string;
+    dueDate?: string;
+    priority?: string;
+    status: 'pending' | 'completed';
+    isBackfilled?: boolean;
+};
+
+type NoticeState = {
+    type: 'info' | 'success' | 'error';
+    message: string;
+} | null;
+
+const DEFAULT_SCHEDULING_PREFERENCES = {
+    preferredWorkStartHour: 6,
+    preferredWorkEndHour: 18,
+    maxTasksPerDay: 4,
+    avoidWeekdays: [],
+    riskTolerance: 'balanced',
+    irrigationStyle: 'reminder',
+    constraintsNote: '',
+} as const;
+
+function noticeClassName(type: NonNullable<NoticeState>['type']): string {
+    if (type === 'error') return 'border-red-200 bg-red-50 text-red-700';
+    if (type === 'success') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+    return 'border-blue-200 bg-blue-50 text-blue-700';
+}
+
 export default function ProjectWizard({ locale }: { locale: string }) {
     const t = useTranslations('projects.create.wizard');
     const router = useRouter();
@@ -30,15 +76,123 @@ export default function ProjectWizard({ locale }: { locale: string }) {
     const [selectedField, setSelectedField] = useState<{ id: string } | null>(null);
     const [loading, setLoading] = useState(false);
     const [loadingMode, setLoadingMode] = useState<'scan' | 'manual' | null>(null);
+    const [notice, setNotice] = useState<NoticeState>(null);
+    const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
 
     // State for new workflow
     const [projectType, setProjectType] = useState<'new' | 'existing' | null>(null);
     const [plantingDate, setPlantingDate] = useState<string | null>(null);
 
+    const extractErrorMessage = async (response: Response, fallback: string): Promise<string> => {
+        const payload = await response.json().catch(() => ({}));
+        return payload?.error || payload?.message || payload?.details || fallback;
+    };
+
+    const toTaskPayload = (
+        task: GeneratedTask,
+        status: TaskPayload['status'],
+        isBackfilledTask?: boolean
+    ): TaskPayload => ({
+        title: task.title,
+        description: task.description,
+        dueDate: task.dueDate,
+        priority: task.priority,
+        status,
+        ...(isBackfilledTask ? { isBackfilled: true } : {}),
+    });
+
+    const buildTaskPayloads = (schedule: GeneratedSchedule, isBackfilled: boolean): TaskPayload[] => {
+        if (isBackfilled) {
+            const pastTasks = (schedule.pastTasks || []).flatMap((week) =>
+                (week.tasks || []).map((task) => toTaskPayload(task, 'completed', true))
+            );
+            const currentTasks = (schedule.currentWeekTasks || []).map((task) => toTaskPayload(task, 'pending'));
+            const futureTasks = (schedule.futureTasks || []).flatMap((week) =>
+                (week.tasks || []).map((task) => toTaskPayload(task, 'pending'))
+            );
+            return [...pastTasks, ...currentTasks, ...futureTasks];
+        }
+
+        return (schedule.weeks || []).flatMap((week) =>
+            (week.tasks || []).map((task) => toTaskPayload(task, 'pending'))
+        );
+    };
+
+    const generateAndPersistInitialSchedule = async (projectId: string): Promise<number> => {
+        if (!cropAnalysis) throw new Error('作物情報が見つかりません');
+
+        const isBackfilled = projectType === 'existing' && !!plantingDate;
+        const effectivePlantingDate = plantingDate || new Date().toISOString().split('T')[0];
+        const endpoint = isBackfilled
+            ? '/api/v1/agents/generate-backfilled-schedule'
+            : '/api/v1/agents/generate-schedule';
+
+        const scheduleResponse = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(
+                isBackfilled
+                    ? {
+                        projectId,
+                        schedulingPreferences: DEFAULT_SCHEDULING_PREFERENCES,
+                        cropAnalysis: {
+                            crop: cropAnalysis.crop,
+                            variety: cropAnalysis.variety,
+                            startDate: effectivePlantingDate,
+                            targetHarvestDate: cropAnalysis.targetHarvestDate || '',
+                            notes: cropAnalysis.notes,
+                        },
+                        plantingDate: effectivePlantingDate,
+                        currentDate: new Date().toISOString().split('T')[0],
+                    }
+                    : {
+                        projectId,
+                        schedulingPreferences: DEFAULT_SCHEDULING_PREFERENCES,
+                        cropAnalysis: {
+                            crop: cropAnalysis.crop,
+                            variety: cropAnalysis.variety,
+                            startDate: cropAnalysis.startDate || new Date().toISOString().split('T')[0],
+                            targetHarvestDate: cropAnalysis.targetHarvestDate || '',
+                            notes: cropAnalysis.notes,
+                        },
+                        currentDate: new Date().toISOString().split('T')[0],
+                    }
+            ),
+        });
+
+        if (!scheduleResponse.ok) {
+            throw new Error(await extractErrorMessage(scheduleResponse, '初回スケジュールの生成に失敗しました'));
+        }
+
+        const generatedData = await scheduleResponse.json();
+        const schedule: GeneratedSchedule = generatedData?.schedule || generatedData;
+        const tasks = buildTaskPayloads(schedule, isBackfilled);
+        if (!tasks.length) {
+            throw new Error('初回スケジュールにタスクが含まれていませんでした');
+        }
+
+        const saveResponse = await fetch(`/api/v1/projects/${projectId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                tasks,
+                schedulingPreferences: DEFAULT_SCHEDULING_PREFERENCES,
+            }),
+        });
+
+        if (!saveResponse.ok) {
+            throw new Error(await extractErrorMessage(saveResponse, '生成したタスクの保存に失敗しました'));
+        }
+
+        return tasks.length;
+    };
+
     // Step 0: Project Type Selection (FIRST STEP)
     if (step === 'project-type') {
         return (
             <ProjectTypeSelector onSelect={(type) => {
+                setNotice(null);
+                setCreatedProjectId(null);
                 setProjectType(type);
                 setStep('selection'); // Move to crop selection
             }} />
@@ -47,6 +201,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
 
     // Step 1: Selection (Scan or Manual) - Modified to handle flow
     const handleScanImage = async (file: File) => {
+        setNotice(null);
         setLoading(true);
         setLoadingMode('scan');
         const reader = new FileReader();
@@ -89,7 +244,10 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                 }
             } catch (error) {
                 console.error('Scan error:', error);
-                alert(`画像の読み込みに失敗しました。\n詳細: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                setNotice({
+                    type: 'error',
+                    message: `画像の読み込みに失敗しました: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                });
             } finally {
                 setLoading(false);
                 setLoadingMode(null);
@@ -101,6 +259,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
 
     const handleManualCropInput = async (cropName: string) => {
         if (!cropName) return;
+        setNotice(null);
         setLoading(true);
         setLoadingMode('manual');
 
@@ -128,13 +287,19 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                 body: JSON.stringify({ crop: cropName, knowledge }),
             });
 
-            if (res.ok) {
-                const data = await res.json() as CropAnalysis;
-                setCropAnalysis({ ...data, knowledge });
-                setStep('crop-analysis');
+            if (!res.ok) {
+                throw new Error(await extractErrorMessage(res, '作物分析に失敗しました'));
             }
+
+            const data = await res.json() as CropAnalysis;
+            setCropAnalysis({ ...data, knowledge });
+            setStep('crop-analysis');
         } catch (error) {
             console.error('Analysis error:', error);
+            setNotice({
+                type: 'error',
+                message: error instanceof Error ? error.message : '作物分析に失敗しました',
+            });
         } finally {
             setLoading(false);
             setLoadingMode(null);
@@ -144,6 +309,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
     // Step 2: Crop Analysis Review -> Field Context OR Planting History
     const handleProceedFromAnalysis = () => {
         if (!cropAnalysis) return;
+        setNotice(null);
         if (projectType === 'existing') {
             setStep('planting-history');
         } else {
@@ -153,6 +319,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
 
     // Step 2.5: Planting History (For Existing Projects)
     const handlePlantingHistoryComplete = (data: { plantingDate: string }) => {
+        setNotice(null);
         setPlantingDate(data.plantingDate);
         setStep('field-context');
     };
@@ -160,37 +327,58 @@ export default function ProjectWizard({ locale }: { locale: string }) {
     // Step 3: Field Context -> Create Project (Directly)
     const handleCreateProject = async () => {
         if (!cropAnalysis) return;
+        setNotice(null);
         setLoading(true);
 
         try {
-            const payload = {
-                name: `${cropAnalysis.crop} ${new Date().getFullYear()}`,
-                crop: cropAnalysis.crop,
-                variety: cropAnalysis.variety,
-                startDate: plantingDate || new Date().toISOString().split('T')[0],
-                fieldId: selectedField?.id,
-                notes: cropAnalysis.notes,
-                tasks: [],
-            };
-            console.log('Creating project with payload:', payload);
+            let projectId = createdProjectId;
 
-            // Use local API proxy to handle cross-origin auth
-            const res = await fetch('/api/v1/projects', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
+            if (!projectId) {
+                setNotice({ type: 'info', message: 'プロジェクトを作成しています...' });
+                const payload = {
+                    name: `${cropAnalysis.crop} ${new Date().getFullYear()}`,
+                    crop: cropAnalysis.crop,
+                    variety: cropAnalysis.variety,
+                    startDate: plantingDate || new Date().toISOString().split('T')[0],
+                    fieldId: selectedField?.id,
+                    notes: cropAnalysis.notes,
+                    tasks: [],
+                };
+                console.log('Creating project with payload:', payload);
 
-            if (res.ok) {
-                const { project } = await res.json();
-                router.refresh(); // Ensure list is updated
-                router.push(`/${locale}/projects/${project.id}`);
-            } else {
-                throw new Error('Failed to create project');
+                // Use local API proxy to handle cross-origin auth
+                const createResponse = await fetch('/api/v1/projects', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+
+                if (!createResponse.ok) {
+                    throw new Error(await extractErrorMessage(createResponse, 'プロジェクトの作成に失敗しました'));
+                }
+
+                const { project } = await createResponse.json();
+                projectId = project?.id;
+                if (!projectId) {
+                    throw new Error('プロジェクトIDを取得できませんでした');
+                }
+                setCreatedProjectId(projectId);
             }
+
+            setNotice({ type: 'info', message: 'AIが初回スケジュールを作成しています...' });
+            const taskCount = await generateAndPersistInitialSchedule(projectId);
+            setNotice({ type: 'success', message: `初回スケジュールを作成しました（${taskCount}件）` });
+
+            router.refresh(); // Ensure list is updated
+            router.push(`/${locale}/projects/${projectId}`);
         } catch (error) {
             console.error('Project creation error:', error);
-            alert('プロジェクトの作成に失敗しました');
+            setNotice({
+                type: 'error',
+                message: error instanceof Error
+                    ? error.message
+                    : 'プロジェクトまたは初回スケジュールの作成に失敗しました',
+            });
         } finally {
             setLoading(false);
         }
@@ -213,6 +401,12 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                     </button>
                     <h2 className="text-xl font-semibold text-center flex-1">{t('title')}</h2>
                 </div>
+
+                {notice && (
+                    <div className={`rounded-xl border px-4 py-3 text-sm ${noticeClassName(notice.type)}`}>
+                        {notice.message}
+                    </div>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Scan Option */}
@@ -289,6 +483,11 @@ export default function ProjectWizard({ locale }: { locale: string }) {
     if (step === 'crop-analysis') {
         return (
             <div className="space-y-6">
+                {notice && (
+                    <div className={`rounded-xl border px-4 py-3 text-sm ${noticeClassName(notice.type)}`}>
+                        {notice.message}
+                    </div>
+                )}
                 <CropAnalysisCard analysis={cropAnalysis} />
                 <div className="flex justify-end gap-4">
                     <button
@@ -311,6 +510,11 @@ export default function ProjectWizard({ locale }: { locale: string }) {
     if (step === 'planting-history') {
         return (
             <div className="space-y-6">
+                {notice && (
+                    <div className={`rounded-xl border px-4 py-3 text-sm ${noticeClassName(notice.type)}`}>
+                        {notice.message}
+                    </div>
+                )}
                 <PlantingHistoryInput
                     crop={cropAnalysis.crop}
                     onComplete={handlePlantingHistoryComplete}
@@ -330,6 +534,32 @@ export default function ProjectWizard({ locale }: { locale: string }) {
     if (step === 'field-context') {
         return (
             <div className="space-y-6">
+                {notice && (
+                    <div className={`rounded-xl border px-4 py-3 text-sm ${noticeClassName(notice.type)}`}>
+                        <div className="flex items-center justify-between gap-3">
+                            <span>{notice.message}</span>
+                            {notice.type === 'error' && (
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={handleCreateProject}
+                                        disabled={loading}
+                                        className="rounded-lg border border-current px-3 py-1 text-xs font-semibold hover:bg-white/50 disabled:opacity-50"
+                                    >
+                                        再試行
+                                    </button>
+                                    {createdProjectId && (
+                                        <button
+                                            onClick={() => router.push(`/${locale}/projects/${createdProjectId}`)}
+                                            className="rounded-lg border border-current px-3 py-1 text-xs font-semibold hover:bg-white/50"
+                                        >
+                                            プロジェクトを開く
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
                 <CropAnalysisCard analysis={cropAnalysis} />
                 <FieldSelector
                     selectedFieldId={selectedField?.id ?? ''}

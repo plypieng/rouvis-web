@@ -27,10 +27,12 @@ export default function ConversationalQA({
     const [answers, setAnswers] = useState<Record<string, AnswerOption>>({});
     const [loading, setLoading] = useState(false);
     const [fetching, setFetching] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     // Fetch questions on mount
     const fetchQuestions = async () => {
         setFetching(true);
+        setErrorMessage(null);
         try {
             const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
             const res = await fetch(`${baseUrl}/api/v1/agents/get-conversational-questions`, {
@@ -42,9 +44,13 @@ export default function ConversationalQA({
             if (res.ok) {
                 const data = await res.json();
                 setQuestions(data.questions || []);
+            } else {
+                const payload = await res.json().catch(() => ({}));
+                setErrorMessage(payload?.error || '質問の取得に失敗しました。');
             }
         } catch (error) {
             console.error('Failed to fetch questions:', error);
+            setErrorMessage('質問の取得に失敗しました。時間をおいて再試行してください。');
         } finally {
             setFetching(false);
         }
@@ -71,6 +77,7 @@ export default function ConversationalQA({
     // Submit all answers to get estimated date
     const submitAnswers = async (finalAnswers: Record<string, AnswerOption>) => {
         setLoading(true);
+        setErrorMessage(null);
         try {
             const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
             const res = await fetch(`${baseUrl}/api/v1/agents/estimate-planting-date`, {
@@ -83,11 +90,12 @@ export default function ConversationalQA({
                 const data = await res.json();
                 onComplete(data.suggestedPlantingDate);
             } else {
-                throw new Error('Failed to estimate date');
+                const payload = await res.json().catch(() => ({}));
+                throw new Error(payload?.error || '植付け日の推定に失敗しました');
             }
         } catch (error) {
             console.error('Failed to estimate date:', error);
-            alert('植付け日の推定に失敗しました。もう一度お試しください。');
+            setErrorMessage(error instanceof Error ? error.message : '植付け日の推定に失敗しました。もう一度お試しください。');
             setLoading(false);
         }
     };
@@ -110,6 +118,9 @@ export default function ConversationalQA({
                     {fetching ? '読み込み中...' : '開始する'}
                 </button>
                 {fetching && <p className="text-sm text-purple-600 mt-2">質問を生成中...</p>}
+                {errorMessage && (
+                    <p className="mt-3 text-sm text-red-600">{errorMessage}</p>
+                )}
             </div>
         );
     }
@@ -127,6 +138,11 @@ export default function ConversationalQA({
 
     return (
         <div className="bg-gradient-to-br from-purple-50 to-indigo-50 border-2 border-purple-200 rounded-xl p-8">
+            {errorMessage && (
+                <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {errorMessage}
+                </div>
+            )}
             <div className="mb-6">
                 <div className="flex items-center justify-between mb-4">
                     <span className="text-sm font-medium text-purple-700">

@@ -114,13 +114,20 @@ export default function ProjectAgentOnboarding({
     const [isGenerating, setIsGenerating] = useState(false);
     const [isSavingPreferences, setIsSavingPreferences] = useState(false);
     const [progressMessage, setProgressMessage] = useState('');
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [preferences, setPreferences] = useState<SchedulingPreferences>(() => normalizePreferences(initialPreferences));
     const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
     const router = useRouter();
 
     const preferencePayload = useMemo(() => toPreferencePayload(preferences), [preferences]);
 
+    const extractErrorMessage = async (response: Response, fallback: string): Promise<string> => {
+        const payload = await response.json().catch(() => ({}));
+        return payload?.error || payload?.message || payload?.details || fallback;
+    };
+
     const savePreferences = async (silent = false): Promise<boolean> => {
+        if (!silent) setErrorMessage(null);
         if (!silent) {
             setIsSavingPreferences(true);
             setProgressMessage('⚙️ 設定を保存しています...');
@@ -136,7 +143,7 @@ export default function ProjectAgentOnboarding({
             });
 
             if (!saveRes.ok) {
-                throw new Error('Failed to save scheduling preferences');
+                throw new Error(await extractErrorMessage(saveRes, '設定の保存に失敗しました'));
             }
 
             setLastSavedAt(new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }));
@@ -149,7 +156,7 @@ export default function ProjectAgentOnboarding({
             console.error('Preference save error:', error);
             if (!silent) {
                 setProgressMessage('');
-                alert('設定の保存に失敗しました');
+                setErrorMessage(error instanceof Error ? error.message : '設定の保存に失敗しました');
             }
             return false;
         } finally {
@@ -170,6 +177,7 @@ export default function ProjectAgentOnboarding({
     };
 
     const handleGenerate = async () => {
+        setErrorMessage(null);
         setIsGenerating(true);
         try {
             const saved = await savePreferences(true);
@@ -213,13 +221,15 @@ export default function ProjectAgentOnboarding({
                 }),
             });
 
-            if (!genRes.ok) throw new Error('Failed to generate schedule');
+            if (!genRes.ok) {
+                throw new Error(await extractErrorMessage(genRes, 'スケジュールの生成に失敗しました'));
+            }
             const generatedData = await genRes.json();
 
             setProgressMessage('🌱 タスクを作成中...');
 
             // 3. Process Tasks
-            const scheduleData = (generatedData as GeneratedScheduleResponse).schedule;
+            const scheduleData = (generatedData as GeneratedScheduleResponse).schedule || generatedData;
             const toPayload = (task: GeneratedTask, status: TaskPayload['status'], isBackfilledTask?: boolean): TaskPayload => ({
                 title: task.title,
                 description: task.description,
@@ -245,6 +255,10 @@ export default function ProjectAgentOnboarding({
                 );
             }
 
+            if (!tasks.length) {
+                throw new Error('AIがタスクを生成できませんでした。条件を調整して再試行してください。');
+            }
+
             setProgressMessage(`💾 ${tasks.length}個のタスクを保存中...`);
 
             // 4. Save Tasks and Preferences
@@ -257,7 +271,9 @@ export default function ProjectAgentOnboarding({
                 }),
             });
 
-            if (!saveRes.ok) throw new Error('Failed to save tasks');
+            if (!saveRes.ok) {
+                throw new Error(await extractErrorMessage(saveRes, 'タスク保存に失敗しました'));
+            }
 
             setProgressMessage('✅ スケジュール生成が完了しました！');
 
@@ -270,7 +286,7 @@ export default function ProjectAgentOnboarding({
         } catch (error) {
             console.error('Generation error:', error);
             setProgressMessage('');
-            alert('スケジュールの生成に失敗しました');
+            setErrorMessage(error instanceof Error ? error.message : 'スケジュールの生成に失敗しました');
         } finally {
             setIsGenerating(false);
         }
@@ -411,6 +427,21 @@ export default function ProjectAgentOnboarding({
             {progressMessage && (
                 <div className="mb-6 p-4 bg-white/80 backdrop-blur rounded-lg border border-blue-200 text-sm text-gray-700 font-medium animate-pulse">
                     {progressMessage}
+                </div>
+            )}
+
+            {errorMessage && (
+                <div className="mb-6 p-4 bg-red-50 rounded-lg border border-red-200 text-sm text-red-700">
+                    <div className="flex items-center justify-between gap-3">
+                        <span>{errorMessage}</span>
+                        <button
+                            onClick={handleGenerate}
+                            disabled={isGenerating || isSavingPreferences}
+                            className="rounded-lg border border-red-300 px-3 py-1 text-xs font-semibold hover:bg-red-100 disabled:opacity-60"
+                        >
+                            再試行
+                        </button>
+                    </div>
                 </div>
             )}
 
