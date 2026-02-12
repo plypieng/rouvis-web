@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import CropAnalysisCard from './CropAnalysisCard';
@@ -51,15 +51,19 @@ type NoticeState = {
     message: string;
 } | null;
 
-const DEFAULT_SCHEDULING_PREFERENCES = {
-    preferredWorkStartHour: 6,
-    preferredWorkEndHour: 18,
-    maxTasksPerDay: 4,
-    avoidWeekdays: [],
-    riskTolerance: 'balanced',
-    irrigationStyle: 'reminder',
-    constraintsNote: '',
-} as const;
+type PreferenceTemplate = {
+    id: string;
+    label: string;
+    description: string;
+    preferences: Record<string, unknown>;
+};
+
+type PreferenceTemplateCatalog = {
+    templates?: PreferenceTemplate[];
+    recommendedTemplate?: string;
+};
+
+const FALLBACK_TEMPLATE_ID = 'balanced-new-farmer';
 
 function noticeClassName(type: NonNullable<NoticeState>['type']): string {
     if (type === 'error') return 'border-red-200 bg-red-50 text-red-700';
@@ -78,6 +82,11 @@ export default function ProjectWizard({ locale }: { locale: string }) {
     const [loadingMode, setLoadingMode] = useState<'scan' | 'manual' | null>(null);
     const [notice, setNotice] = useState<NoticeState>(null);
     const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
+    const [preferenceTemplates, setPreferenceTemplates] = useState<PreferenceTemplate[]>([]);
+    const [recommendedTemplateId, setRecommendedTemplateId] = useState<string | null>(FALLBACK_TEMPLATE_ID);
+    const [selectedTemplateId, setSelectedTemplateId] = useState<string>(FALLBACK_TEMPLATE_ID);
+    const [templatesLoading, setTemplatesLoading] = useState(false);
+    const [templatesError, setTemplatesError] = useState<string | null>(null);
 
     // State for new workflow
     const [projectType, setProjectType] = useState<'new' | 'existing' | null>(null);
@@ -87,6 +96,70 @@ export default function ProjectWizard({ locale }: { locale: string }) {
         const payload = await response.json().catch(() => ({}));
         return payload?.error || payload?.message || payload?.details || fallback;
     };
+
+    const applyTemplateCatalog = (catalog: PreferenceTemplateCatalog): void => {
+        const templates = Array.isArray(catalog.templates) ? catalog.templates : [];
+        const recommendedTemplate = typeof catalog.recommendedTemplate === 'string'
+            ? catalog.recommendedTemplate
+            : null;
+        setRecommendedTemplateId(recommendedTemplate);
+        if (templates.length === 0) return;
+
+        setPreferenceTemplates(templates);
+        setSelectedTemplateId((current) => {
+            if (templates.some((template) => template.id === current)) return current;
+            if (recommendedTemplate && templates.some((template) => template.id === recommendedTemplate)) {
+                return recommendedTemplate;
+            }
+            return templates[0].id;
+        });
+    };
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const fetchTemplateCatalog = async () => {
+            setTemplatesLoading(true);
+            setTemplatesError(null);
+            try {
+                const response = await fetch('/api/v1/projects/preference-templates');
+                const payload = await response.json().catch(() => ({}));
+
+                if (!response.ok) {
+                    throw new Error(
+                        payload?.error
+                        || payload?.message
+                        || '設定テンプレートの取得に失敗しました'
+                    );
+                }
+
+                if (!cancelled) {
+                    applyTemplateCatalog(payload as PreferenceTemplateCatalog);
+                }
+            } catch (error) {
+                console.error('Failed to fetch preference templates:', error);
+                if (!cancelled) {
+                    setTemplatesError(
+                        error instanceof Error
+                            ? error.message
+                            : '設定テンプレートの取得に失敗しました'
+                    );
+                    setPreferenceTemplates([]);
+                    setRecommendedTemplateId(FALLBACK_TEMPLATE_ID);
+                    setSelectedTemplateId(FALLBACK_TEMPLATE_ID);
+                }
+            } finally {
+                if (!cancelled) {
+                    setTemplatesLoading(false);
+                }
+            }
+        };
+
+        fetchTemplateCatalog();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     const toTaskPayload = (
         task: GeneratedTask,
@@ -127,6 +200,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
             ? '/api/v1/agents/generate-backfilled-schedule'
             : '/api/v1/agents/generate-schedule';
 
+        const preferenceTemplate = selectedTemplateId || FALLBACK_TEMPLATE_ID;
         const scheduleResponse = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -134,7 +208,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                 isBackfilled
                     ? {
                         projectId,
-                        schedulingPreferences: DEFAULT_SCHEDULING_PREFERENCES,
+                        preferenceTemplate,
                         cropAnalysis: {
                             crop: cropAnalysis.crop,
                             variety: cropAnalysis.variety,
@@ -147,7 +221,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                     }
                     : {
                         projectId,
-                        schedulingPreferences: DEFAULT_SCHEDULING_PREFERENCES,
+                        preferenceTemplate,
                         cropAnalysis: {
                             crop: cropAnalysis.crop,
                             variety: cropAnalysis.variety,
@@ -160,11 +234,27 @@ export default function ProjectWizard({ locale }: { locale: string }) {
             ),
         });
 
+        const generatedData = await scheduleResponse.json().catch(() => ({}));
         if (!scheduleResponse.ok) {
-            throw new Error(await extractErrorMessage(scheduleResponse, '初回スケジュールの生成に失敗しました'));
+            if (
+                scheduleResponse.status === 409
+                && (generatedData as Record<string, unknown>)?.error === 'SCHEDULING_PREFERENCES_REQUIRED'
+            ) {
+                applyTemplateCatalog(generatedData as PreferenceTemplateCatalog);
+                throw new Error(
+                    ((generatedData as Record<string, unknown>)?.message as string)
+                    || '初回ドラフトの前に、作業設定テンプレートを選択してください。'
+                );
+            }
+
+            throw new Error(
+                ((generatedData as Record<string, unknown>)?.error as string)
+                || ((generatedData as Record<string, unknown>)?.message as string)
+                || ((generatedData as Record<string, unknown>)?.details as string)
+                || '初回スケジュールの生成に失敗しました'
+            );
         }
 
-        const generatedData = await scheduleResponse.json();
         const schedule: GeneratedSchedule = generatedData?.schedule || generatedData;
         const tasks = buildTaskPayloads(schedule, isBackfilled);
         if (!tasks.length) {
@@ -176,7 +266,6 @@ export default function ProjectWizard({ locale }: { locale: string }) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 tasks,
-                schedulingPreferences: DEFAULT_SCHEDULING_PREFERENCES,
             }),
         });
 
@@ -343,6 +432,9 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                     fieldId: selectedField?.id,
                     notes: cropAnalysis.notes,
                     tasks: [],
+                    schedulingPreferences: preferenceTemplates.find(
+                        (template) => template.id === selectedTemplateId
+                    )?.preferences,
                 };
                 console.log('Creating project with payload:', payload);
 
@@ -561,6 +653,54 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                     </div>
                 )}
                 <CropAnalysisCard analysis={cropAnalysis} />
+                <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4">
+                    <div className="mb-3">
+                        <h3 className="text-sm font-semibold text-indigo-900">初回ドラフトの作業スタイル</h3>
+                        <p className="text-xs text-indigo-700">
+                            テンプレートを選ぶと、最初のスケジュールの優先度と作業量が調整されます。
+                        </p>
+                    </div>
+                    {templatesLoading && (
+                        <p className="text-xs text-indigo-700">テンプレートを読み込み中...</p>
+                    )}
+                    {!templatesLoading && templatesError && (
+                        <p className="text-xs text-amber-700">
+                            {templatesError} 標準テンプレートで続行します。
+                        </p>
+                    )}
+                    {!templatesLoading && preferenceTemplates.length > 0 && (
+                        <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                            {preferenceTemplates.map((template) => {
+                                const selected = template.id === selectedTemplateId;
+                                const recommended = template.id === recommendedTemplateId;
+                                return (
+                                    <button
+                                        key={template.id}
+                                        type="button"
+                                        onClick={() => setSelectedTemplateId(template.id)}
+                                        className={`rounded-lg border px-3 py-3 text-left transition ${
+                                            selected
+                                                ? 'border-indigo-500 bg-white shadow-sm'
+                                                : 'border-indigo-100 bg-white/70 hover:border-indigo-300'
+                                        }`}
+                                    >
+                                        <div className="mb-1 flex items-center justify-between gap-2">
+                                            <span className="text-sm font-semibold text-gray-900">
+                                                {template.label}
+                                            </span>
+                                            {recommended && (
+                                                <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                                                    推奨
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-xs text-gray-600">{template.description}</p>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
                 <FieldSelector
                     selectedFieldId={selectedField?.id ?? ''}
                     onChange={(id) => setSelectedField({ id })}
@@ -574,10 +714,14 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                     </button>
                     <button
                         onClick={handleCreateProject}
-                        disabled={loading}
+                        disabled={loading || templatesLoading}
                         className="px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 font-bold text-lg"
                     >
-                        {loading ? '作成中...' : 'プロジェクトを作成'}
+                        {loading
+                            ? '作成中...'
+                            : templatesLoading
+                                ? 'テンプレート読込中...'
+                                : 'プロジェクトを作成'}
                     </button>
                 </div>
             </div>
