@@ -129,6 +129,7 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
+    line-height: 1.65;
     background-image:
       radial-gradient(circle at 8% 10%, hsl(var(--surface-soil-2) / 0.45), transparent 25%),
       radial-gradient(circle at 84% 0%, hsl(var(--surface-soil-2) / 0.42), transparent 24%);
@@ -140,7 +141,21 @@
   h4,
   h5,
   h6 {
-    @apply font-heading tracking-tight;
+    @apply font-heading;
+    letter-spacing: -0.01em;
+  }
+
+  [lang="ja"] {
+    line-height: 1.72;
+  }
+
+  [lang="ja"] h1,
+  [lang="ja"] h2,
+  [lang="ja"] h3,
+  [lang="ja"] h4,
+  [lang="ja"] h5,
+  [lang="ja"] h6 {
+    letter-spacing: 0;
   }
 }
 

@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { format, isSameDay } from 'date-fns';
-import { ja } from 'date-fns/locale';
+import { enUS, ja } from 'date-fns/locale';
 
 import TaskDetailModal from '../TaskDetailModal';
 import { toastInfo } from '@/lib/feedback';
@@ -33,8 +33,10 @@ type ForecastDay = {
 };
 
 export default function TaskSidePanel({ selectedDate, tasks, affectedTasks = [], onAddTask, onTaskComplete }: TaskSidePanelProps) {
+    const locale = useLocale();
     const t = useTranslations('projects.calendar');
     const tProject = useTranslations('projects');
+    const dateLocale = locale === 'ja' ? ja : enUS;
 
     const selectedTasks = tasks.filter(task => isSameDay(new Date(task.dueDate), selectedDate));
     // const isTodaySelected = isToday(selectedDate);
@@ -60,6 +62,11 @@ export default function TaskSidePanel({ selectedDate, tasks, affectedTasks = [],
         const key = format(selectedDate, 'yyyy-MM-dd');
         return forecast.find(d => d.date === key);
     }, [forecast, selectedDate]);
+    const selectedDateLabel = format(
+        selectedDate,
+        locale === 'ja' ? 'M月d日 (EEE)' : 'MMM d (EEE)',
+        { locale: dateLocale }
+    );
 
     const getWeatherIcon = (code?: string) => {
         if (!code) return 'cloud';
@@ -80,8 +87,9 @@ export default function TaskSidePanel({ selectedDate, tasks, affectedTasks = [],
                     <div className="flex justify-between items-start mb-2">
                         <div>
                             <h3 className="text-lg font-bold text-gray-900">
-                                {format(selectedDate, 'M月d日 (EEE)', { locale: ja })}の作業
+                                {selectedDateLabel}
                             </h3>
+                            <p className="text-xs text-gray-600">{t('tasks_for_date')}</p>
                         </div>
                         {forecastForSelectedDate && (
                             <div className="flex items-center gap-2 bg-white px-2 py-1 rounded-lg border border-gray-100 shadow-sm">
@@ -96,7 +104,7 @@ export default function TaskSidePanel({ selectedDate, tasks, affectedTasks = [],
                     </div>
                     {forecastForSelectedDate?.condition && (
                         <p className="text-xs text-gray-600">
-                            天気: {forecastForSelectedDate.condition}
+                            {forecastForSelectedDate.condition}
                         </p>
                     )}
                 </div>

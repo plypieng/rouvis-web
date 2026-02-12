@@ -17,8 +17,28 @@ module.exports = {
     },
     extend: {
       fontFamily: {
-        sans: ['var(--font-zen-kaku)', 'ui-sans-serif', 'sans-serif'],
-        heading: ['var(--font-shippori)', 'var(--font-zen-kaku)', 'serif'],
+        sans: [
+          'var(--font-inter)',
+          'var(--font-noto-sans-jp)',
+          'ui-sans-serif',
+          'system-ui',
+          '-apple-system',
+          '"Hiragino Kaku Gothic ProN"',
+          '"Yu Gothic UI"',
+          '"Meiryo"',
+          'sans-serif',
+        ],
+        heading: [
+          'var(--font-inter)',
+          'var(--font-noto-sans-jp)',
+          'ui-sans-serif',
+          'system-ui',
+          '-apple-system',
+          '"Hiragino Kaku Gothic ProN"',
+          '"Yu Gothic UI"',
+          '"Meiryo"',
+          'sans-serif',
+        ],
         mono: ['var(--font-jetbrains)', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       colors: {

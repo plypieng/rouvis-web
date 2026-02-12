@@ -1,4 +1,4 @@
-import { JetBrains_Mono, Shippori_Mincho_B1, Zen_Kaku_Gothic_New } from 'next/font/google';
+import { Inter, JetBrains_Mono, Noto_Sans_JP } from 'next/font/google';
 import '../../styles/globals.css';
 import { NextIntlClientProvider } from 'next-intl';
 import { notFound } from 'next/navigation';
@@ -15,17 +15,16 @@ import { getServerSessionFromToken } from '../../lib/server-auth';
 import type { Locale } from '../../i18n/config';
 import type { AppShellProps } from '@/types/ui-shell';
 
-const zenKaku = Zen_Kaku_Gothic_New({
+const inter = Inter({
   subsets: ['latin'],
-  weight: ['400', '500', '700', '900'],
-  variable: '--font-zen-kaku',
+  variable: '--font-inter',
   display: 'swap',
 });
 
-const shippori = Shippori_Mincho_B1({
+const notoSansJp = Noto_Sans_JP({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700', '800'],
-  variable: '--font-shippori',
+  weight: ['400', '500', '700'],
+  variable: '--font-noto-sans-jp',
   display: 'swap',
 });
 
@@ -73,7 +72,7 @@ export default async function RootLayout(props: {
     <NextIntlClientProvider locale={locale} messages={messages}>
       <Providers session={session}>
         <div
-          className={`${zenKaku.variable} ${shippori.variable} ${jetbrainsMono.variable} shell-canvas mobile-viewport flex min-h-screen flex-col font-sans`}
+          className={`${inter.variable} ${notoSansJp.variable} ${jetbrainsMono.variable} shell-canvas mobile-viewport flex min-h-screen flex-col font-sans`}
           lang={locale}
           data-authenticated={shellProps.isAuthenticated ? 'true' : 'false'}
         >

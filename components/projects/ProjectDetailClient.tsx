@@ -198,7 +198,7 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
 
             router.refresh();
             if (status === 'completed') {
-                toastSuccess('タスクを完了にしました。');
+                toastSuccess(t('task_completed_notice'));
                 void trackUXEvent('task_completed', {
                     surface: 'project_detail',
                     projectId: project.id,
@@ -226,11 +226,11 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
             setNotice({
                 type: 'error',
                 message,
-                actionLabel: '再試行',
+                actionLabel: t('retry'),
                 onAction: retry,
             });
             toastError(message, {
-                label: '再試行',
+                label: t('retry'),
                 onClick: retry,
             });
         }

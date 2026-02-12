@@ -843,7 +843,8 @@
       "month_label": "{month}",
       "task_detail_heading": "Details",
       "task_detail_empty": "No detailed description available.",
-      "task_detail_close": "Close"
+      "task_detail_close": "Close",
+      "tasks_for_date": "Tasks for this day"
     },
     "insights_panel": {
       "fetch_failed": "Failed to load AI advice.",
@@ -857,6 +858,7 @@
       "tone_critical": "Critical"
     },
     "task_completed_notice": "Task marked as complete.",
-    "task_updated_notice": "Task updated."
+    "task_updated_notice": "Task updated.",
+    "retry": "Retry"
   }
 }
