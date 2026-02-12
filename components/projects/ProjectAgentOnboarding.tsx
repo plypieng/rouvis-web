@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 type GeneratedTask = {
@@ -44,6 +44,18 @@ type SchedulingPreferences = {
 };
 
 type SchedulingPreferencesInput = Partial<SchedulingPreferences> | null;
+
+type PreferenceTemplate = {
+    id: string;
+    label: string;
+    description: string;
+    preferences: Partial<SchedulingPreferences>;
+};
+
+type PreferenceTemplateCatalog = {
+    templates?: PreferenceTemplate[];
+    recommendedTemplate?: string;
+};
 
 const weekdayLabels = ['日', '月', '火', '水', '木', '金', '土'];
 
@@ -117,6 +129,11 @@ export default function ProjectAgentOnboarding({
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [preferences, setPreferences] = useState<SchedulingPreferences>(() => normalizePreferences(initialPreferences));
     const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+    const [preferenceTemplates, setPreferenceTemplates] = useState<PreferenceTemplate[]>([]);
+    const [recommendedTemplateId, setRecommendedTemplateId] = useState<string | null>(null);
+    const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+    const [templatesLoading, setTemplatesLoading] = useState(false);
+    const [templatesError, setTemplatesError] = useState<string | null>(null);
     const router = useRouter();
 
     const preferencePayload = useMemo(() => toPreferencePayload(preferences), [preferences]);
@@ -125,6 +142,73 @@ export default function ProjectAgentOnboarding({
         const payload = await response.json().catch(() => ({}));
         return payload?.error || payload?.message || payload?.details || fallback;
     };
+
+    const applyTemplateCatalog = (catalog: PreferenceTemplateCatalog) => {
+        const templates = Array.isArray(catalog.templates) ? catalog.templates : [];
+        const recommendedTemplate = typeof catalog.recommendedTemplate === 'string'
+            ? catalog.recommendedTemplate
+            : null;
+        setRecommendedTemplateId(recommendedTemplate);
+        if (templates.length === 0) return;
+
+        setPreferenceTemplates(templates);
+        setSelectedTemplateId((current) => {
+            if (current && templates.some((template) => template.id === current)) return current;
+            if (recommendedTemplate && templates.some((template) => template.id === recommendedTemplate)) {
+                return recommendedTemplate;
+            }
+            return templates[0].id;
+        });
+    };
+
+    const applyTemplatePreferences = (templateId: string) => {
+        const selectedTemplate = preferenceTemplates.find((template) => template.id === templateId);
+        if (!selectedTemplate) return;
+        setSelectedTemplateId(templateId);
+        setPreferences(normalizePreferences(selectedTemplate.preferences));
+    };
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const fetchTemplateCatalog = async () => {
+            setTemplatesLoading(true);
+            setTemplatesError(null);
+            try {
+                const response = await fetch('/api/v1/projects/preference-templates');
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(
+                        payload?.error
+                        || payload?.message
+                        || 'テンプレートの取得に失敗しました'
+                    );
+                }
+
+                if (!cancelled) {
+                    applyTemplateCatalog(payload as PreferenceTemplateCatalog);
+                }
+            } catch (error) {
+                console.error('Failed to load preference templates:', error);
+                if (!cancelled) {
+                    setTemplatesError(
+                        error instanceof Error
+                            ? error.message
+                            : 'テンプレートの取得に失敗しました'
+                    );
+                }
+            } finally {
+                if (!cancelled) {
+                    setTemplatesLoading(false);
+                }
+            }
+        };
+
+        fetchTemplateCatalog();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     const savePreferences = async (silent = false): Promise<boolean> => {
         if (!silent) setErrorMessage(null);
@@ -202,6 +286,7 @@ export default function ProjectAgentOnboarding({
                 body: JSON.stringify(isBackfilled ? {
                     projectId,
                     schedulingPreferences: preferencePayload,
+                    preferenceTemplate: selectedTemplateId || undefined,
                     cropAnalysis: {
                         crop,
                         startDate: startDate || new Date().toISOString().split('T')[0],
@@ -212,6 +297,7 @@ export default function ProjectAgentOnboarding({
                 } : {
                     projectId,
                     schedulingPreferences: preferencePayload,
+                    preferenceTemplate: selectedTemplateId || undefined,
                     cropAnalysis: {
                         crop,
                         startDate: startDate || new Date().toISOString().split('T')[0],
@@ -221,10 +307,34 @@ export default function ProjectAgentOnboarding({
                 }),
             });
 
+            const generatedData = await genRes.json().catch(() => ({}));
             if (!genRes.ok) {
-                throw new Error(await extractErrorMessage(genRes, 'スケジュールの生成に失敗しました'));
+                if (
+                    genRes.status === 409
+                    && (generatedData as Record<string, unknown>)?.error === 'SCHEDULING_PREFERENCES_REQUIRED'
+                ) {
+                    const catalog = generatedData as PreferenceTemplateCatalog;
+                    applyTemplateCatalog(catalog);
+                    const templates = Array.isArray(catalog.templates) ? catalog.templates : [];
+                    const recommendedTemplate = templates.find(
+                        (template) => template.id === catalog.recommendedTemplate
+                    ) || templates[0];
+                    if (recommendedTemplate) {
+                        setSelectedTemplateId(recommendedTemplate.id);
+                        setPreferences(normalizePreferences(recommendedTemplate.preferences));
+                    }
+                    throw new Error(
+                        ((generatedData as Record<string, unknown>)?.message as string)
+                        || '先に作業設定テンプレートを選択してから再実行してください。'
+                    );
+                }
+                throw new Error(
+                    ((generatedData as Record<string, unknown>)?.error as string)
+                    || ((generatedData as Record<string, unknown>)?.message as string)
+                    || ((generatedData as Record<string, unknown>)?.details as string)
+                    || 'スケジュールの生成に失敗しました'
+                );
             }
-            const generatedData = await genRes.json();
 
             setProgressMessage('🌱 タスクを作成中...');
 
@@ -308,6 +418,48 @@ export default function ProjectAgentOnboarding({
 
             <div className="bg-white/85 backdrop-blur rounded-xl border border-blue-100 p-5 text-left mb-6">
                 <h3 className="font-bold text-gray-900 mb-4">初回ドラフト前の作業設定</h3>
+                <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50/70 p-3">
+                    <div className="mb-2">
+                        <p className="text-sm font-semibold text-blue-900">テンプレートから始める</p>
+                        <p className="text-xs text-blue-700">状況に近い作業スタイルを選んでから細かく調整できます。</p>
+                    </div>
+                    {templatesLoading && (
+                        <p className="text-xs text-blue-700">テンプレートを読み込み中...</p>
+                    )}
+                    {!templatesLoading && templatesError && (
+                        <p className="text-xs text-amber-700">{templatesError}</p>
+                    )}
+                    {!templatesLoading && preferenceTemplates.length > 0 && (
+                        <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                            {preferenceTemplates.map((template) => {
+                                const isSelected = template.id === selectedTemplateId;
+                                const isRecommended = template.id === recommendedTemplateId;
+                                return (
+                                    <button
+                                        key={template.id}
+                                        type="button"
+                                        onClick={() => applyTemplatePreferences(template.id)}
+                                        className={`rounded-lg border px-3 py-2 text-left transition ${
+                                            isSelected
+                                                ? 'border-blue-500 bg-white shadow-sm'
+                                                : 'border-blue-100 bg-white/80 hover:border-blue-300'
+                                        }`}
+                                    >
+                                        <div className="mb-1 flex items-center justify-between gap-2">
+                                            <span className="text-sm font-semibold text-gray-900">{template.label}</span>
+                                            {isRecommended && (
+                                                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                                                    推奨
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-xs text-gray-600">{template.description}</p>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <label className="text-sm text-gray-700">
                         <span className="block mb-1 font-medium">作業開始時刻</span>
