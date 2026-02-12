@@ -40,7 +40,13 @@
     "all_caught_up": "すべてのタスクが完了しました",
     "tasks_remaining": "件の残りタスク",
     "overdue": "期限切れ",
-    "no_projects": "プロジェクトがありません"
+    "no_projects": "プロジェクトがありません",
+    "empty_title": "最初のプロジェクトを始めましょう",
+    "empty_subtitle": "作物を登録するだけで、AIが最適なスケジュールを作成します",
+    "empty_step_1": "写真を撮るか、作物名を入力",
+    "empty_step_2": "AIがスケジュールを自動作成",
+    "empty_step_3": "毎日のタスクをチェックして記録",
+    "create_first_project": "プロジェクトを作成する"
   },
   "planner": {
     "title": "Crop Layout Planner",

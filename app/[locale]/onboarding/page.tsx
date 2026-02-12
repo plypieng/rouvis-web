@@ -239,7 +239,7 @@ export default function OnboardingPage() {
       } catch (error) {
         console.warn('Session update failed after field save:', error);
       }
-      setStep(4);
+      router.push(`/${locale}/projects/create`);
     } catch (err) {
       if (err instanceof z.ZodError) {
         const newErrors: Record<string, string> = {};
@@ -261,12 +261,8 @@ export default function OnboardingPage() {
     }
   };
 
-  const handleSkipField = () => {
-    // Allow users to continue with project creation if they skip field setup.
-    router.push(`/${locale}/projects/create`);
-  };
-
-  const handleComplete = async () => {
+  const handleSkipField = async () => {
+    // Refresh session (best-effort) then go straight to project creation.
     try {
       await update();
     } catch (error) {
@@ -283,7 +279,7 @@ export default function OnboardingPage() {
   // Step 1: Welcome
   if (step === 1) {
     return (
-      <OnboardingLayout step={1} totalSteps={4}>
+      <OnboardingLayout step={1} totalSteps={3}>
         <div className="text-center space-y-6">
           <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto">
             <span className="text-3xl">🌾</span>
@@ -321,7 +317,7 @@ export default function OnboardingPage() {
   // Step 2: Profile
   if (step === 2) {
     return (
-      <OnboardingLayout step={2} totalSteps={4}>
+      <OnboardingLayout step={2} totalSteps={3}>
         <div className="space-y-6">
           <div className="text-center mb-4">
             <h2 className="text-xl font-bold text-gray-900">基本情報</h2>
@@ -425,7 +421,7 @@ export default function OnboardingPage() {
   // Step 3: Field Creation
   if (step === 3) {
     return (
-      <OnboardingLayout step={3} totalSteps={4}>
+      <OnboardingLayout step={3} totalSteps={3}>
         <div className="space-y-6">
           <div className="text-center mb-4">
             <h2 className="text-xl font-bold text-gray-900">最初の畑を登録</h2>
@@ -571,40 +567,10 @@ export default function OnboardingPage() {
     );
   }
 
-  // Step 4: Complete
-  return (
-    <OnboardingLayout step={4} totalSteps={4}>
-      <div className="text-center space-y-6 py-4">
-        <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto">
-          <Check className="w-8 h-8 text-emerald-600" />
-        </div>
-
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">準備完了！</h2>
-          <p className="text-gray-600">
-            {profileData.name}さん、お疲れさまでした
-          </p>
-        </div>
-
-        <div className="bg-gray-50 rounded-xl p-4 text-left space-y-3">
-          <p className="text-sm font-medium text-gray-700">次のステップ</p>
-          <div className="space-y-2">
-            <NextStepItem number={1} text="プロジェクトを作成" />
-            <NextStepItem number={2} text="AIがスケジュールを自動提案" />
-            <NextStepItem number={3} text="毎日のタスクをチェック" />
-          </div>
-        </div>
-
-        <button
-          onClick={handleComplete}
-          className="w-full px-6 py-4 bg-emerald-600 text-white rounded-xl hover:bg-emerald-500 transition-colors font-semibold flex items-center justify-center gap-2"
-        >
-          最初のプロジェクトを作成
-          <ArrowRight className="w-4 h-4" />
-        </button>
-      </div>
-    </OnboardingLayout>
-  );
+  // Onboarding complete — user should have been redirected already.
+  // Fallback: redirect to project creation.
+  router.push(`/${locale}/projects/create`);
+  return null;
 }
 
 // Layout

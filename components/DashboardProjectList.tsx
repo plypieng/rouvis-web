@@ -150,13 +150,34 @@ export default async function DashboardProjectList({ locale, userId: _userId }: 
                     </div>
 
                     {projects.length === 0 ? (
-                        <div className="text-center py-12 bg-white rounded-lg border border-dashed border-gray-300">
-                            <p className="text-gray-500 mb-4">{t('no_projects')}</p>
+                        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 max-w-lg mx-auto text-center space-y-5">
+                            <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto">
+                                <span className="text-3xl">🌱</span>
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold text-gray-900 mb-1">{t('empty_title')}</h3>
+                                <p className="text-sm text-gray-500">{t('empty_subtitle')}</p>
+                            </div>
+                            <div className="text-left space-y-3 bg-gray-50 rounded-xl p-4">
+                                <div className="flex items-center gap-3">
+                                    <span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center justify-center flex-none">1</span>
+                                    <span className="text-sm text-gray-700">{t('empty_step_1')}</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center justify-center flex-none">2</span>
+                                    <span className="text-sm text-gray-700">{t('empty_step_2')}</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center justify-center flex-none">3</span>
+                                    <span className="text-sm text-gray-700">{t('empty_step_3')}</span>
+                                </div>
+                            </div>
                             <Link
                                 href={`/${locale}/projects/create`}
-                                className="text-green-600 hover:underline font-medium"
+                                className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-500 transition-colors font-semibold shadow-sm"
                             >
-                                {t('create_new')}
+                                <span className="material-symbols-outlined text-lg">add</span>
+                                {t('create_first_project')}
                             </Link>
                         </div>
                     ) : (

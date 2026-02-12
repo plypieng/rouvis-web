@@ -66,6 +66,60 @@ type PreferenceTemplateCatalog = {
 
 const FALLBACK_TEMPLATE_ID = 'balanced-new-farmer';
 
+// Visual step progress indicator
+const WIZARD_STEPS = [
+    { key: 'project-type', label: '種類', icon: '📋' },
+    { key: 'selection', label: '作物', icon: '🌱' },
+    { key: 'crop-analysis', label: '分析', icon: '🔍' },
+    { key: 'field-context', label: '作成', icon: '🚀' },
+] as const;
+
+function WizardProgress({ currentStep, showPlantingHistory }: { currentStep: WizardStep; showPlantingHistory?: boolean }) {
+    const steps = showPlantingHistory
+        ? [...WIZARD_STEPS.slice(0, 3), { key: 'planting-history' as const, label: '植付け', icon: '📅' }, WIZARD_STEPS[3]]
+        : [...WIZARD_STEPS];
+
+    const currentIndex = steps.findIndex((s) => s.key === currentStep);
+
+    return (
+        <div className="mb-6">
+            <div className="flex items-center justify-between relative">
+                {/* Connecting line */}
+                <div className="absolute top-4 left-0 right-0 h-0.5 bg-gray-200" />
+                <div
+                    className="absolute top-4 left-0 h-0.5 bg-emerald-500 transition-all duration-500"
+                    style={{ width: `${(currentIndex / Math.max(steps.length - 1, 1)) * 100}%` }}
+                />
+
+                {steps.map((step, i) => {
+                    const isDone = i < currentIndex;
+                    const isCurrent = i === currentIndex;
+                    return (
+                        <div key={step.key} className="flex flex-col items-center relative z-10">
+                            <div
+                                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 ${isDone
+                                    ? 'bg-emerald-500 text-white'
+                                    : isCurrent
+                                        ? 'bg-emerald-100 text-emerald-700 ring-2 ring-emerald-500'
+                                        : 'bg-gray-100 text-gray-400'
+                                    }`}
+                            >
+                                {isDone ? '✓' : step.icon}
+                            </div>
+                            <span
+                                className={`text-xs mt-1 font-medium ${isCurrent ? 'text-emerald-700' : isDone ? 'text-emerald-600' : 'text-gray-400'
+                                    }`}
+                            >
+                                {step.label}
+                            </span>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
 function noticeClassName(type: NonNullable<NoticeState>['type']): string {
     if (type === 'error') return 'border-red-200 bg-red-50 text-red-700';
     if (type === 'success') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
@@ -281,12 +335,15 @@ export default function ProjectWizard({ locale }: { locale: string }) {
     // Step 0: Project Type Selection (FIRST STEP)
     if (step === 'project-type') {
         return (
-            <ProjectTypeSelector onSelect={(type) => {
-                setNotice(null);
-                setCreatedProjectId(null);
-                setProjectType(type);
-                setStep('selection'); // Move to crop selection
-            }} />
+            <div className="space-y-6">
+                <WizardProgress currentStep={step} />
+                <ProjectTypeSelector onSelect={(type) => {
+                    setNotice(null);
+                    setCreatedProjectId(null);
+                    setProjectType(type);
+                    setStep('selection'); // Move to crop selection
+                }} />
+            </div>
         );
     }
 
@@ -488,6 +545,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
     if (step === 'selection') {
         return (
             <div className="space-y-6 relative min-h-[400px]">
+                <WizardProgress currentStep={step} showPlantingHistory={projectType === 'existing'} />
                 {loading && loadingMode && (
                     <AIProcessingOverlay mode={loadingMode} />
                 )}
@@ -583,6 +641,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
     if (step === 'crop-analysis') {
         return (
             <div className="space-y-6">
+                <WizardProgress currentStep={step} showPlantingHistory={projectType === 'existing'} />
                 {notice && (
                     <div className={`rounded-xl border px-4 py-3 text-sm ${noticeClassName(notice.type)}`}>
                         {notice.message}
@@ -610,6 +669,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
     if (step === 'planting-history') {
         return (
             <div className="space-y-6">
+                <WizardProgress currentStep={step} showPlantingHistory={true} />
                 {notice && (
                     <div className={`rounded-xl border px-4 py-3 text-sm ${noticeClassName(notice.type)}`}>
                         {notice.message}
@@ -634,6 +694,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
     if (step === 'field-context') {
         return (
             <div className="space-y-6">
+                <WizardProgress currentStep={step} showPlantingHistory={projectType === 'existing'} />
                 {notice && (
                     <div className={`rounded-xl border px-4 py-3 text-sm ${noticeClassName(notice.type)}`}>
                         <div className="flex items-center justify-between gap-3">
@@ -686,11 +747,10 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                                         key={template.id}
                                         type="button"
                                         onClick={() => setSelectedTemplateId(template.id)}
-                                        className={`rounded-lg border px-3 py-3 text-left transition ${
-                                            selected
-                                                ? 'border-indigo-500 bg-white shadow-sm'
-                                                : 'border-indigo-100 bg-white/70 hover:border-indigo-300'
-                                        }`}
+                                        className={`rounded-lg border px-3 py-3 text-left transition ${selected
+                                            ? 'border-indigo-500 bg-white shadow-sm'
+                                            : 'border-indigo-100 bg-white/70 hover:border-indigo-300'
+                                            }`}
                                     >
                                         <div className="mb-1 flex items-center justify-between gap-2">
                                             <span className="text-sm font-semibold text-gray-900">

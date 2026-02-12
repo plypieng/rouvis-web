@@ -24,7 +24,16 @@
     "five_day_forecast": "5-day forecast",
     "rain_chance": "{percentage}% chance of rain",
     "no_rain": "No rain expected",
-    "view_detailed_forecast": "View detailed forecast"
+    "view_detailed_forecast": "View detailed forecast",
+    "active_projects": "Active Projects",
+    "view_all": "View All",
+    "no_projects": "No projects yet",
+    "empty_title": "Start your first project",
+    "empty_subtitle": "Just register your crop and AI will create the optimal schedule for you",
+    "empty_step_1": "Take a photo or type your crop name",
+    "empty_step_2": "AI auto-creates your schedule",
+    "empty_step_3": "Check and log daily tasks",
+    "create_first_project": "Create Project"
   },
   "planner": {
     "title": "Crop Layout Planner",
