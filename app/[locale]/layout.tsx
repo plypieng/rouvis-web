@@ -66,6 +66,9 @@ export default async function RootLayout(props: {
   console.log('[Layout] Server session:', session);
 
   const typedLocale = locale as Locale;
+  const isAuthenticated = Boolean(session?.user?.id);
+  const onboardingComplete = Boolean((session?.user as { onboardingComplete?: boolean } | undefined)?.onboardingComplete);
+  const isOnboardingIncompleteUser = isAuthenticated && !onboardingComplete;
   const headerUser = session?.user
     ? {
       name: session.user.name ?? undefined,
@@ -81,27 +84,34 @@ export default async function RootLayout(props: {
       <Providers session={session}>
         {/* Full-height layout with mobile optimizations */}
         <div className={`${inter.variable} ${outfit.variable} font-sans mobile-viewport bg-background flex flex-col`} lang={locale}>
-          {/* New sticky header */}
-          <Header locale={typedLocale} user={headerUser} />
+          {!isOnboardingIncompleteUser && (
+            <Header locale={typedLocale} user={headerUser} />
+          )}
 
           {/* Main Content - Full height minus bottom nav on mobile */}
-          <main id="main-content" className="flex-1 overflow-auto mobile-scroll safe-bottom pb-20 lg:pb-0">
+          <main
+            id="main-content"
+            className={`flex-1 overflow-auto mobile-scroll safe-bottom ${isOnboardingIncompleteUser ? 'pb-0' : 'pb-20 lg:pb-0'}`}
+          >
             {children}
           </main>
 
-          {/* New Footer */}
-          <Footer locale={typedLocale} user={session?.user} />
+          {!isOnboardingIncompleteUser && (
+            <Footer locale={typedLocale} user={session?.user} />
+          )}
 
           {/* Feedback Button - Alpha Testing (Authenticated users only) */}
-          {session?.user && <FeedbackButton />}
+          {!isOnboardingIncompleteUser && session?.user && <FeedbackButton />}
 
           {/* Onboarding Tour - Shows once for new users */}
-          {session?.user && <OnboardingTour />}
+          {!isOnboardingIncompleteUser && session?.user && <OnboardingTour />}
 
           {/* Bottom Navigation - Mobile Only - Enhanced */}
-          <div className="mobile-nav-height">
-            <BottomNav locale={typedLocale} user={session?.user} />
-          </div>
+          {!isOnboardingIncompleteUser && (
+            <div className="mobile-nav-height">
+              <BottomNav locale={typedLocale} user={session?.user} />
+            </div>
+          )}
 
           {/* Global non-blocking replacement for window.alert() */}
           <AlertToastBridge />

@@ -155,12 +155,28 @@ export const authOptions: NextAuthOptions = {
         }
       }
 
-      // Check if user has completed onboarding
+      // Check if user has completed onboarding.
+      // Completion requires profile + at least one field or project.
       if (token.id) {
-        const userProfile = await prisma.userProfile.findUnique({
-          where: { userId: token.id as string },
-        });
-        token.onboardingComplete = !!userProfile;
+        const userId = token.id as string;
+        const [userProfile, firstField, firstProject] = await Promise.all([
+          prisma.userProfile.findUnique({
+            where: { userId },
+            select: { id: true },
+          }),
+          prisma.field.findFirst({
+            where: { userId },
+            select: { id: true },
+          }),
+          prisma.project.findFirst({
+            where: { userId },
+            select: { id: true },
+          }),
+        ]);
+
+        const profileComplete = Boolean(userProfile);
+        token.profileComplete = profileComplete;
+        token.onboardingComplete = Boolean(profileComplete && (firstField || firstProject));
       }
 
       return token;
@@ -174,6 +190,8 @@ export const authOptions: NextAuthOptions = {
         session.user.id = (token.id as string | undefined) ?? (token.sub as string) ?? '';
         session.user.email = token.email as string;
         session.user.name = token.name as string;
+        session.user.profileComplete = Boolean(token.profileComplete);
+        session.user.onboardingComplete = Boolean(token.onboardingComplete);
       }
       return session;
     },

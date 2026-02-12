@@ -2,7 +2,6 @@
 
 import { cookies } from 'next/headers';
 import { decode } from 'next-auth/jwt';
-import type { Session } from 'next-auth';
 
 export async function getServerSessionFromToken(token?: string) {
   let sessionToken = token;
@@ -41,7 +40,9 @@ export async function getServerSessionFromToken(token?: string) {
         name: decoded.name,
         email: decoded.email,
         image: decoded.picture,
-        id: decoded.sub || '',
+        id: (decoded.id as string | undefined) ?? decoded.sub ?? '',
+        profileComplete: Boolean(decoded.profileComplete),
+        onboardingComplete: Boolean(decoded.onboardingComplete),
       },
       expires: decoded.exp ? new Date((decoded.exp as number) * 1000).toISOString() : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     };

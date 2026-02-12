@@ -14,7 +14,7 @@ const intlMiddleware = createMiddleware({
 
 // Public routes that don't require authentication
 const publicRoutes = ['/login', '/signup', '/api/auth', '/privacy', '/terms'];
-const onboardingSafeRoutes = ['/onboarding'];
+const onboardingSafeRoutes = ['/onboarding', '/projects/create'];
 
 // Export a custom middleware function to handle auth + i18n
 export default async function middleware(request: NextRequest) {
@@ -76,15 +76,24 @@ export default async function middleware(request: NextRequest) {
   }
 
   // Onboarding enforcement for new users
-  // Check if user has completed onboarding (has UserProfile)
+  // `onboardingComplete` is computed in auth callbacks from required setup state.
+  const profileComplete = (token as any)?.profileComplete;
   const onboardingComplete = (token as any)?.onboardingComplete;
+  const isProjectCreateRoute = pathWithoutLocale.startsWith('/projects/create');
   const isOnboardingRoute = onboardingSafeRoutes.some((route) => pathWithoutLocale.startsWith(route));
 
   // If user hasn't completed onboarding, keep them on onboarding flow
   // to avoid inconsistent app state (missing profile/field context).
-  if (!onboardingComplete && !isOnboardingRoute) {
-    const onboardingUrl = new URL(`/${locale}/onboarding`, request.url);
-    return NextResponse.redirect(onboardingUrl);
+  if (!onboardingComplete) {
+    if (isProjectCreateRoute && !profileComplete) {
+      const onboardingUrl = new URL(`/${locale}/onboarding`, request.url);
+      return NextResponse.redirect(onboardingUrl);
+    }
+
+    if (!isOnboardingRoute) {
+      const onboardingUrl = new URL(`/${locale}/onboarding`, request.url);
+      return NextResponse.redirect(onboardingUrl);
+    }
   }
 
   // For authenticated users on protected routes that already have a locale prefix,

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { useSession } from 'next-auth/react';
 import CropAnalysisCard from './CropAnalysisCard';
 import FieldSelector from './FieldSelector';
 import ProjectTypeSelector from './ProjectTypeSelector';
@@ -74,6 +75,7 @@ function noticeClassName(type: NonNullable<NoticeState>['type']): string {
 export default function ProjectWizard({ locale }: { locale: string }) {
     const t = useTranslations('projects.create.wizard');
     const router = useRouter();
+    const { update } = useSession();
 
     const [step, setStep] = useState<WizardStep>('project-type');
     const [cropAnalysis, setCropAnalysis] = useState<CropAnalysis | null>(null);
@@ -461,6 +463,12 @@ export default function ProjectWizard({ locale }: { locale: string }) {
             const taskCount = await generateAndPersistInitialSchedule(projectId);
             setNotice({ type: 'success', message: `初回スケジュールを作成しました（${taskCount}件）` });
 
+            // Refresh session so onboarding guard sees the new project immediately.
+            try {
+                await update();
+            } catch (error) {
+                console.warn('Session update failed after project creation:', error);
+            }
             router.refresh(); // Ensure list is updated
             router.push(`/${locale}/projects/${projectId}`);
         } catch (error) {

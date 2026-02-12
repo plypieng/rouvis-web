@@ -49,6 +49,10 @@ export default function OnboardingPage() {
 
   const hasSeenLoading = useRef(false);
   const hasPrefilledName = useRef(false);
+  const hasCheckedExistingProfile = useRef(false);
+  const onboardingComplete = Boolean(
+    (session?.user as { onboardingComplete?: boolean } | undefined)?.onboardingComplete
+  );
 
   if (status === 'loading') {
     hasSeenLoading.current = true;
@@ -79,6 +83,46 @@ export default function OnboardingPage() {
     }
   }, [status, router, locale]);
 
+  // If onboarding is already complete, keep user out of onboarding flow.
+  useEffect(() => {
+    if (hasSeenLoading.current && status === 'authenticated' && onboardingComplete) {
+      router.replace(`/${locale}`);
+    }
+  }, [status, onboardingComplete, router, locale]);
+
+  // Resume onboarding at field step if profile already exists.
+  useEffect(() => {
+    if (status !== 'authenticated' || onboardingComplete || step !== 1 || hasCheckedExistingProfile.current) {
+      return;
+    }
+
+    hasCheckedExistingProfile.current = true;
+
+    const checkProfile = async () => {
+      try {
+        const response = await fetch('/api/v1/profile', { cache: 'no-store' });
+        if (!response.ok) {
+          return;
+        }
+        const payload = await response.json();
+        const profile = payload?.profile;
+        if (!profile) {
+          return;
+        }
+
+        setProfileData((prev) => ({
+          ...prev,
+          name: profile.displayName || prev.name || session?.user?.name || '',
+        }));
+        setStep(3);
+      } catch {
+        // Silent fallback: stay on step 1 if profile lookup fails.
+      }
+    };
+
+    void checkProfile();
+  }, [status, onboardingComplete, step, session?.user?.name]);
+
   if (status === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -96,6 +140,17 @@ export default function OnboardingPage() {
         <div className="flex items-center gap-3 text-gray-600">
           <Loader2 className="w-5 h-5 animate-spin" />
           <span>ログインページへ移動中...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (hasSeenLoading.current && status === 'authenticated' && onboardingComplete) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="flex items-center gap-3 text-gray-600">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span>ダッシュボードへ移動中...</span>
         </div>
       </div>
     );
@@ -124,8 +179,12 @@ export default function OnboardingPage() {
         throw new Error(payload?.error || 'プロフィールの保存に失敗しました');
       }
 
-      // Trigger session update to refresh onboardingComplete flag
-      await update();
+      // Trigger session update (best-effort) so middleware gets the latest auth state.
+      try {
+        await update();
+      } catch (error) {
+        console.warn('Session update failed after profile save:', error);
+      }
       setStep(3);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -174,6 +233,12 @@ export default function OnboardingPage() {
         throw new Error(payload?.error || '圃場の登録に失敗しました');
       }
 
+      // Refresh token/session (best-effort) so middleware receives onboardingComplete=true.
+      try {
+        await update();
+      } catch (error) {
+        console.warn('Session update failed after field save:', error);
+      }
       setStep(4);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -196,13 +261,17 @@ export default function OnboardingPage() {
     }
   };
 
-  const handleSkipField = async () => {
-    // Ensure session is updated with onboardingComplete = true
-    await update();
-    router.push(`/${locale}/projects`);
+  const handleSkipField = () => {
+    // Allow users to continue with project creation if they skip field setup.
+    router.push(`/${locale}/projects/create`);
   };
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
+    try {
+      await update();
+    } catch (error) {
+      console.warn('Session update failed before project creation redirect:', error);
+    }
     router.push(`/${locale}/projects/create`);
   };
 
@@ -360,7 +429,7 @@ export default function OnboardingPage() {
         <div className="space-y-6">
           <div className="text-center mb-4">
             <h2 className="text-xl font-bold text-gray-900">最初の畑を登録</h2>
-            <p className="text-sm text-gray-500">AIがスケジュールを作成するために必要です</p>
+            <p className="text-sm text-gray-500">おすすめ設定です（後から追加もできます）</p>
           </div>
 
           {notice?.type === 'error' && (
@@ -494,7 +563,7 @@ export default function OnboardingPage() {
               disabled={isSubmitting}
               className="text-gray-400 hover:text-gray-600 text-sm"
             >
-              後で登録する →
+              圃場登録をスキップして続ける →
             </button>
           </div>
         </div>
