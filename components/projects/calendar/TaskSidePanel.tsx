@@ -1,164 +1,214 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { useDraggable } from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
 import { format, isSameDay } from 'date-fns';
-import { ja } from 'date-fns/locale';
-
 import TaskDetailModal from '../TaskDetailModal';
-
-interface Task {
-    id: string;
-    title: string;
-    description?: string;
-    dueDate: string;
-    status: string;
-    priority?: string;
-}
+import type { ProjectTaskItem } from '@/types/project-cockpit';
 
 interface TaskSidePanelProps {
-    selectedDate: Date;
-    tasks: Task[];
-    onAddTask?: (date: Date) => void;
-    onTaskComplete?: (taskId: string, status: string) => void;
+  selectedDate: Date;
+  tasks: ProjectTaskItem[];
+  affectedTasks?: Array<{ id: string; title: string; dueDate: string }>;
+  onAddTask?: (date: Date) => void;
+  onTaskComplete?: (taskId: string, status: string) => void;
 }
 
 type ForecastDay = {
-    date: string;
-    temperature: { min: number; max: number };
-    condition: string;
-    icon?: string;
+  date: string;
+  temperature: { min: number; max: number };
+  condition: string;
+  icon?: string;
 };
 
-export default function TaskSidePanel({ selectedDate, tasks, onAddTask, onTaskComplete }: TaskSidePanelProps) {
-    const t = useTranslations('projects.calendar');
-    const tProject = useTranslations('projects');
+function DraggableTaskCard({
+  task,
+  onToggleComplete,
+  onOpen,
+}: {
+  task: ProjectTaskItem;
+  onToggleComplete: () => void;
+  onOpen: () => void;
+}) {
+  const t = useTranslations('projects.calendar');
+  const dateKey = format(new Date(task.dueDate), 'yyyy-MM-dd');
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `task:panel:${task.id}`,
+    data: {
+      taskId: task.id,
+      fromDate: dateKey,
+      source: 'panel',
+    },
+  });
 
-    const selectedTasks = tasks.filter(task => isSameDay(new Date(task.dueDate), selectedDate));
-    // const isTodaySelected = isToday(selectedDate);
+  const style = {
+    transform: CSS.Translate.toString(transform),
+  };
 
-    const [forecast, setForecast] = useState<ForecastDay[]>([]);
-    const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const statusClass = task.status === 'completed'
+    ? 'status-safe'
+    : task.priority === 'high'
+      ? 'status-critical'
+      : 'status-watch';
 
-    useEffect(() => {
-        const loadWeather = async () => {
-            try {
-                const res = await fetch('/api/weather', { cache: 'no-store' });
-                if (!res.ok) return;
-                const data = await res.json().catch(() => ({}));
-                if (Array.isArray(data?.forecast)) setForecast(data.forecast as ForecastDay[]);
-            } catch {
-                // ignore
-            }
-        };
-        loadWeather();
-    }, []);
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`rounded-lg border border-border bg-card p-3 transition ${isDragging ? 'shadow-lift1 opacity-65' : 'hover:border-brand-seedling/45'}`}
+    >
+      <div className="mb-2 flex items-start gap-2">
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggleComplete();
+          }}
+          className={`mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full border text-[11px] font-bold ${
+            task.status === 'completed'
+              ? 'border-brand-seedling bg-brand-seedling text-primary-foreground'
+              : 'border-border bg-secondary text-muted-foreground hover:border-brand-seedling hover:text-brand-seedling'
+          }`}
+        >
+          {task.status === 'completed' ? '✓' : ''}
+        </button>
 
-    const forecastForSelectedDate = useMemo(() => {
-        const key = format(selectedDate, 'yyyy-MM-dd');
-        return forecast.find(d => d.date === key);
-    }, [forecast, selectedDate]);
+        <button
+          type="button"
+          onClick={onOpen}
+          className={`min-w-0 flex-1 text-left text-sm font-medium ${task.status === 'completed' ? 'text-muted-foreground line-through' : 'text-foreground'}`}
+        >
+          {task.title}
+        </button>
+      </div>
 
-    const getWeatherIcon = (code?: string) => {
-        if (!code) return 'cloud';
-        if (code.startsWith('01') || code.startsWith('02')) return 'sunny';
-        if (code.startsWith('03') || code.startsWith('04')) return 'cloud';
-        if (code.startsWith('09') || code.startsWith('10')) return 'rainy';
-        if (code.startsWith('11')) return 'thunderstorm';
-        if (code.startsWith('13')) return 'weather_snowy';
-        if (code.startsWith('50')) return 'foggy';
-        return 'cloud';
+      {task.description ? (
+        <p className="mb-2 line-clamp-2 text-xs text-muted-foreground">{task.description}</p>
+      ) : null}
+
+      <div className="flex items-center justify-between gap-2">
+        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusClass}`}>
+          {task.status === 'completed' ? t('task_completed') : t('task_pending')}
+        </span>
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          className="touch-target rounded-md border border-border bg-secondary px-2 py-1 text-[10px] font-semibold text-secondary-foreground hover:bg-secondary/75"
+          aria-label={t('drag_task')}
+        >
+          {t('drag_task')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export default function TaskSidePanel({
+  selectedDate,
+  tasks,
+  affectedTasks = [],
+  onAddTask,
+  onTaskComplete,
+}: TaskSidePanelProps) {
+  const locale = useLocale();
+  const t = useTranslations('projects.calendar');
+  const tProject = useTranslations('projects');
+
+  const selectedTasks = tasks.filter((task) => isSameDay(new Date(task.dueDate), selectedDate));
+  const [forecast, setForecast] = useState<ForecastDay[]>([]);
+  const [selectedTask, setSelectedTask] = useState<ProjectTaskItem | null>(null);
+
+  useEffect(() => {
+    const loadWeather = async () => {
+      try {
+        const res = await fetch('/api/weather', { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => ({}));
+        if (Array.isArray(data?.forecast)) setForecast(data.forecast as ForecastDay[]);
+      } catch {
+        // ignore weather failures in side panel
+      }
     };
+    void loadWeather();
+  }, []);
 
-    return (
-        <>
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm h-full flex flex-col">
-                {/* Header */}
-                <div className="p-4 border-b border-gray-100 bg-gray-50/50 rounded-t-xl">
-                    <div className="flex justify-between items-start mb-2">
-                        <div>
-                            <h3 className="text-lg font-bold text-gray-900">
-                                {format(selectedDate, 'M月d日 (EEE)', { locale: ja })}の作業
-                            </h3>
-                        </div>
-                        {forecastForSelectedDate && (
-                            <div className="flex items-center gap-2 bg-white px-2 py-1 rounded-lg border border-gray-100 shadow-sm">
-                                <span className="material-symbols-outlined text-sky-600">
-                                    {getWeatherIcon(forecastForSelectedDate.icon)}
-                                </span>
-                                <span className="text-sm font-bold text-gray-700">
-                                    {Math.round(forecastForSelectedDate.temperature.max)}°C
-                                </span>
-                            </div>
-                        )}
-                    </div>
-                    {forecastForSelectedDate?.condition && (
-                        <p className="text-xs text-gray-600">
-                            天気: {forecastForSelectedDate.condition}
-                        </p>
-                    )}
-                </div>
+  const forecastForSelectedDate = useMemo(() => {
+    const key = format(selectedDate, 'yyyy-MM-dd');
+    return forecast.find((day) => day.date === key);
+  }, [forecast, selectedDate]);
 
-                {/* Task List */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                    {selectedTasks.length === 0 ? (
-                        <div className="text-center py-8 text-gray-400">
-                            <span className="material-symbols-outlined text-4xl mb-2 opacity-20">event_available</span>
-                            <p className="text-sm">{t('no_tasks_for_date')}</p>
-                        </div>
-                    ) : (
-                        selectedTasks.map(task => (
-                            <div
-                                key={task.id}
-                                onClick={() => setSelectedTask(task)}
-                                className={`p-3 rounded-lg border transition-all hover:shadow-sm cursor-pointer ${task.status === 'completed'
-                                    ? 'bg-gray-50 border-gray-200 opacity-70'
-                                    : 'bg-white border-gray-200 hover:border-green-300'
-                                    }`}
-                            >
-                                <div className="flex items-start gap-3">
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onTaskComplete?.(task.id, task.status === 'completed' ? 'pending' : 'completed');
-                                        }}
-                                        className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center cursor-pointer transition-colors ${task.status === 'completed' ? 'bg-green-500 border-green-500' : 'border-gray-300 hover:border-green-400'
-                                            }`}
-                                    >
-                                        {task.status === 'completed' && <span className="material-symbols-outlined text-white text-[12px] font-bold">check</span>}
-                                    </button>
-                                    <div className="flex-1">
-                                        <p className={`text-sm font-medium ${task.status === 'completed' ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
-                                            {task.title}
-                                        </p>
-                                        {task.priority && (
-                                            <span className={`text-[10px] px-1.5 py-0.5 rounded mt-1 inline-block ${task.priority === 'high' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
-                                                }`}>
-                                                {task.priority}
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        ))
-                    )}
+  const selectedDateLabel = useMemo(() => (
+    new Intl.DateTimeFormat(locale === 'ja' ? 'ja-JP' : locale, {
+      month: 'numeric',
+      day: 'numeric',
+      weekday: 'short',
+    }).format(selectedDate)
+  ), [locale, selectedDate]);
 
-                    {/* Add Memo / Task Placeholder */}
-                    <button
-                        className="w-full py-2 border-2 border-dashed border-gray-200 rounded-lg text-gray-400 text-sm font-medium hover:border-green-400 hover:text-green-600 hover:bg-green-50 transition flex items-center justify-center gap-2"
-                        onClick={() => onAddTask ? onAddTask(selectedDate) : alert(tProject('add_task_alert'))}
-                    >
-                        <span className="material-symbols-outlined text-lg">add</span>
-                        {t('add_memo')}
-                    </button>
-                </div>
+  return (
+    <>
+      <div className="surface-base flex h-full min-h-0 flex-col">
+        <div className="border-b border-border px-4 py-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h3 className="text-base font-semibold text-foreground">
+              {selectedDateLabel}
+            </h3>
+            {forecastForSelectedDate ? (
+              <span className="rounded-full border border-border bg-secondary px-2 py-1 text-xs font-semibold text-secondary-foreground">
+                {Math.round(forecastForSelectedDate.temperature.max)}° / {Math.round(forecastForSelectedDate.temperature.min)}°
+              </span>
+            ) : null}
+          </div>
+          <p className="text-xs text-muted-foreground">{t('tasks_for_date')}</p>
+        </div>
+
+        {affectedTasks.length > 0 ? (
+          <div className="border-b border-border px-4 py-3">
+            <p className="mb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">{t('affected_tasks_title')}</p>
+            <ul className="space-y-1">
+              {affectedTasks.slice(0, 3).map((task) => (
+                <li key={task.id} className="truncate text-xs text-foreground">
+                  • {task.title}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        <div className="mobile-scroll flex-1 space-y-2 overflow-y-auto p-4">
+          {selectedTasks.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
+              {t('no_tasks_for_date')}
             </div>
+          ) : (
+            selectedTasks.map((task) => (
+              <DraggableTaskCard
+                key={task.id}
+                task={task}
+                onOpen={() => setSelectedTask(task)}
+                onToggleComplete={() => onTaskComplete?.(task.id, task.status === 'completed' ? 'pending' : 'completed')}
+              />
+            ))
+          )}
 
-            <TaskDetailModal
-                isOpen={!!selectedTask}
-                onClose={() => setSelectedTask(null)}
-                task={selectedTask || undefined}
-            />
-        </>
-    );
+          <button
+            type="button"
+            className="touch-target w-full rounded-lg border-2 border-dashed border-border bg-secondary/35 px-3 py-3 text-sm font-semibold text-muted-foreground transition hover:border-brand-seedling hover:text-brand-seedling"
+            onClick={() => onAddTask ? onAddTask(selectedDate) : alert(tProject('add_task_alert'))}
+          >
+            {t('add_memo')}
+          </button>
+        </div>
+      </div>
+
+      <TaskDetailModal
+        isOpen={Boolean(selectedTask)}
+        onClose={() => setSelectedTask(null)}
+        task={selectedTask || undefined}
+      />
+    </>
+  );
 }

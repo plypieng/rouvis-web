@@ -3,13 +3,15 @@
 import { forwardRef, useImperativeHandle, useRef, useEffect, useState, useCallback } from 'react';
 import { Send, Loader2, RefreshCw, Undo2, Paperclip, X, ArrowRight } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import type { QuickApplyResult } from '@/types/project-cockpit';
 
 export type ChatMode = 'default' | 'reschedule' | 'diagnosis' | 'logging';
 
 export interface RouvisChatKitRef {
-  sendMessage: (message: string, overrideMode?: ChatMode) => void;
+  sendMessage: (message: string, overrideMode?: ChatMode) => Promise<void>;
   setSuggestions: (suggestions: { label: string; message: string; isCancel?: boolean }[]) => void;
   setChatMode: (mode: ChatMode) => void;
+  runRescheduleQuickApply: (options: { prompt: string; confirmMessage?: string }) => Promise<QuickApplyResult>;
 }
 
 interface ActionConfirmation {
@@ -89,6 +91,12 @@ function stripHiddenBlocks(content: string): string {
     .trim();
 }
 
+function extractReschedulePlanBlock(content: string): string | null {
+  if (!content) return null;
+  const matched = content.match(/\[\[RESCHEDULE_PLAN:\s*([\s\S]*?)\]\]/);
+  return matched?.[0] || null;
+}
+
 // Time-aware greetings
 function getGreeting(weather?: { condition?: string }): { main: string; sub: string } {
   const hour = new Date().getHours();
@@ -153,6 +161,10 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const lastAssistantRawRef = useRef('');
+  const lastAssistantFailedRef = useRef(false);
+  const quickApplyInFlightRef = useRef(false);
+  const lastActionTypeRef = useRef<ActionConfirmation['type'] | null>(null);
 
   // Load chat history on mount
   useEffect(() => {
@@ -247,6 +259,10 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
 
   const sendMessage = useCallback(async (content: string, overrideMode?: ChatMode) => {
     if ((!content.trim() && !selectedImage) || isLoading) return;
+    let assistantRawContent = '';
+    let assistantFailed = false;
+    lastAssistantRawRef.current = '';
+    lastAssistantFailedRef.current = false;
 
     // Capture image before clearing state
     const currentImageUrl = selectedImage;
@@ -319,6 +335,8 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
           if (line.startsWith('0:')) {
             try {
               const text = JSON.parse(line.slice(2));
+              assistantRawContent += text;
+              lastAssistantRawRef.current = assistantRawContent;
               setMessages(prev => prev.map(m =>
                 m.id === assistantId ? { ...m, content: m.content + text } : m
               ));
@@ -356,6 +374,8 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
             // Content
             if (event.type === 'content' && event.delta?.content) {
               const content = event.delta.content;
+              assistantRawContent += content;
+              lastAssistantRawRef.current = assistantRawContent;
               setMessages(prev => prev.map(m =>
                 m.id === assistantId ? { ...m, content: m.content + content } : m
               ));
@@ -377,6 +397,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
                   event.action.type === 'task_updated'
                   ? event.action.type
                   : 'task_updated';
+              lastActionTypeRef.current = actionType;
               const confirmation: ActionConfirmation = {
                 id: `confirm-${Date.now()}`,
                 type: actionType,
@@ -403,6 +424,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
 
             // Mark error
             if (event.type === 'tool_call_delta' && event.delta?.status === 'error') {
+              assistantFailed = true;
               setMessages(prev => prev.map(m =>
                 m.id === assistantId ? { ...m, hasError: true } : m
               ));
@@ -437,6 +459,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
 
       onTaskUpdate?.();
     } catch (error) {
+      assistantFailed = true;
       console.error('Chat error:', error);
       setMessages(prev => prev.map(m =>
         m.id === assistantId
@@ -444,10 +467,52 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
           : m
       ));
     } finally {
+      lastAssistantRawRef.current = assistantRawContent;
+      lastAssistantFailedRef.current = assistantFailed;
       setIsLoading(false);
       setCurrentStatus('');
     }
-  }, [messages, projectId, threadId, isLoading, selectedImage, onTaskUpdate, onDiagnosisComplete, chatMode]);
+  }, [messages, projectId, threadId, isLoading, selectedImage, onTaskUpdate, onDiagnosisComplete, onDraftCreate, chatMode]);
+
+  const runRescheduleQuickApply = useCallback(async (
+    options: { prompt: string; confirmMessage?: string }
+  ): Promise<QuickApplyResult> => {
+    const prompt = options.prompt?.trim() || '';
+    if (!prompt) return { applied: false, reason: 'missing_prompt' };
+    if (quickApplyInFlightRef.current || isLoading) return { applied: false, reason: 'in_flight' };
+
+    quickApplyInFlightRef.current = true;
+    setChatModeState('reschedule');
+    setCustomSuggestions(null);
+
+    try {
+      await sendMessage(prompt, 'reschedule');
+      if (lastAssistantFailedRef.current) {
+        return { applied: false, reason: 'proposal_failed' };
+      }
+
+      const proposalRaw = lastAssistantRawRef.current;
+      const planBlock = extractReschedulePlanBlock(proposalRaw);
+      if (!planBlock) {
+        return { applied: false, reason: 'no_plan' };
+      }
+
+      lastActionTypeRef.current = null;
+      await sendMessage(options.confirmMessage?.trim() || 'この内容でお願いします', 'reschedule');
+      if (lastAssistantFailedRef.current) {
+        return { applied: false, reason: 'apply_failed' };
+      }
+
+      const confirmationRaw = lastAssistantRawRef.current;
+      const appliedByAction = lastActionTypeRef.current === 'task_updated';
+      const appliedByText = /予定を調整しました|更新しました|反映済み/.test(confirmationRaw);
+      return appliedByAction || appliedByText
+        ? { applied: true }
+        : { applied: false, reason: 'apply_unconfirmed' };
+    } finally {
+      quickApplyInFlightRef.current = false;
+    }
+  }, [isLoading, sendMessage]);
 
   const handleRetry = useCallback(() => {
     setMessages(prev => {
@@ -472,7 +537,8 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     setChatMode: (mode: ChatMode) => {
       setChatModeState(mode);
       setIsUserNearBottom(true);
-    }
+    },
+    runRescheduleQuickApply,
   }));
 
   useEffect(() => {

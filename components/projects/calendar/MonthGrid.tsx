@@ -1,178 +1,240 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import { useDraggable, useDroppable } from '@dnd-kit/core';
+import { CSS } from '@dnd-kit/utilities';
 import {
-    format,
-    startOfMonth,
-    endOfMonth,
-    eachDayOfInterval,
-    getDay,
-    isSameDay,
-    isToday
+  eachDayOfInterval,
+  endOfMonth,
+  format,
+  getDay,
+  isSameDay,
+  isToday,
+  startOfMonth,
 } from 'date-fns';
 import { useMonthWeather } from '@/hooks/useMonthWeather';
-
-interface Task {
-    id: string;
-    title: string;
-    dueDate: string;
-    status: string;
-}
+import type { ProjectTaskItem } from '@/types/project-cockpit';
 
 interface MonthGridProps {
-    currentDate: Date;
-    selectedDate: Date;
-    onSelectDate: (date: Date) => void;
-    tasks: Task[];
-    startDate: string;
-    targetHarvestDate?: string;
+  currentDate: Date;
+  selectedDate: Date;
+  onSelectDate: (date: Date) => void;
+  tasks: ProjectTaskItem[];
+  startDate: string;
+  targetHarvestDate?: string;
+  activeDragTaskId?: string | null;
+  affectedTaskIds?: Set<string>;
+}
+
+function DayTaskChip({
+  task,
+  source,
+  affected,
+}: {
+  task: ProjectTaskItem;
+  source: string;
+  affected: boolean;
+}) {
+  const dateKey = format(new Date(task.dueDate), 'yyyy-MM-dd');
+  const draggableId = `task:${source}:${task.id}`;
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: draggableId,
+    data: {
+      taskId: task.id,
+      fromDate: dateKey,
+      source,
+    },
+  });
+
+  const style = {
+    transform: CSS.Translate.toString(transform),
+  };
+
+  return (
+    <button
+      type="button"
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className={`w-full truncate rounded-md border px-1.5 py-0.5 text-left text-[10px] font-medium transition ${
+        task.status === 'completed'
+          ? 'border-border bg-secondary text-muted-foreground line-through'
+          : affected
+            ? 'border-brand-waterline/55 bg-brand-waterline/15 text-foreground'
+            : 'border-border bg-card text-foreground hover:border-brand-seedling/45'
+      } ${isDragging ? 'opacity-65 shadow-lift1' : ''}`}
+      aria-label={`${task.title} ${format(new Date(task.dueDate), 'M/d')}`}
+    >
+      {task.title}
+    </button>
+  );
+}
+
+type DayCellProps = {
+  day: Date;
+  dateKey: string;
+  selectedDate: Date;
+  onSelectDate: (date: Date) => void;
+  weather?: { temperature: { min: number; max: number } };
+  isStart: boolean;
+  isHarvest: boolean;
+  dayTasks: ProjectTaskItem[];
+  affectedTaskIds: Set<string>;
+  activeDragTaskId?: string | null;
+  t: (key: string, values?: Record<string, string | number | Date>) => string;
+};
+
+function DayCell({
+  day,
+  dateKey,
+  selectedDate,
+  onSelectDate,
+  weather,
+  isStart,
+  isHarvest,
+  dayTasks,
+  affectedTaskIds,
+  activeDragTaskId = null,
+  t,
+}: DayCellProps) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `day:${dateKey}`,
+    data: { date: dateKey },
+  });
+
+  const isSelected = isSameDay(day, selectedDate);
+  const hasActiveDrag = Boolean(activeDragTaskId);
+
+  return (
+    <button
+      type="button"
+      ref={setNodeRef}
+      onClick={() => onSelectDate(day)}
+      className={`flex min-h-[98px] flex-col border-b border-r border-border/70 p-1.5 text-left transition ${
+        isSelected
+          ? 'bg-brand-waterline/10 ring-1 ring-inset ring-brand-waterline/55'
+          : 'bg-card hover:bg-secondary/40'
+      } ${isToday(day) ? 'border-brand-seedling/55' : ''} ${hasActiveDrag && isOver ? 'bg-brand-seedling/15 ring-2 ring-brand-seedling/55' : ''}`}
+      aria-label={t('drop_target_label', { date: format(day, 'M/d') })}
+    >
+      <div className="mb-1 flex items-start justify-between gap-1">
+        <span
+          className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold ${
+            isSelected
+              ? 'bg-brand-waterline text-primary-foreground'
+              : isToday(day)
+                ? 'bg-brand-seedling/20 text-brand-seedling'
+                : 'bg-secondary text-secondary-foreground'
+          }`}
+        >
+          {format(day, 'd')}
+        </span>
+
+        <div className="flex items-center gap-1">
+          {weather ? (
+            <span className="text-[10px] font-medium text-muted-foreground">
+              {Math.round(weather.temperature.max)}°/{Math.round(weather.temperature.min)}°
+            </span>
+          ) : null}
+          {isStart ? <span className="material-symbols-outlined text-[14px] text-brand-seedling" title={t('start_date')}>flag</span> : null}
+          {isHarvest ? <span className="material-symbols-outlined text-[14px] text-risk-warning" title={t('harvest_date')}>agriculture</span> : null}
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        {dayTasks.slice(0, 3).map((task) => (
+          <DayTaskChip
+            key={`month-chip-${task.id}`}
+            task={task}
+            source="month"
+            affected={affectedTaskIds.has(task.id)}
+          />
+        ))}
+        {dayTasks.length > 3 ? (
+          <p className="truncate text-[10px] font-semibold text-muted-foreground">
+            {t('more_tasks', { count: dayTasks.length - 3 })}
+          </p>
+        ) : null}
+        {hasActiveDrag && isOver ? (
+          <p className="text-[10px] font-semibold text-brand-seedling">{t('drop_hint')}</p>
+        ) : null}
+      </div>
+    </button>
+  );
 }
 
 export default function MonthGrid({
-    currentDate,
-    selectedDate,
-    onSelectDate,
-    tasks,
-    startDate,
-    targetHarvestDate
+  currentDate,
+  selectedDate,
+  onSelectDate,
+  tasks,
+  startDate,
+  targetHarvestDate,
+  activeDragTaskId = null,
+  affectedTaskIds = new Set<string>(),
 }: MonthGridProps) {
-    const t = useTranslations('projects.calendar');
+  const t = useTranslations('projects.calendar');
 
-    const monthStart = startOfMonth(currentDate);
-    const monthEnd = endOfMonth(currentDate);
-    const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
-    const startDayOfWeek = getDay(monthStart); // 0 (Sun) - 6 (Sat)
+  const monthStart = startOfMonth(currentDate);
+  const monthEnd = endOfMonth(currentDate);
+  const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  const startDayOfWeek = getDay(monthStart);
 
-    const projectStart = new Date(startDate);
-    const projectEnd = targetHarvestDate ? new Date(targetHarvestDate) : null;
+  const projectStart = new Date(startDate);
+  const projectEnd = targetHarvestDate ? new Date(targetHarvestDate) : null;
 
-    const { data: weatherData } = useMonthWeather(monthStart.getFullYear(), monthStart.getMonth() + 1);
+  const { data: weatherData } = useMonthWeather(monthStart.getFullYear(), monthStart.getMonth() + 1);
 
-    const getDayClass = (day: Date) => {
-        let classes = "h-full min-h-[40px] p-1 border-b border-r border-gray-100 transition-colors relative cursor-pointer hover:bg-gray-50 flex flex-col ";
+  const getTasksForDay = (day: Date) => (
+    tasks.filter((task) => isSameDay(new Date(task.dueDate), day))
+  );
 
-        // Selected State
-        if (isSameDay(day, selectedDate)) {
-            classes += "bg-blue-50 hover:bg-blue-50 ring-2 ring-inset ring-blue-400 z-10 ";
-        }
+  const weekdays = [t('weekday_sun'), t('weekday_mon'), t('weekday_tue'), t('weekday_wed'), t('weekday_thu'), t('weekday_fri'), t('weekday_sat')];
 
-        // Today
-        if (isToday(day)) {
-            classes += "bg-yellow-50/50 ";
-        }
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="grid grid-cols-7 border-b border-border bg-secondary/45">
+        {weekdays.map((label, index) => (
+          <div
+            key={label}
+            className={`py-2 text-center text-[11px] font-semibold ${index === 0 ? 'text-risk-critical' : index === 6 ? 'text-brand-waterline' : 'text-muted-foreground'}`}
+          >
+            {label}
+          </div>
+        ))}
+      </div>
 
-        return classes;
-    };
+      <div className="grid min-h-0 flex-1 grid-cols-7 auto-rows-fr">
+        {Array.from({ length: startDayOfWeek }).map((_, index) => (
+          <div key={`empty-${index}`} className="border-b border-r border-border/70 bg-secondary/20" />
+        ))}
 
-    const getDateNumberClass = (day: Date) => {
-        let classes = "text-sm font-medium w-6 h-6 flex items-center justify-center rounded-full mb-1 ";
+        {days.map((day) => {
+          const dayTasks = getTasksForDay(day);
+          const dateKey = format(day, 'yyyy-MM-dd');
+          return (
+            <DayCell
+              key={day.toISOString()}
+              day={day}
+              dateKey={dateKey}
+              selectedDate={selectedDate}
+              onSelectDate={onSelectDate}
+              weather={weatherData[dateKey]}
+              isStart={isSameDay(day, projectStart)}
+              isHarvest={projectEnd ? isSameDay(day, projectEnd) : false}
+              dayTasks={dayTasks}
+              affectedTaskIds={affectedTaskIds}
+              activeDragTaskId={activeDragTaskId}
+              t={t}
+            />
+          );
+        })}
 
-        if (isSameDay(day, selectedDate)) {
-            classes += "bg-blue-500 text-white ";
-        } else if (isToday(day)) {
-            classes += "bg-blue-100 text-blue-700 ";
-        } else if (getDay(day) === 0) {
-            classes += "text-red-500 ";
-        } else if (getDay(day) === 6) {
-            classes += "text-blue-500 ";
-        } else {
-            classes += "text-gray-700 ";
-        }
-
-        return classes;
-    };
-
-    const getTasksForDay = (day: Date) => {
-        return tasks.filter(task => isSameDay(new Date(task.dueDate), day));
-    };
-
-    return (
-        <div className="h-full flex flex-col">
-            {/* Days Header */}
-            <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
-                {['日', '月', '火', '水', '木', '金', '土'].map((d, i) => (
-                    <div key={d} className={`py-2 text-center text-xs font-bold ${i === 0 ? 'text-red-500' : i === 6 ? 'text-blue-500' : 'text-gray-500'}`}>
-                        {d}
-                    </div>
-                ))}
-            </div>
-
-            {/* Calendar Grid */}
-            <div className="grid grid-cols-7 flex-1 auto-rows-fr">
-                {/* Empty cells for start of month */}
-                {Array.from({ length: startDayOfWeek }).map((_, i) => (
-                    <div key={`empty-${i}`} className="border-b border-r border-gray-100 bg-gray-50/30"></div>
-                ))}
-
-                {/* Days */}
-                {days.map((day) => {
-                    const dayTasks = getTasksForDay(day);
-                    const isStart = isSameDay(day, projectStart);
-                    const isHarvest = projectEnd && isSameDay(day, projectEnd);
-                    const dateKey = format(day, 'yyyy-MM-dd');
-                    const weather = weatherData[dateKey];
-
-                    return (
-                        <div
-                            key={day.toISOString()}
-                            className={getDayClass(day)}
-                            onClick={() => onSelectDate(day)}
-                        >
-                            <div className="flex justify-between items-start">
-                                <span className={getDateNumberClass(day)}>
-                                    {format(day, 'd')}
-                                </span>
-                                <div className="flex gap-0.5 items-center">
-                                    {weather && (
-                                        <div className="flex flex-col items-end">
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            <img
-                                                src={`https://openweathermap.org/img/wn/${weather.icon}.png`}
-                                                alt={weather.condition}
-                                                title={`${weather.condition} / ${weather.temperature.max}°C`}
-                                                className="w-8 h-8 object-contain -my-1"
-                                            />
-                                            <div className="text-[10px] font-medium leading-none text-gray-600 flex gap-0.5">
-                                                <span className="text-red-500">{Math.round(weather.temperature.max)}</span>
-                                                <span className="text-gray-300">/</span>
-                                                <span className="text-blue-500">{Math.round(weather.temperature.min)}</span>
-                                            </div>
-                                        </div>
-                                    )}
-                                    {isStart && (
-                                        <span className="material-symbols-outlined text-[14px] text-green-600" title={t('start_date')}>flag</span>
-                                    )}
-                                    {isHarvest && (
-                                        <span className="material-symbols-outlined text-[14px] text-orange-500" title={t('harvest_date')}>agriculture</span>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Task Indicators (Dots/Chips) */}
-                            <div className="space-y-1 mt-1">
-                                {dayTasks.slice(0, 3).map(task => (
-                                    <div key={task.id} className={`text-[10px] px-1.5 py-0.5 rounded truncate ${task.status === 'completed'
-                                        ? 'bg-gray-100 text-gray-500 line-through'
-                                        : 'bg-blue-100 text-blue-700'
-                                        }`}>
-                                        {task.title}
-                                    </div>
-                                ))}
-                                {dayTasks.length > 3 && (
-                                    <div className="text-[10px] text-gray-400 pl-1">
-                                        +{dayTasks.length - 3} more
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    );
-                })}
-
-                {/* Fill remaining cells to complete the grid visually (optional, but looks better) */}
-                {Array.from({ length: 42 - (startDayOfWeek + days.length) }).map((_, i) => (
-                    <div key={`fill-${i}`} className="border-b border-r border-gray-100 bg-gray-50/30"></div>
-                ))}
-            </div>
-        </div>
-    );
+        {Array.from({ length: 42 - (startDayOfWeek + days.length) }).map((_, index) => (
+          <div key={`fill-${index}`} className="border-b border-r border-border/70 bg-secondary/20" />
+        ))}
+      </div>
+    </div>
+  );
 }
