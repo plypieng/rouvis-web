@@ -515,34 +515,124 @@
   },
   "landing": {
     "hero": {
-      "title": "Data-Driven Farming for Niigata",
-      "subtitle": "ROUVIS combines local agricultural wisdom with advanced AI to help you plan, manage, and optimize your crops with precision.",
-      "cta_start": "Start for Free",
+      "header_tag": "JAPAN FARM OS",
+      "eyebrow": "AI farm operations platform for Japanese growers",
+      "title": "Built for Japanese farms,",
+      "title_accent": "so daily decisions get easier.",
+      "subtitle": "ROUVIS unifies weather, work planning, and records so your team can decide today's priorities in minutes, even during peak season.",
+      "cta_start": "Start Free",
       "cta_login": "Sign In",
-      "cta_demo": "Try Demo"
+      "cta_demo": "Watch Demo",
+      "cta_beta": "Request Beta Access",
+      "chip_1": "JMA weather integration",
+      "chip_2": "Field-first mobile workflow",
+      "chip_3": "Automatic work history",
+      "image_alt": "ROUVIS farm dashboard preview",
+      "overlay": {
+        "weather_label": "Today's weather risk",
+        "weather_value": "Fertilize before afternoon rainfall",
+        "task_label": "Top task today",
+        "task_value": "08:00-10:00 field protection and log update"
+      }
     },
-    "features": {
-      "ai_advisor": {
-        "title": "AI Cultivation Concierge",
-        "desc": "Specialized for Niigata rice & vegetables. Ask about pests, growth stages, or organic farming methods anytime."
+    "pain_points": {
+      "title": "Reduce the daily decision burden on farm teams",
+      "subtitle": "Weather shifts, labor limits, and fragmented records are brought into one operating view.",
+      "solution_label": "How ROUVIS improves it",
+      "weather": {
+        "title": "Plans break when weather changes",
+        "problem": "Morning weather changes force last-minute decisions and schedule resets.",
+        "solution": "ROUVIS auto-suggests task resequencing based on weather and growth stage."
       },
-      "precision_calendar": {
-        "title": "Dynamic Work Calendar",
-        "desc": "Schedules that adapt to real-time JMA weather data. Never miss the perfect window for planting or harvesting."
+      "labor": {
+        "title": "Small teams struggle to coordinate",
+        "problem": "Assigning who does what in which field becomes manual and inconsistent.",
+        "solution": "Priority-ranked task lists help teams assign work quickly and clearly."
       },
-      "field_monitoring": {
-        "title": "Field & Weather Map",
-        "desc": "Visualize all your fields on a map with overlayed weather forecasts. Monitor growth progress specific to Niigata's micro-climates."
+      "records": {
+        "title": "Records are scattered across tools",
+        "problem": "Paper notes and chats make review and improvement difficult later.",
+        "solution": "All actions and outcomes are saved in one timeline for future decisions."
+      }
+    },
+    "value_section": {
+      "title": "Four capabilities that improve field execution",
+      "subtitle": "The product is designed to reduce operational friction before advanced analytics.",
+      "features": {
+        "daily_brief": {
+          "title": "Auto-prioritized morning task brief",
+          "desc": "Get a practical list of what to do today, ordered by urgency and conditions."
+        },
+        "field_ai": {
+          "title": "Field-level AI recommendations",
+          "desc": "Receive next-step suggestions tailored by crop, stage, and recent activity."
+        },
+        "weather_risk": {
+          "title": "Proactive weather-risk guidance",
+          "desc": "Get alerts for rain, heat, and cold with suggested schedule adjustments."
+        },
+        "traceability": {
+          "title": "Records that drive next-season learning",
+          "desc": "Captured logs become reusable operational knowledge for your next cycle."
+        }
+      }
+    },
+    "workflow": {
+      "title": "Simple onboarding in three steps",
+      "subtitle": "A mobile-first workflow that teams can adopt quickly.",
+      "steps": {
+        "capture": {
+          "title": "Register fields and crops",
+          "desc": "Set up your basic farm context once to personalize recommendations."
+        },
+        "suggest": {
+          "title": "AI generates daily plans",
+          "desc": "Weather and growth stages are used to prepare practical task suggestions."
+        },
+        "execute": {
+          "title": "Execute and log in real time",
+          "desc": "Tap to record completed work and continuously improve recommendation quality."
+        }
+      }
+    },
+    "testimonial": {
+      "title": "What beta users say",
+      "quote": "We spend less time deciding what to do each morning, and we react faster when weather shifts.",
+      "author": "Open-field vegetable grower, Niigata (beta user)"
+    },
+    "faq": {
+      "title": "FAQ",
+      "items": {
+        "setup": {
+          "q": "Can we run this from smartphones only?",
+          "a": "Yes. Field registration, task checks, and work logs are all available on mobile."
+        },
+        "pricing": {
+          "q": "When does pricing start?",
+          "a": "ROUVIS is currently in closed beta. Pricing and rollout are shared during onboarding."
+        },
+        "support": {
+          "q": "Is onboarding support included?",
+          "a": "Yes. We provide guided setup and operational support to help teams adopt smoothly."
+        }
       }
     },
     "trust": {
-      "trusted_by": "Powered by Verified Agricultural Data",
-      "stat_1": "3 AI Agents",
-      "stat_2": "JMA Weather Sync",
-      "stat_3": "Niigata Optimized"
+      "stat_1_label": "Operations",
+      "stat_1": "Morning priorities automatically organized",
+      "stat_2_label": "Data",
+      "stat_2": "Weather and field activity unified",
+      "stat_3_label": "Team model",
+      "stat_3": "Designed for small farm teams"
+    },
+    "cta": {
+      "title": "Move from reactive farming to reliable operations",
+      "subtitle": "Join the beta and build an operating model tailored to your crops and fields.",
+      "primary": "Start Free",
+      "secondary": "Sign In"
     },
     "footer": {
-      "copyright": "© 2024 Rouvis. Empowering Niigata Agriculture.",
+      "copyright": "© 2026 Rouvis. Supporting better farm decisions in Japan.",
       "privacy": "Privacy Policy",
       "terms": "Terms of Service"
     }
