@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import DashboardHeader from './DashboardHeader';
+import { ModuleBlueprint } from '@/components/workflow/ModuleBlueprint';
 
 import { cookies } from 'next/headers';
 
@@ -126,11 +127,23 @@ export default async function DashboardProjectList({ locale, userId: _userId }: 
     today.setHours(23, 59, 59, 999);
     const todayTasks = dashboardTasks.filter((t: any) => new Date(t.dueAt) <= today);
 
+    const statusLabel = (status: string) => {
+        if (status === 'active') return locale === 'ja' ? '進行中' : 'Active';
+        if (status === 'completed') return locale === 'ja' ? '完了' : 'Completed';
+        return locale === 'ja' ? '要確認' : 'Review';
+    };
+
+    const statusClassName = (status: string) => {
+        if (status === 'active') return 'status-safe';
+        if (status === 'completed') return 'status-watch';
+        return 'status-warning';
+    };
+
     return (
-        <div className="min-h-screen bg-background font-sans">
+        <div className="min-h-screen shell-canvas font-sans">
             <DashboardHeader locale={locale} weather={weather} tasks={dashboardTasks} />
 
-            <main className="container mx-auto px-4 py-8 max-w-7xl space-y-8">
+            <main className="shell-main pb-10 space-y-8">
                 {/* Today's Focus Section */}
                 {todayTasks.length > 0 && (
                     <TodayFocus tasks={todayTasks} locale={locale} />
@@ -139,10 +152,10 @@ export default async function DashboardProjectList({ locale, userId: _userId }: 
                 {/* Projects Grid */}
                 <div>
                     <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-xl font-bold text-gray-900">{t('active_projects')}</h2>
+                        <h2 className="text-xl font-semibold text-foreground">{t('active_projects')}</h2>
                         <Link
                             href={`/${locale}/projects`}
-                            className="text-sm font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                            className="inline-flex items-center gap-1 text-sm font-semibold text-brand-seedling hover:text-brand-seedling/80"
                         >
                             {t('view_all')}
                             <span className="material-symbols-outlined text-sm">arrow_forward</span>
@@ -150,63 +163,54 @@ export default async function DashboardProjectList({ locale, userId: _userId }: 
                     </div>
 
                     {projects.length === 0 ? (
-                        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 max-w-lg mx-auto text-center space-y-5">
-                            <div className="w-14 h-14 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto">
-                                <span className="text-3xl">🌱</span>
+                        <div className="mx-auto max-w-xl space-y-4">
+                            <ModuleBlueprint
+                                title={t('empty_title')}
+                                description={t('empty_subtitle')}
+                                tone="watch"
+                                icon={<span className="text-2xl" aria-hidden="true">+</span>}
+                                action={(
+                                    <Link
+                                        href={`/${locale}/projects/create`}
+                                        className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
+                                    >
+                                        <span className="material-symbols-outlined text-base">add</span>
+                                        {t('create_first_project')}
+                                    </Link>
+                                )}
+                            />
+                            <div className="surface-base p-4">
+                                <ol className="space-y-2 text-sm text-muted-foreground">
+                                    <li className="flex items-center gap-2"><span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-secondary text-xs font-bold text-secondary-foreground">1</span>{t('empty_step_1')}</li>
+                                    <li className="flex items-center gap-2"><span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-secondary text-xs font-bold text-secondary-foreground">2</span>{t('empty_step_2')}</li>
+                                    <li className="flex items-center gap-2"><span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-secondary text-xs font-bold text-secondary-foreground">3</span>{t('empty_step_3')}</li>
+                                </ol>
                             </div>
-                            <div>
-                                <h3 className="text-lg font-bold text-gray-900 mb-1">{t('empty_title')}</h3>
-                                <p className="text-sm text-gray-500">{t('empty_subtitle')}</p>
-                            </div>
-                            <div className="text-left space-y-3 bg-gray-50 rounded-xl p-4">
-                                <div className="flex items-center gap-3">
-                                    <span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center justify-center flex-none">1</span>
-                                    <span className="text-sm text-gray-700">{t('empty_step_1')}</span>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center justify-center flex-none">2</span>
-                                    <span className="text-sm text-gray-700">{t('empty_step_2')}</span>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center justify-center flex-none">3</span>
-                                    <span className="text-sm text-gray-700">{t('empty_step_3')}</span>
-                                </div>
-                            </div>
-                            <Link
-                                href={`/${locale}/projects/create`}
-                                className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-500 transition-colors font-semibold shadow-sm"
-                            >
-                                <span className="material-symbols-outlined text-lg">add</span>
-                                {t('create_first_project')}
-                            </Link>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                             {projects.slice(0, 6).map((project) => (
-                                <Link key={project.id} href={`/${locale}/projects/${project.id}`} className="block group h-full">
-                                    <div className="border rounded-xl p-5 hover:shadow-md transition bg-white h-full flex flex-col border-gray-200 group-hover:border-green-200">
-                                        <div className="flex justify-between items-start mb-3">
-                                            <h3 className="text-lg font-semibold text-gray-900 group-hover:text-green-700 transition line-clamp-1">
+                                <Link key={project.id} href={`/${locale}/projects/${project.id}`} className="group block h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                                    <article className="surface-base h-full p-5 transition-colors group-hover:border-brand-seedling/45 group-hover:bg-secondary/40">
+                                        <div className="mb-3 flex items-start justify-between gap-2">
+                                            <h3 className="line-clamp-1 text-lg font-semibold text-foreground group-hover:text-brand-seedling">
                                                 {project.name}
                                             </h3>
-                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${project.status === 'active' ? 'bg-green-100 text-green-800' :
-                                                project.status === 'completed' ? 'bg-blue-100 text-blue-800' :
-                                                    'bg-yellow-100 text-yellow-800'
-                                                }`}>
-                                                {project.status}
+                                            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusClassName(project.status)}`}>
+                                                {statusLabel(project.status)}
                                             </span>
                                         </div>
-                                        <div className="space-y-2 text-sm text-gray-600 flex-1">
+                                        <div className="space-y-2 text-sm text-muted-foreground">
                                             <div className="flex items-center gap-2">
-                                                <span className="material-symbols-outlined text-gray-400 text-base">grass</span>
+                                                <span className="material-symbols-outlined text-base text-foreground/70">grass</span>
                                                 <span>{project.crop} {project.variety && `(${project.variety})`}</span>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                <span className="material-symbols-outlined text-gray-400 text-base">calendar_today</span>
+                                                <span className="material-symbols-outlined text-base text-foreground/70">calendar_today</span>
                                                 <span>{new Date(project.startDate).toLocaleDateString(locale)}</span>
                                             </div>
                                         </div>
-                                    </div>
+                                    </article>
                                 </Link>
                             ))}
                         </div>

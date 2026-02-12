@@ -1,7 +1,9 @@
-import Link from 'next/link';
 import { AdvisorStrip } from './AdvisorStrip';
 import PriorityTaskBubble from './PriorityTaskBubble';
 import DashboardCalendar from './DashboardCalendar';
+import { SeasonRail } from '@/components/workflow/SeasonRail';
+import { buildSeasonRailState } from '@/lib/workflow-ui';
+import type { RiskTone } from '@/types/ui-shell';
 
 interface WeatherData {
   location: string;
@@ -45,29 +47,69 @@ export default async function DashboardHeader({ locale, weather, tasks }: { loca
     };
   }
 
+  const todayIso = new Date().toISOString().split('T')[0];
+  const overdueCount = tasks.filter((task) => task.status !== 'completed' && task.dueAt.split('T')[0] < todayIso).length;
+  const dueSoonCount = tasks.filter((task) => task.status !== 'completed' && task.dueAt.split('T')[0] === todayIso).length;
+
+  let riskTone: RiskTone = 'safe';
+  if ((weather.alerts?.length || 0) >= 2 || overdueCount > 3) riskTone = 'critical';
+  else if ((weather.alerts?.length || 0) >= 1 || overdueCount > 0) riskTone = 'warning';
+  else if (dueSoonCount > 3) riskTone = 'watch';
+
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 1).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  const completedTodayRatio = Math.round(((tasks.length - dueSoonCount) / Math.max(tasks.length, 1)) * 100);
+  const seasonState = buildSeasonRailState({
+    stage: overdueCount > 0 ? 'flowering' : 'vegetative',
+    progress: completedTodayRatio,
+    dayCount: dayOfYear,
+    totalDays: 365,
+    windowLabel: `${weather.location} · ${highLabel} ${Math.round(weather.temperature.max)}° / ${lowLabel} ${Math.round(weather.temperature.min)}°`,
+    risk: riskTone,
+    note: overdueCount > 0
+      ? `${overdueCount} ${locale === 'ja' ? '件の期限超過タスクがあります' : 'overdue tasks need recovery'}`
+      : locale === 'ja'
+        ? '今日の重点タスクを先に完了させると遅延を防げます'
+        : 'Clear priority items early to keep this week on track.',
+  });
+
   return (
-    <div className="bg-card border-b border-border mb-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex flex-col">
-
-          {/* 1. Large Weekly Calendar with Priority Bubble */}
-          <div className="flex items-stretch gap-0 z-10">
-            {/* Left: Priority Bubble (Fixed width) */}
-            <PriorityTaskBubble task={priorityTask} />
-
-            {/* Right: Calendar (Takes remaining space) */}
-            <div className="flex-1 min-w-0">
-              <DashboardCalendar tasks={tasks} locale={locale} weatherForecast={weather.forecast} />
-            </div>
+    <section className="surface-raised mb-8 overflow-hidden">
+      <div className="shell-main py-6">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              {locale === 'ja' ? '圃場オペレーション' : 'Field Operations'}
+            </p>
+            <h2 className="text-xl font-semibold text-foreground">
+              {weather.location}
+            </h2>
           </div>
-
-          {/* 2. AI Advisor Strip (Moved Below Calendar) */}
-          <div className="w-full -mt-[2px] z-0">
-            <AdvisorStrip className="rounded-t-none" />
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-border bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground">
+              {highLabel} {Math.round(weather.temperature.max)}°
+            </span>
+            <span className="rounded-full border border-border bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground">
+              {lowLabel} {Math.round(weather.temperature.min)}°
+            </span>
+            {(weather.alerts?.length || 0) > 0 && (
+              <span className="status-warning rounded-full px-3 py-1 text-xs font-semibold">
+                {locale === 'ja' ? `警戒 ${weather.alerts?.length} 件` : `${weather.alerts?.length} alerts`}
+              </span>
+            )}
           </div>
-
         </div>
+
+        <SeasonRail state={seasonState} className="mb-4" />
+
+        <div className="mb-4 grid gap-4 lg:grid-cols-[320px,1fr]">
+          <PriorityTaskBubble task={priorityTask} />
+          <div className="surface-base min-w-0 overflow-hidden">
+            <DashboardCalendar tasks={tasks} locale={locale} weatherForecast={weather.forecast} />
+          </div>
+        </div>
+
+        <AdvisorStrip className="surface-base" />
       </div>
-    </div>
+    </section>
   );
 }

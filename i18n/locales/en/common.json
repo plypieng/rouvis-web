@@ -646,6 +646,12 @@
       "terms": "Terms of Service"
     }
   },
+  "workflow": {
+    "season_rail": "Season Rail",
+    "field_operations": "Field Operations",
+    "module_blueprint_title": "Module setup required",
+    "module_blueprint_description": "Finish initial setup to activate this workflow module."
+  },
   "privacy_policy": {
     "title": "Privacy Policy",
     "last_updated": "Last Updated: January 17, 2026",

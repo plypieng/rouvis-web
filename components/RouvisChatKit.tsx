@@ -597,7 +597,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
                 setHasUnreadMessages(false);
                 setIsUserNearBottom(true);
               }}
-              className="px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-medium shadow-md hover:opacity-90"
+              className="rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-md hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               最新のメッセージへ
             </button>
@@ -621,7 +621,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
                 {!!confirmation.undoData && Date.now() < confirmation.expiresAt && (
                   <button
                     onClick={() => handleUndo(confirmation)}
-                    className="flex items-center gap-1 text-xs underline opacity-70 hover:opacity-100"
+                    className="flex items-center gap-1 rounded px-1 text-xs underline opacity-70 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <Undo2 className="w-3 h-3" />
                     取り消す
@@ -649,7 +649,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
                     setCustomSuggestions(null); // Clear after selection
                   }
                 }}
-                className={`w-full text-left px-3 py-2 text-xs font-medium bg-background border border-border/60 hover:border-primary/50 hover:bg-muted/50 rounded-md transition-all flex items-center justify-between group ${(s as any).isCancel ? 'text-muted-foreground' : 'text-foreground'}`}
+                className={`group flex w-full items-center justify-between rounded-md border border-border/60 bg-background px-3 py-2 text-left text-xs font-medium transition-all hover:border-primary/50 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${(s as any).isCancel ? 'text-muted-foreground' : 'text-foreground'}`}
               >
                 <span className="truncate">{s.label}</span>
                 {!((s as any).isCancel) && (
@@ -671,7 +671,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
               />
               <button
                 onClick={handleRemoveImage}
-                className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 shadow-sm hover:bg-destructive/90 transition-colors"
+                className="absolute -top-2 -right-2 rounded-full bg-destructive p-1 text-destructive-foreground shadow-sm transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -692,7 +692,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="p-2 ml-1 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full transition-colors"
+              className="ml-1 rounded-full p-2 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               disabled={isLoading}
             >
               <Paperclip className="w-5 h-5" />
@@ -708,7 +708,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
             <button
               type="submit"
               disabled={isLoading || (!input.trim() && !selectedImage)}
-              className={`text-primary-foreground rounded-full p-3 min-w-[44px] min-h-[44px] flex items-center justify-center hover:opacity-90 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed transition-all ${chatMode !== 'default' ? chatMode === 'reschedule' ? 'bg-amber-600' : chatMode === 'diagnosis' ? 'bg-teal-600' : 'bg-blue-600' : 'bg-primary'}`}
+              className={`flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full p-3 text-primary-foreground transition-all hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${chatMode !== 'default' ? chatMode === 'reschedule' ? 'bg-amber-600' : chatMode === 'diagnosis' ? 'bg-teal-600' : 'bg-blue-600' : 'bg-primary'}`}
             >
               {isLoading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -730,7 +730,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
             </div>
             <button
               onClick={() => setChatModeState('default')}
-              className="hover:underline opacity-80 hover:opacity-100 uppercase tracking-wider text-[10px]"
+              className="rounded px-1 text-[10px] uppercase tracking-wider opacity-80 hover:opacity-100 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               終了
             </button>

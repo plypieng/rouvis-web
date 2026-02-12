@@ -119,12 +119,15 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
         setShowTaskCreateModal(true);
     };
 
-    return (
-        <div className="min-h-[calc(100vh-64px)] bg-gray-50/50 flex flex-col">
-            <div className="container mx-auto px-4 py-2 max-w-7xl flex-1 flex flex-col">
+  return (
+        <div className="min-h-[calc(100vh-64px)] shell-canvas flex flex-col">
+            <div className="shell-main py-3 flex-1 flex flex-col">
                 {/* Top Bar: Back Link + Compact ProjectHeader */}
-                <div className="flex-none mb-3 flex items-start gap-4">
-                    <Link href={`/${locale}/projects`} className="flex-none inline-flex items-center gap-1 text-gray-500 hover:text-gray-900 transition font-medium text-sm mt-2">
+                <div className="mb-3 flex flex-none items-start gap-3">
+                    <Link
+                        href={`/${locale}/projects`}
+                        className="mt-1 inline-flex flex-none items-center gap-1 rounded-md px-2 py-1 text-sm font-semibold text-muted-foreground transition hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
                         <span className="material-symbols-outlined text-lg">arrow_back</span>
                         <span className="hidden sm:inline">{t('back_to_projects')}</span>
                     </Link>
@@ -139,20 +142,20 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
                     <div
                         className={`mb-3 rounded-lg border px-4 py-3 text-sm ${
                             notice.type === 'success'
-                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                : 'border-red-200 bg-red-50 text-red-700'
+                                ? 'status-safe'
+                                : 'status-critical'
                         }`}
                     >
                         {notice.message}
                     </div>
                 )}
 
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch mb-2 lg:h-[calc(100vh-120px)] h-auto">
+                <div className="mb-2 grid h-auto grid-cols-1 items-stretch gap-4 lg:h-[calc(100vh-120px)] lg:grid-cols-12">
                     {/* LEFT COLUMN: Companion Sidebar */}
-                    <div id="project-chat-kit" className="lg:col-span-4 order-2 lg:order-1 flex flex-col h-full min-h-0">
+                    <div id="project-chat-kit" className="order-2 flex h-full min-h-0 flex-col lg:order-1 lg:col-span-4">
                         <RouvisChatKit
                             ref={chatRef}
-                            className="flex-1 border border-gray-200 rounded-2xl shadow-sm overflow-hidden bg-white h-full"
+                            className="surface-base h-full flex-1 overflow-hidden"
                             projectId={project.id}
                             onTaskUpdate={() => router.refresh()}
                             onDraftCreate={(draft) => handleTaskCreate(new Date(), draft)}
@@ -162,7 +165,7 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
                     </div>
 
                     {/* RIGHT COLUMN: Calendar Only (Auto Height) */}
-                    <div className="lg:col-span-8 order-1 lg:order-2 flex flex-col gap-2 h-full min-h-0">
+                    <div className="order-1 flex h-full min-h-0 flex-col gap-2 lg:order-2 lg:col-span-8">
                         {/* 2. Onboarding OR Calendar */}
                         {(!project.tasks || project.tasks.length === 0) ? (
                             <ProjectAgentOnboarding
