@@ -19,9 +19,6 @@ const nextConfig = {
       },
     ],
   },
-  env: {
-    NEXT_PUBLIC_DEMO_MODE: 'true',
-  },
 };
 
 export default withSentryConfig(withNextIntl(nextConfig), {

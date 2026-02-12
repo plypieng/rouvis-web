@@ -11,9 +11,10 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { prisma, authPrisma } from "./prisma";
 
-const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim();
-const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
-const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+const normalizeEnvValue = (value?: string) => value?.replace(/\\[rn]/g, '').trim();
+const googleClientId = normalizeEnvValue(process.env.GOOGLE_CLIENT_ID);
+const googleClientSecret = normalizeEnvValue(process.env.GOOGLE_CLIENT_SECRET);
+const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true' && process.env.NODE_ENV === 'development';
 const hasGoogleOAuth = !!googleClientId && !!googleClientSecret;
 
 if (!hasGoogleOAuth && !isDemoMode) {
@@ -31,7 +32,7 @@ export const authOptions: NextAuthOptions = {
           authorization: {
             params: {
               // Request calendar scope for Google Calendar integration
-              scope: 'openid email profile https://www.googleapis.com/auth/calendar',
+              scope: 'openid email profile',
               access_type: 'offline',
               prompt: 'consent',
             },
@@ -39,7 +40,7 @@ export const authOptions: NextAuthOptions = {
         })
       ]
       : []),
-    ...(process.env.NEXT_PUBLIC_DEMO_MODE === 'true' ? [
+    ...(isDemoMode ? [
       CredentialsProvider({
         id: "demo-device",
         name: "Demo Device",
