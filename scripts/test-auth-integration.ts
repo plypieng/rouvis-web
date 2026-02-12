@@ -345,7 +345,27 @@ class AuthIntegrationTests {
   async testOAuthRedirect(): Promise<void> {
     log('OAuth', 'Testing Google OAuth redirect...');
 
+    // NextAuth requires a CSRF-protected POST to initiate OAuth provider sign-in.
+    const csrfResponse = await fetchWithCookies(`${APP_URL}/api/auth/csrf`);
+    if (csrfResponse.status !== 200) {
+      throw new Error(`CSRF endpoint failed with status ${csrfResponse.status}`);
+    }
+    const csrfData = JSON.parse(csrfResponse.body);
+    if (!csrfData.csrfToken) {
+      throw new Error('CSRF token not returned for OAuth redirect test');
+    }
+
+    const body = new URLSearchParams({
+      csrfToken: csrfData.csrfToken,
+      callbackUrl: `${APP_URL}/`,
+    }).toString();
+
     const response = await fetchWithCookies(`${APP_URL}/api/auth/signin/google`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body,
       followRedirect: false,
     });
 

@@ -1,191 +1,240 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 
-
 interface ProjectInsightsPanelProps {
-    project: {
-        id: string;
-        crop: string;
-        stage?: string;
-    };
-    onAskAI: () => void;
+  project: {
+    id: string;
+    crop: string;
+    stage?: string;
+  };
+  onAskAI: () => void;
 }
 
 type AdviceBlock = {
-    status?: 'safe' | 'warning' | 'critical' | string;
-    summary?: string;
-    detail?: string;
-    message?: string;
+  status?: 'safe' | 'warning' | 'critical' | string;
+  summary?: string;
+  detail?: string;
+  message?: string;
 };
 
 type AdviceTask = string | { summary?: string; detail?: string };
 
 type Advice = {
-    weatherImpact?: AdviceBlock;
-    stageAdvice?: { summary?: string; detail?: string; message?: string };
-    priorityTasks?: AdviceTask[];
+  weatherImpact?: AdviceBlock;
+  stageAdvice?: { summary?: string; detail?: string; message?: string };
+  priorityTasks?: AdviceTask[];
 };
 
+function normalizeTone(status?: string): 'safe' | 'warning' | 'critical' {
+  if (status === 'critical') return 'critical';
+  if (status === 'warning') return 'warning';
+  return 'safe';
+}
+
+function toneClass(tone: 'safe' | 'warning' | 'critical'): string {
+  if (tone === 'critical') return 'status-critical';
+  if (tone === 'warning') return 'status-warning';
+  return 'status-safe';
+}
+
+function toneIcon(tone: 'safe' | 'warning' | 'critical'): string {
+  if (tone === 'critical') return 'error';
+  if (tone === 'warning') return 'warning';
+  return 'check_circle';
+}
+
 export default function ProjectInsightsPanel({ project, onAskAI }: ProjectInsightsPanelProps) {
-    const t = useTranslations('projects.insights_panel');
-    const [loading, setLoading] = useState(true);
-    const [insights, setInsights] = useState<Advice | null>(null);
+  const t = useTranslations('projects.insights_panel');
+  const [loading, setLoading] = useState(true);
+  const [insights, setInsights] = useState<Advice | null>(null);
+  const [hasError, setHasError] = useState(false);
+  const [expandedWeather, setExpandedWeather] = useState(false);
+  const [expandedStage, setExpandedStage] = useState(false);
+  const [expandedTasks, setExpandedTasks] = useState<number[]>([]);
 
-    useEffect(() => {
-        const fetchAdvice = async () => {
-            try {
-                const res = await fetch('/api/v1/agents/advice', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ projectId: project.id }),
-                });
+  useEffect(() => {
+    let isActive = true;
 
-                if (res.ok) {
-                    const data = await res.json();
-                    setInsights(data.advice);
-                } else {
-                    console.error('Advice fetch failed:', res.status, res.statusText);
-                }
-            } catch (error) {
-                console.error('Failed to fetch advice:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
+    const fetchAdvice = async () => {
+      setLoading(true);
+      setHasError(false);
 
-        fetchAdvice();
-    }, [project.id]);
+      try {
+        const res = await fetch('/api/v1/agents/advice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId: project.id }),
+        });
 
-    const [expandedWeather, setExpandedWeather] = useState(false);
-    const [expandedStage, setExpandedStage] = useState(false);
-    const [expandedTasks, setExpandedTasks] = useState<number[]>([]);
+        if (!res.ok) {
+          if (isActive) {
+            setHasError(true);
+            setInsights(null);
+          }
+          return;
+        }
 
-    const toggleTaskExpansion = (index: number) => {
-        setExpandedTasks(prev =>
-            prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index]
-        );
+        const data = (await res.json()) as { advice?: Advice };
+        if (isActive) {
+          setInsights(data.advice || null);
+        }
+      } catch (error) {
+        console.error('Failed to fetch advice:', error);
+        if (isActive) {
+          setHasError(true);
+          setInsights(null);
+        }
+      } finally {
+        if (isActive) {
+          setLoading(false);
+        }
+      }
     };
 
-    if (loading) {
-        return (
-            <div className="bg-white rounded-xl border border-gray-100 p-8 mb-6 shadow-sm flex justify-center items-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-            </div>
-        );
-    }
+    void fetchAdvice();
 
-    if (!insights) {
-        return (
-            <div className="bg-white rounded-xl border border-gray-100 p-4 mb-6 shadow-sm text-center text-gray-500 text-sm">
-                AIアドバイスの取得に失敗しました。
-                <button
-                    onClick={() => window.location.reload()}
-                    className="ml-2 text-indigo-600 hover:underline"
-                >
-                    再読み込み
-                </button>
-            </div>
-        );
-    }
+    return () => {
+      isActive = false;
+    };
+  }, [project.id]);
 
-    return (
-        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border border-indigo-100 p-4 mb-6 shadow-sm">
-            <div className="flex justify-between items-center mb-3">
-                <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-indigo-600">auto_awesome</span>
-                    <h3 className="font-bold text-indigo-900">{t('title')}</h3>
-                </div>
-                <button
-                    onClick={onAskAI}
-                    className="text-xs bg-white text-indigo-600 px-3 py-1.5 rounded-full border border-indigo-100 hover:bg-indigo-50 transition shadow-sm flex items-center gap-1 font-medium"
-                >
-                    <span className="material-symbols-outlined text-sm">chat</span>
-                    {t('ask_ai')}
-                </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Weather Impact - Expandable */}
-                <div className="bg-white/60 backdrop-blur-sm rounded-lg p-3 border border-indigo-50">
-                    <h4 className="text-xs font-bold text-gray-500 uppercase mb-1">{t('weather_impact')}</h4>
-                    <div className="flex items-start gap-2 mb-2">
-                        <span className={`material-symbols-outlined text-sm mt-0.5 ${insights.weatherImpact?.status === 'critical' ? 'text-red-500' :
-                            insights.weatherImpact?.status === 'warning' ? 'text-orange-500' : 'text-green-500'
-                            }`}>
-                            {insights.weatherImpact?.status === 'critical' ? 'error' :
-                                insights.weatherImpact?.status === 'warning' ? 'warning' : 'check_circle'}
-                        </span>
-                        <div className="flex-1">
-                            <p className="text-sm text-gray-700">
-                                {expandedWeather ? insights.weatherImpact?.detail : insights.weatherImpact?.summary || insights.weatherImpact?.message}
-                            </p>
-                        </div>
-                    </div>
-                    {insights.weatherImpact?.detail && (
-                        <button
-                            onClick={() => setExpandedWeather(!expandedWeather)}
-                            className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1 mt-1"
-                        >
-                            <span className="material-symbols-outlined text-sm">
-                                {expandedWeather ? 'expand_less' : 'expand_more'}
-                            </span>
-                            {expandedWeather ? '閉じる' : '詳しく見る'}
-                        </button>
-                    )}
-                </div>
-
-                {/* Stage Advice - Expandable */}
-                <div className="bg-white/60 backdrop-blur-sm rounded-lg p-3 border border-indigo-50">
-                    <h4 className="text-xs font-bold text-gray-500 uppercase mb-1">{t('stage_advice')}</h4>
-                    <p className="text-sm text-gray-700 whitespace-pre-line">
-                        {expandedStage ? insights.stageAdvice?.detail : insights.stageAdvice?.summary || insights.stageAdvice?.message}
-                    </p>
-                    {insights.stageAdvice?.detail && (
-                        <button
-                            onClick={() => setExpandedStage(!expandedStage)}
-                            className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1 mt-2"
-                        >
-                            <span className="material-symbols-outlined text-sm">
-                                {expandedStage ? 'expand_less' : 'expand_more'}
-                            </span>
-                            {expandedStage ? '閉じる' : '詳しく見る'}
-                        </button>
-                    )}
-                </div>
-
-                {/* Priority Tasks - Expandable */}
-                <div className="bg-white/60 backdrop-blur-sm rounded-lg p-3 border border-indigo-50">
-                    <h4 className="text-xs font-bold text-gray-500 uppercase mb-1">{t('priority_tasks')}</h4>
-                    <ul className="space-y-2">
-                        {Array.isArray(insights.priorityTasks) && insights.priorityTasks.map((task, index: number) => {
-                            const isExpanded = expandedTasks.includes(index);
-                            const taskText = typeof task === 'string'
-                                ? task
-                                : (isExpanded ? task.detail : task.summary) || '—';
-                            const hasDetail = typeof task === 'object' && !!task?.detail;
-
-                            return (
-                                <li key={index} className="flex items-start gap-1.5">
-                                    <span className="text-indigo-600 text-xs mt-0.5">•</span>
-                                    <div className="flex-1">
-                                        <span className="text-sm text-gray-700">{taskText}</span>
-                                        {hasDetail && (
-                                            <button
-                                                onClick={() => toggleTaskExpansion(index)}
-                                                className="text-xs text-indigo-600 hover:text-indigo-800 ml-1"
-                                            >
-                                                {isExpanded ? '▲' : '▼'}
-                                            </button>
-                                        )}
-                                    </div>
-                                </li>
-                            );
-                        })}
-                    </ul>
-                </div>
-            </div>
-        </div>
+  const toggleTaskExpansion = (index: number) => {
+    setExpandedTasks((prev) =>
+      prev.includes(index)
+        ? prev.filter((value) => value !== index)
+        : [...prev, index]
     );
+  };
+
+  if (loading) {
+    return (
+      <div className="surface-base p-4 sm:p-5">
+        <div className="mb-3 h-5 w-44 animate-pulse rounded bg-secondary" />
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className="control-inset h-24 animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (hasError || !insights) {
+    return (
+      <div className="surface-base p-4 text-sm">
+        <div className="status-critical flex items-center justify-between gap-3 rounded-lg px-3 py-2">
+          <span>{t('fetch_failed')}</span>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="touch-target rounded-md border border-current/30 px-3 py-1 text-xs font-semibold hover:bg-black/5"
+          >
+            {t('retry')}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const weatherTone = normalizeTone(insights.weatherImpact?.status);
+  const weatherSummary = expandedWeather
+    ? insights.weatherImpact?.detail
+    : insights.weatherImpact?.summary || insights.weatherImpact?.message;
+
+  const stageSummary = expandedStage
+    ? insights.stageAdvice?.detail
+    : insights.stageAdvice?.summary || insights.stageAdvice?.message;
+
+  const priorityTasks = Array.isArray(insights.priorityTasks) ? insights.priorityTasks : [];
+
+  return (
+    <section className="surface-base p-4 sm:p-5">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
+          <span className="material-symbols-outlined text-brand-seedling">auto_awesome</span>
+          {t('title')}
+        </h3>
+        <button
+          type="button"
+          onClick={onAskAI}
+          className="touch-target inline-flex items-center gap-1 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary"
+        >
+          <span className="material-symbols-outlined text-[15px]">chat</span>
+          {t('ask_ai')}
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <article className="control-inset p-3">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{t('weather_impact')}</p>
+          <div className={`mb-2 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold ${toneClass(weatherTone)}`}>
+            <span className="material-symbols-outlined text-[13px]">{toneIcon(weatherTone)}</span>
+            <span>{t(`tone_${weatherTone}`)}</span>
+          </div>
+          <p className="text-sm text-foreground">{weatherSummary || t('no_data')}</p>
+          {insights.weatherImpact?.detail ? (
+            <button
+              type="button"
+              onClick={() => setExpandedWeather((prev) => !prev)}
+              className="mt-2 text-xs font-semibold text-brand-waterline hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {expandedWeather ? t('collapse') : t('expand')}
+            </button>
+          ) : null}
+        </article>
+
+        <article className="control-inset p-3">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{t('stage_advice')}</p>
+          <p className="text-sm text-foreground whitespace-pre-line">{stageSummary || t('no_data')}</p>
+          {insights.stageAdvice?.detail ? (
+            <button
+              type="button"
+              onClick={() => setExpandedStage((prev) => !prev)}
+              className="mt-2 text-xs font-semibold text-brand-waterline hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {expandedStage ? t('collapse') : t('expand')}
+            </button>
+          ) : null}
+        </article>
+
+        <article className="control-inset p-3">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{t('priority_tasks')}</p>
+          {priorityTasks.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t('no_priority_tasks')}</p>
+          ) : (
+            <ul className="space-y-2">
+              {priorityTasks.map((task, index) => {
+                const isExpanded = expandedTasks.includes(index);
+                const summary = typeof task === 'string' ? task : task.summary || task.detail || t('no_data');
+                const detail = typeof task === 'string' ? null : task.detail;
+                const hasDetail = Boolean(detail && detail !== summary);
+
+                return (
+                  <li key={`${index}-${summary.slice(0, 12)}`} className="rounded-md border border-border/70 bg-card px-2 py-1.5 text-sm text-foreground">
+                    <div className="flex items-start gap-2">
+                      <span className="mt-1 inline-flex h-1.5 w-1.5 rounded-full bg-brand-seedling" />
+                      <div className="min-w-0 flex-1">
+                        <p className="break-words">{hasDetail && isExpanded ? detail : summary}</p>
+                        {hasDetail ? (
+                          <button
+                            type="button"
+                            onClick={() => toggleTaskExpansion(index)}
+                            className="mt-1 text-xs font-semibold text-brand-waterline hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            {isExpanded ? t('collapse') : t('expand')}
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </article>
+      </div>
+    </section>
+  );
 }

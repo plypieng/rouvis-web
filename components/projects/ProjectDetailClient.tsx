@@ -1,14 +1,15 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { RouvisChatKit, RouvisChatKitRef } from '@/components/RouvisChatKit';
 import ProjectHeader from '@/components/projects/ProjectHeader';
 import ProjectCalendar from '@/components/projects/ProjectCalendar';
 import ProjectAgentOnboarding from '@/components/projects/ProjectAgentOnboarding';
 import TaskCreateModal from './TaskCreateModal';
+import type { CockpitPanelMode, QuickApplyResult, QuickApplyState } from '@/types/project-cockpit';
 
 type ProjectTask = {
     id: string;
@@ -51,14 +52,32 @@ type NoticeState = {
     message: string;
 } | null;
 
+const COCKPIT_SPLIT_KEY = 'rouvis:project-cockpit-split';
+const DEFAULT_SPLIT = 0.36;
+const MIN_SPLIT = 0.28;
+const MAX_SPLIT = 0.62;
+
+function clampSplitRatio(value: number): number {
+    if (!Number.isFinite(value)) return DEFAULT_SPLIT;
+    return Math.min(MAX_SPLIT, Math.max(MIN_SPLIT, value));
+}
+
 export default function ProjectDetailClient({ project, locale }: ProjectDetailClientProps) {
     const t = useTranslations('projects');
     const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
     const [showTaskCreateModal, setShowTaskCreateModal] = useState(false);
     const [selectedDateForTask, setSelectedDateForTask] = useState<Date | undefined>(undefined);
     const [taskInitialData, setTaskInitialData] = useState<{ title: string; description?: string } | undefined>(undefined);
     const [notice, setNotice] = useState<NoticeState>(null);
+    const [panelMode, setPanelMode] = useState<CockpitPanelMode>('chat');
+    const [splitRatio, setSplitRatio] = useState(DEFAULT_SPLIT);
+    const [isResizing, setIsResizing] = useState(false);
+    const [quickApplyState, setQuickApplyState] = useState<QuickApplyState>({ status: 'idle' });
     const chatRef = useRef<RouvisChatKitRef>(null);
+    const splitContainerRef = useRef<HTMLDivElement>(null);
+    const resizeStateRef = useRef<{ startX: number; startRatio: number } | null>(null);
 
     useEffect(() => {
         window.scrollTo(0, 0);
@@ -70,6 +89,71 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
         return () => clearTimeout(timeout);
     }, [notice]);
 
+    useEffect(() => {
+        const panel = searchParams?.get('panel');
+        if (panel === 'chat' || panel === 'calendar') {
+            setPanelMode(panel);
+        }
+    }, [searchParams]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const saved = Number.parseFloat(window.localStorage.getItem(COCKPIT_SPLIT_KEY) || '');
+        if (Number.isFinite(saved)) {
+            setSplitRatio(clampSplitRatio(saved));
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!isResizing) return;
+
+        const onPointerMove = (event: MouseEvent) => {
+            const container = splitContainerRef.current;
+            const resize = resizeStateRef.current;
+            if (!container || !resize) return;
+            const width = container.getBoundingClientRect().width;
+            if (width <= 0) return;
+            const deltaRatio = (event.clientX - resize.startX) / width;
+            setSplitRatio(clampSplitRatio(resize.startRatio + deltaRatio));
+        };
+
+        const onPointerUp = () => {
+            setIsResizing(false);
+            if (typeof window !== 'undefined') {
+                window.localStorage.setItem(COCKPIT_SPLIT_KEY, String(splitRatio));
+            }
+        };
+
+        window.addEventListener('mousemove', onPointerMove);
+        window.addEventListener('mouseup', onPointerUp);
+
+        return () => {
+            window.removeEventListener('mousemove', onPointerMove);
+            window.removeEventListener('mouseup', onPointerUp);
+        };
+    }, [isResizing, splitRatio]);
+
+    useEffect(() => {
+        if (quickApplyState.status === 'idle') return;
+        if (quickApplyState.status === 'running') return;
+        const timeout = setTimeout(() => setQuickApplyState({ status: 'idle' }), 3000);
+        return () => clearTimeout(timeout);
+    }, [quickApplyState.status]);
+
+    const updatePanelQuery = useCallback((mode: CockpitPanelMode) => {
+        const params = new URLSearchParams(searchParams?.toString() || '');
+        params.set('panel', mode);
+        router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    }, [pathname, router, searchParams]);
+
+    const commitSplitRatio = useCallback((ratio: number) => {
+        const clamped = clampSplitRatio(ratio);
+        setSplitRatio(clamped);
+        if (typeof window !== 'undefined') {
+            window.localStorage.setItem(COCKPIT_SPLIT_KEY, String(clamped));
+        }
+    }, []);
+
     const handleRescheduleRequest = (message?: string) => {
         if (chatRef.current) {
             // Activate Reschedule Mode with visual banner
@@ -77,9 +161,15 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
 
             // Set specific suggestions for rescheduling context
             chatRef.current.setSuggestions([
-                { label: 'スケジュールと天気を再確認', message: '今後のスケジュールと直近の天気を再確認し、必要な変更があれば提案して。' },
-                { label: '作業の優先順位を見直す', message: '作業の優先順位を見直したいです。どれから手をつけるべき？' },
-                { label: 'キャンセル', message: '', isCancel: true }
+                {
+                    label: t('calendar.reschedule_suggestion_weather_label'),
+                    message: t('calendar.reschedule_suggestion_weather_message'),
+                },
+                {
+                    label: t('calendar.reschedule_suggestion_priority_label'),
+                    message: t('calendar.reschedule_suggestion_priority_message'),
+                },
+                { label: t('calendar.reschedule_suggestion_cancel'), message: '', isCancel: true }
             ]);
 
             if (message) {
@@ -102,7 +192,7 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
             router.refresh();
             setNotice({
                 type: 'success',
-                message: status === 'completed' ? 'タスクを完了にしました。' : 'タスクを更新しました。',
+                message: status === 'completed' ? t('task_completed_notice') : t('task_updated_notice'),
             });
         } catch (error) {
             console.error('Failed to update task', error);
@@ -119,12 +209,91 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
         setShowTaskCreateModal(true);
     };
 
+    const handleQuickApplyRequest = useCallback(async (prompt: string): Promise<QuickApplyResult> => {
+        if (!chatRef.current) {
+            setQuickApplyState({ status: 'error', reason: t('calendar.quick_apply_chat_unavailable') });
+            return { applied: false, reason: 'chat_unavailable' };
+        }
+
+        setPanelMode('chat');
+        updatePanelQuery('chat');
+        setQuickApplyState({ status: 'running' });
+
+        const result = await chatRef.current.runRescheduleQuickApply({
+            prompt,
+            confirmMessage: t('calendar.quick_apply_confirm_message'),
+        });
+
+        if (result.applied) {
+            setQuickApplyState({ status: 'success', reason: t('calendar.quick_apply_success') });
+            router.refresh();
+            return result;
+        }
+
+        const reasonMap: Record<string, string> = {
+            in_flight: t('calendar.quick_apply_error_in_flight'),
+            no_plan: t('calendar.quick_apply_error_no_plan'),
+            proposal_failed: t('calendar.quick_apply_error_proposal_failed'),
+            apply_failed: t('calendar.quick_apply_error_apply_failed'),
+            apply_unconfirmed: t('calendar.quick_apply_error_unconfirmed'),
+            missing_prompt: t('calendar.quick_apply_error_missing_prompt'),
+            chat_unavailable: t('calendar.quick_apply_chat_unavailable'),
+        };
+        setQuickApplyState({
+            status: 'error',
+            reason: reasonMap[result.reason || ''] || t('calendar.quick_apply_error_generic'),
+        });
+        return result;
+    }, [router, t, updatePanelQuery]);
+
+    const hasTasks = Boolean(project.tasks?.length);
+
+    const chatPane = (
+        <div id="project-chat-kit" className="flex h-full min-h-0 flex-col">
+            <RouvisChatKit
+                ref={chatRef}
+                className="surface-base h-full flex-1 overflow-hidden"
+                projectId={project.id}
+                onTaskUpdate={() => router.refresh()}
+                onDraftCreate={(draft) => handleTaskCreate(new Date(), draft)}
+                density="compact"
+                growthStage={project.currentStage}
+            />
+        </div>
+    );
+
+    const planningPane = hasTasks ? (
+        <div className="surface-base h-full min-h-0 overflow-hidden">
+            <ProjectCalendar
+                startDate={project.startDate}
+                targetHarvestDate={project.targetHarvestDate}
+                tasks={project.tasks || []}
+                project={project}
+                onRescheduleRequest={handleRescheduleRequest}
+                onTaskComplete={handleTaskComplete}
+                onTaskCreate={handleTaskCreate}
+                onQuickApplyRequest={handleQuickApplyRequest}
+                quickApplyState={quickApplyState}
+            />
+        </div>
+    ) : (
+        <ProjectAgentOnboarding
+            projectId={project.id}
+            crop={project.crop}
+            startDate={project.startDate}
+            initialPreferences={project.schedulingPreferences || null}
+        />
+    );
+
     return (
-        <div className="min-h-[calc(100vh-64px)] bg-gray-50/50 flex flex-col">
-            <div className="container mx-auto px-4 py-2 max-w-7xl flex-1 flex flex-col">
+        <div className="min-h-[calc(100vh-64px)] shell-canvas flex flex-col">
+            <div className="shell-main py-3 flex-1 flex flex-col">
                 {/* Top Bar: Back Link + Compact ProjectHeader */}
-                <div className="flex-none mb-3 flex items-start gap-4">
-                    <Link href={`/${locale}/projects`} className="flex-none inline-flex items-center gap-1 text-gray-500 hover:text-gray-900 transition font-medium text-sm mt-2">
+                <div className="mb-3 flex flex-none items-start gap-3">
+                    <Link
+                        href={`/${locale}/projects`}
+                        className="mt-1 inline-flex flex-none items-center gap-1 rounded-md px-2 py-1 text-sm font-semibold text-muted-foreground transition hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
                         <span className="material-symbols-outlined text-lg">arrow_back</span>
                         <span className="hidden sm:inline">{t('back_to_projects')}</span>
                     </Link>
@@ -139,51 +308,94 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
                     <div
                         className={`mb-3 rounded-lg border px-4 py-3 text-sm ${
                             notice.type === 'success'
-                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                : 'border-red-200 bg-red-50 text-red-700'
+                                ? 'status-safe'
+                                : 'status-critical'
                         }`}
                     >
                         {notice.message}
                     </div>
                 )}
 
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch mb-2 lg:h-[calc(100vh-120px)] h-auto">
-                    {/* LEFT COLUMN: Companion Sidebar */}
-                    <div id="project-chat-kit" className="lg:col-span-4 order-2 lg:order-1 flex flex-col h-full min-h-0">
-                        <RouvisChatKit
-                            ref={chatRef}
-                            className="flex-1 border border-gray-200 rounded-2xl shadow-sm overflow-hidden bg-white h-full"
-                            projectId={project.id}
-                            onTaskUpdate={() => router.refresh()}
-                            onDraftCreate={(draft) => handleTaskCreate(new Date(), draft)}
-                            density="compact"
-                            growthStage={project.currentStage}
-                        />
+                <div className="mb-2 lg:hidden">
+                    <div className="surface-base mb-3 p-1">
+                        <div className="grid grid-cols-2 gap-1" role="tablist" aria-label={t('calendar.mobile_panel_switcher')}>
+                            <button
+                                type="button"
+                                role="tab"
+                                aria-selected={panelMode === 'chat'}
+                                onClick={() => {
+                                    setPanelMode('chat');
+                                    updatePanelQuery('chat');
+                                }}
+                                className={`touch-target rounded-lg px-3 py-2 text-sm font-semibold transition ${panelMode === 'chat'
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/75'
+                                    }`}
+                            >
+                                {t('calendar.mobile_tab_chat')}
+                            </button>
+                            <button
+                                type="button"
+                                role="tab"
+                                aria-selected={panelMode === 'calendar'}
+                                onClick={() => {
+                                    setPanelMode('calendar');
+                                    updatePanelQuery('calendar');
+                                }}
+                                className={`touch-target rounded-lg px-3 py-2 text-sm font-semibold transition ${panelMode === 'calendar'
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/75'
+                                    }`}
+                            >
+                                {t('calendar.mobile_tab_calendar')}
+                            </button>
+                        </div>
                     </div>
 
-                    {/* RIGHT COLUMN: Calendar Only (Auto Height) */}
-                    <div className="lg:col-span-8 order-1 lg:order-2 flex flex-col gap-2 h-full min-h-0">
-                        {/* 2. Onboarding OR Calendar */}
-                        {(!project.tasks || project.tasks.length === 0) ? (
-                            <ProjectAgentOnboarding
-                                projectId={project.id}
-                                crop={project.crop}
-                                startDate={project.startDate}
-                                initialPreferences={project.schedulingPreferences || null}
-                            />
-                        ) : (
-                            <div className="flex flex-col h-full min-h-0">
-                                <ProjectCalendar
-                                    startDate={project.startDate}
-                                    targetHarvestDate={project.targetHarvestDate}
-                                    tasks={project.tasks}
-                                    project={project}
-                                    onRescheduleRequest={handleRescheduleRequest}
-                                    onTaskComplete={handleTaskComplete}
-                                    onTaskCreate={handleTaskCreate}
-                                />
-                            </div>
-                        )}
+                    <div className="h-[calc(100vh-210px)] min-h-[520px]">
+                        {panelMode === 'chat' ? chatPane : planningPane}
+                    </div>
+                </div>
+
+                <div
+                    ref={splitContainerRef}
+                    className="mb-2 hidden h-[calc(100vh-120px)] min-h-[640px] lg:grid"
+                    style={{ gridTemplateColumns: `${Math.round(splitRatio * 1000) / 10}% 12px minmax(0,1fr)` }}
+                >
+                    <div className="min-h-0 pr-1">
+                        {chatPane}
+                    </div>
+
+                    <div
+                        role="separator"
+                        aria-orientation="vertical"
+                        aria-label={t('calendar.desktop_splitter_label')}
+                        aria-valuemin={Math.round(MIN_SPLIT * 100)}
+                        aria-valuemax={Math.round(MAX_SPLIT * 100)}
+                        aria-valuenow={Math.round(splitRatio * 100)}
+                        tabIndex={0}
+                        onMouseDown={(event) => {
+                            resizeStateRef.current = { startX: event.clientX, startRatio: splitRatio };
+                            setIsResizing(true);
+                        }}
+                        onKeyDown={(event) => {
+                            if (event.key === 'ArrowLeft') {
+                                event.preventDefault();
+                                commitSplitRatio(splitRatio - 0.03);
+                            }
+                            if (event.key === 'ArrowRight') {
+                                event.preventDefault();
+                                commitSplitRatio(splitRatio + 0.03);
+                            }
+                        }}
+                        className={`group relative mx-auto h-full w-[8px] cursor-col-resize rounded-full transition ${isResizing ? 'bg-primary/50' : 'bg-border/70 hover:bg-primary/35'
+                            } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
+                    >
+                        <span className="absolute left-1/2 top-1/2 h-14 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-muted-foreground/45 group-hover:bg-primary" />
+                    </div>
+
+                    <div className="min-h-0 pl-1">
+                        {planningPane}
                     </div>
                 </div>
             </div>

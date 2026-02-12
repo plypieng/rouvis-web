@@ -122,9 +122,17 @@
     "archiving_progress": "アーカイブ中...",
     "undo_button": "元に戻す",
     "edit_project": "プロジェクトを編集",
+    "project_menu": "プロジェクトメニュー",
+    "collapse_details": "プロジェクト詳細を閉じる",
+    "expand_details": "プロジェクト詳細を開く",
+    "personalized": "個別最適化",
     "project_name": "プロジェクト名",
     "variety": "品種",
     "target_harvest_date": "収穫予定日",
+    "target_harvest_window": "収穫予定: {date}",
+    "target_harvest_missing": "収穫予定日が未設定です",
+    "timeline_warning_note": "進行に遅れが出る前に、今週の作業計画を再確認してください。",
+    "timeline_on_track_note": "現在の進行は計画範囲内です。",
     "notes": "メモ",
     "confirm_archive_title": "プロジェクトをアーカイブ",
     "confirm_archive_message": "「{name}」をアーカイブしますか？",
@@ -155,7 +163,51 @@
       "harvest_date": "収穫予定日",
       "task_pending": "タスク（未完了）",
       "task_completed": "タスク（完了）",
-      "today": "今日"
+      "today": "今日",
+      "mobile_panel_switcher": "コックピット表示切替",
+      "mobile_tab_chat": "チャット",
+      "mobile_tab_calendar": "カレンダー",
+      "desktop_splitter_label": "チャットと計画パネルの幅調整",
+      "handshake_title": "コマンドハンドシェイク",
+      "handshake_preview": "チャットで確認",
+      "handshake_apply": "クイック適用",
+      "handshake_apply_running": "適用中...",
+      "handshake_affected": "影響タスク: {count}件",
+      "quick_apply_confirm_message": "この内容でお願いします",
+      "quick_apply_running": "AIがスケジュール変更を適用しています...",
+      "quick_apply_success": "提案内容を適用しました。最新のタスクに更新します。",
+      "quick_apply_chat_unavailable": "チャットが利用できないため、プレビューで確認してください。",
+      "quick_apply_error_generic": "適用に失敗しました。プレビューで内容を確認して再試行してください。",
+      "quick_apply_error_in_flight": "適用処理が進行中です。完了後に再試行してください。",
+      "quick_apply_error_no_plan": "適用可能な計画が見つかりません。まずチャットで提案内容を確認してください。",
+      "quick_apply_error_proposal_failed": "提案の取得に失敗しました。AIプレビューから再実行してください。",
+      "quick_apply_error_apply_failed": "適用リクエストが失敗しました。時間をおいて再試行してください。",
+      "quick_apply_error_unconfirmed": "適用結果を確認できませんでした。チャット履歴で状態を確認してください。",
+      "quick_apply_error_missing_prompt": "提案内容が不足しています。もう一度提案を生成してください。",
+      "reschedule_suggestion_weather_label": "スケジュールと天気を再確認",
+      "reschedule_suggestion_weather_message": "今後のスケジュールと直近の天気を再確認し、必要な変更があれば提案してください。",
+      "reschedule_suggestion_priority_label": "作業の優先順位を見直す",
+      "reschedule_suggestion_priority_message": "作業の優先順位を見直したいです。どれから着手すべきか提案してください。",
+      "reschedule_suggestion_cancel": "キャンセル",
+      "task_moved": "「{title}」を {date} に移動しました",
+      "task_move_failed": "タスク移動に失敗しました。もう一度お試しください。",
+      "drop_hint": "ここにドロップして日付を変更",
+      "drop_target_label": "{date} に移動",
+      "more_tasks": "他 {count} 件",
+      "drag_task": "ドラッグ",
+      "affected_tasks_title": "影響を受けるタスク",
+      "weekday_sun": "日",
+      "weekday_mon": "月",
+      "weekday_tue": "火",
+      "weekday_wed": "水",
+      "weekday_thu": "木",
+      "weekday_fri": "金",
+      "weekday_sat": "土",
+      "year_label": "{year}年",
+      "month_label": "{month}月",
+      "task_detail_heading": "詳細・解説",
+      "task_detail_empty": "詳しい説明はありません。",
+      "task_detail_close": "閉じる"
     },
     "task_create": {
       "title": "タスクを作成",
@@ -175,7 +227,16 @@
       "stage_advice": "栽培ステージ",
       "priority_tasks": "優先タスク",
       "ask_ai": "AIに質問する",
-      "close_chat": "閉じる"
+      "close_chat": "閉じる",
+      "fetch_failed": "AIアドバイスの取得に失敗しました。",
+      "retry": "再読み込み",
+      "expand": "詳しく見る",
+      "collapse": "閉じる",
+      "no_data": "利用可能な情報がありません。",
+      "no_priority_tasks": "優先タスクはありません。",
+      "tone_safe": "安定",
+      "tone_warning": "注意",
+      "tone_critical": "重要"
     },
     "create": {
       "title": "新規プロジェクト作成",
@@ -314,7 +375,9 @@
       "online": "オンライン & 監視中",
       "ask_placeholder": "質問や報告を入力...",
       "send": "送信"
-    }
+    },
+    "task_completed_notice": "タスクを完了にしました。",
+    "task_updated_notice": "タスクを更新しました。"
   },
   "activities": {
     "rice_field_irrigation": "Rice Field Irrigation",
@@ -507,7 +570,13 @@
     "save": "保存",
     "saving": "保存中...",
     "crop": "作物",
-    "area": "面積"
+    "area": "面積",
+    "save_error": "圃場の保存に失敗しました",
+    "map_draw_first_note": "最初の圃場を描画して、地図運用を開始してください。",
+    "map_boundaries_note": "{mapped}/{total} 区画で境界が設定されています。",
+    "no_fields_mapped": "まだ圃場の境界が登録されていません。",
+    "recenter_map": "地図を再センタリング",
+    "auto_calculated": "自動計算"
   },
   "rotation": {
     "title": "Crop Rotation Planning",
@@ -922,6 +991,90 @@
       "copyright": "© 2026 Rouvis. 日本の農業現場の意思決定を支える。",
       "privacy": "プライバシーポリシー",
       "terms": "利用規約"
+    }
+  },
+  "workflow": {
+    "season_rail": "シーズンレール",
+    "season_rail_aria": "シーズンレール",
+    "field_operations": "圃場オペレーション",
+    "module_blueprint_title": "モジュールの初期設定が必要です",
+    "module_blueprint_description": "初期設定を完了すると、このワークフローモジュールが利用できます。",
+    "risk": {
+      "safe": "安定",
+      "watch": "要確認",
+      "warning": "注意",
+      "critical": "緊急"
+    },
+    "stages": {
+      "dormant": "休眠期",
+      "seedling": "育苗期",
+      "vegetative": "栄養成長期",
+      "flowering": "開花期",
+      "ripening": "登熟期",
+      "harvest": "収穫期"
+    },
+    "milestones": {
+      "seedling": "播種準備",
+      "vegetative": "生育管理",
+      "flowering": "開花期ケア",
+      "harvest": "収穫準備"
+    },
+    "day_progress_simple": "{current}日目",
+    "day_progress_with_total": "{current}日目 / {total}日",
+    "weather": {
+      "high": "最高",
+      "low": "最低"
+    },
+    "dashboard": {
+      "window_weather": "{location} · {highLabel} {high}° / {lowLabel} {low}°",
+      "overdue_note": "{count}件の期限超過タスクがあります",
+      "on_track_note": "今日の重点タスクを先に完了させると遅延を防げます",
+      "alerts": "警戒 {count} 件"
+    },
+    "calendar": {
+      "prev_month": "前月",
+      "next_month": "翌月",
+      "back_to_current_month": "今月に戻る",
+      "projects": "プロジェクト一覧",
+      "no_tasks_for_day_title": "この日の予定はありません",
+      "no_tasks_for_day_description": "別の日付を選ぶか、新しい作業を追加してください。",
+      "open_project": "プロジェクトを開く",
+      "done": "完了",
+      "task_update_failed": "タスク更新に失敗しました",
+      "tasks_selected_note": "選択日に{count}件の作業があります。",
+      "no_tasks_selected_note": "選択日に予定はありません。"
+    },
+    "activity_dashboard": {
+      "error_load_failed": "データの読み込みに失敗しました",
+      "task_update_failed": "タスク更新に失敗しました",
+      "delete_field_confirm": "「{name}」を削除しますか？\nこの操作は元に戻せません。",
+      "delete_field_failed": "圃場の削除に失敗しました",
+      "update_field_failed": "圃場の更新に失敗しました",
+      "retry": "再試行",
+      "ledger_window": "日次オペレーション台帳",
+      "pending_tasks_note": "今週 {count} 件の保留タスクがあります。",
+      "no_pending_tasks_note": "今週の保留タスクはありません。",
+      "title": "農業活動ダッシュボード",
+      "subtitle": "今日の活動状況と今後の予定を確認",
+      "log_activity": "活動を記録",
+      "schedule_task": "タスクを予定",
+      "stats": {
+        "today_activities": "今日の活動",
+        "this_week_tasks": "今週のタスク",
+        "managed_fields": "管理圃場",
+        "completed_activities": "完了活動"
+      },
+      "sections": {
+        "recent_activity": "最近の活動",
+        "view_calendar": "カレンダーを見る",
+        "upcoming_tasks": "今後のタスク",
+        "new_schedule": "新規予定",
+        "field_status": "圃場状況"
+      },
+      "blueprint": {
+        "title": "今週の予定されたタスクはありません",
+        "description": "新しい作業を登録すると、ここに優先順で表示されます。"
+      }
     }
   },
   "privacy_policy": {

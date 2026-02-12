@@ -2,23 +2,45 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { googleMapsLoader } from '@/lib/google-maps';
-import { useTranslations } from 'next-intl';
+
+type LatLngPoint = { lat: number; lng: number };
 
 interface FieldMapEditorProps {
     onFieldChange: (data: { area: number; polygon: any; location: any }) => void;
     initialPolygon?: any;
 }
 
+function parseInitialPolygon(input: unknown): LatLngPoint[] {
+    if (!input) return [];
+
+    if (typeof input === 'string') {
+        try {
+            const parsed = JSON.parse(input) as unknown;
+            return parseInitialPolygon(parsed);
+        } catch {
+            return [];
+        }
+    }
+
+    if (!Array.isArray(input)) return [];
+
+    return input
+        .map((point) => {
+            if (!point || typeof point !== 'object') return null;
+            const candidate = point as { lat?: unknown; lng?: unknown };
+            if (typeof candidate.lat !== 'number' || typeof candidate.lng !== 'number') return null;
+            return { lat: candidate.lat, lng: candidate.lng };
+        })
+        .filter((point): point is LatLngPoint => Boolean(point));
+}
+
 export default function FieldMapEditor({ onFieldChange, initialPolygon }: FieldMapEditorProps) {
-    const t = useTranslations('fields.editor'); // Ensure you have translations or fallback strings
     const mapRef = useRef<HTMLDivElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
     const [map, setMap] = useState<google.maps.Map | null>(null);
     const [drawingManager, setDrawingManager] = useState<google.maps.drawing.DrawingManager | null>(null);
     const [currentPolygon, setCurrentPolygon] = useState<google.maps.Polygon | null>(null);
-    const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
 
-    // Initial Map Setup
     useEffect(() => {
         const initMap = async () => {
             const loader = googleMapsLoader;
@@ -27,28 +49,27 @@ export default function FieldMapEditor({ onFieldChange, initialPolygon }: FieldM
             await loader.importLibrary('geometry');
             await loader.importLibrary('places');
 
-            if (mapRef.current) {
-                const mapInstance = new google.maps.Map(mapRef.current, {
-                    center: { lat: 37.4, lng: 138.8 }, // Default to Niigata
-                    zoom: 14,
-                    mapTypeId: 'hybrid', // Satellite with labels
-                    tilt: 0, // No 45deg imagery for easier drawing
-                });
-                setMap(mapInstance);
-            }
+            if (!mapRef.current) return;
+
+            const mapInstance = new google.maps.Map(mapRef.current, {
+                center: { lat: 37.4, lng: 138.8 },
+                zoom: 14,
+                mapTypeId: 'hybrid',
+                tilt: 0,
+            });
+
+            setMap(mapInstance);
         };
-        initMap();
+
+        void initMap();
     }, []);
 
-    // Setup Drawing Manager & Search
     useEffect(() => {
         if (!map) return;
 
-        // Search Box
         if (searchInputRef.current) {
             const auto = new google.maps.places.Autocomplete(searchInputRef.current);
             auto.bindTo('bounds', map);
-            setAutocomplete(auto);
 
             auto.addListener('place_changed', () => {
                 const place = auto.getPlace();
@@ -63,7 +84,6 @@ export default function FieldMapEditor({ onFieldChange, initialPolygon }: FieldM
             });
         }
 
-        // Drawing Manager
         const manager = new google.maps.drawing.DrawingManager({
             drawingMode: google.maps.drawing.OverlayType.POLYGON,
             drawingControl: true,
@@ -80,6 +100,7 @@ export default function FieldMapEditor({ onFieldChange, initialPolygon }: FieldM
                 zIndex: 1,
             },
         });
+
         manager.setMap(map);
         setDrawingManager(manager);
 
@@ -88,56 +109,78 @@ export default function FieldMapEditor({ onFieldChange, initialPolygon }: FieldM
         };
     }, [map]);
 
-    // Handle Drawing Events
+    useEffect(() => {
+        if (!map || currentPolygon || !initialPolygon) return;
+
+        const points = parseInitialPolygon(initialPolygon);
+        if (!points.length) return;
+
+        const polygon = new google.maps.Polygon({
+            paths: points,
+            fillColor: '#10B981',
+            fillOpacity: 0.4,
+            strokeWeight: 2,
+            clickable: false,
+            editable: true,
+            zIndex: 1,
+            map,
+        });
+
+        const bounds = new google.maps.LatLngBounds();
+        points.forEach((point) => bounds.extend(point));
+        map.fitBounds(bounds);
+        setCurrentPolygon(polygon);
+    }, [map, initialPolygon, currentPolygon]);
+
     useEffect(() => {
         if (!drawingManager) return;
 
-        const updateFieldData = (poly: google.maps.Polygon) => {
-            const path = poly.getPath();
+        const updateFieldData = (polygon: google.maps.Polygon) => {
+            const path = polygon.getPath();
             const areaM2 = google.maps.geometry.spherical.computeArea(path);
-            const areaHa = areaM2 / 10000; // Convert sq meters to hectares
+            const areaHa = areaM2 / 10000;
 
-            // Get Polygon Coords
-            const coords = path.getArray().map(p => ({ lat: p.lat(), lng: p.lng() }));
+            const coordinates = path.getArray().map((point) => ({ lat: point.lat(), lng: point.lng() }));
 
-            // Get Center
             const bounds = new google.maps.LatLngBounds();
-            path.forEach(p => bounds.extend(p));
+            path.forEach((point) => bounds.extend(point));
             const center = bounds.getCenter();
 
             onFieldChange({
-                area: parseFloat(areaHa.toFixed(2)), // 2 decimal places
-                polygon: coords,
-                location: { lat: center?.lat(), lng: center?.lng() },
+                area: Number(areaHa.toFixed(2)),
+                polygon: coordinates,
+                location: center ? { lat: center.lat(), lng: center.lng() } : null,
             });
         };
 
-        const handlePolygonComplete = (poly: google.maps.Polygon) => {
-            // Remove previous polygon if exists (Single field mode)
+        const attachPathListeners = (polygon: google.maps.Polygon) => {
+            polygon.getPath().addListener('set_at', () => updateFieldData(polygon));
+            polygon.getPath().addListener('insert_at', () => updateFieldData(polygon));
+        };
+
+        const handlePolygonComplete = (polygon: google.maps.Polygon) => {
             if (currentPolygon) {
                 currentPolygon.setMap(null);
             }
-            setCurrentPolygon(poly);
 
-            // Turn off drawing mode
+            setCurrentPolygon(polygon);
             drawingManager.setDrawingMode(null);
-
-            // Initial calc
-            updateFieldData(poly);
-
-            // Listen for edits
-            poly.getPath().addListener('set_at', () => updateFieldData(poly));
-            poly.getPath().addListener('insert_at', () => updateFieldData(poly));
+            updateFieldData(polygon);
+            attachPathListeners(polygon);
         };
 
         const listener = google.maps.event.addListener(drawingManager, 'polygoncomplete', handlePolygonComplete);
+
+        if (currentPolygon) {
+            updateFieldData(currentPolygon);
+            attachPathListeners(currentPolygon);
+        }
 
         return () => {
             google.maps.event.removeListener(listener);
         };
     }, [drawingManager, currentPolygon, onFieldChange]);
 
-    // Cleanup current polygon on unmount
     useEffect(() => {
         return () => {
             if (currentPolygon) currentPolygon.setMap(null);
@@ -145,12 +188,12 @@ export default function FieldMapEditor({ onFieldChange, initialPolygon }: FieldM
     }, [currentPolygon]);
 
     const clearMap = () => {
-        if (currentPolygon) {
-            currentPolygon.setMap(null);
-            setCurrentPolygon(null);
-            if (drawingManager) drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
-            onFieldChange({ area: 0, polygon: null, location: null });
-        }
+        if (!currentPolygon) return;
+
+        currentPolygon.setMap(null);
+        setCurrentPolygon(null);
+        if (drawingManager) drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+        onFieldChange({ area: 0, polygon: null, location: null });
     };
 
     return (
@@ -160,22 +203,21 @@ export default function FieldMapEditor({ onFieldChange, initialPolygon }: FieldM
                     ref={searchInputRef}
                     type="text"
                     placeholder="住所や地名で検索 (例: 新潟県魚沼市)"
-                    className="absolute top-2 left-2 z-10 w-64 px-4 py-2 bg-white shadow-md rounded-lg text-sm border border-gray-200 outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="control-inset absolute left-2 top-2 z-10 w-64 px-4 py-2 text-sm"
                 />
+
                 <button
                     onClick={clearMap}
                     type="button"
-                    className="absolute top-2 right-14 z-10 px-3 py-2 bg-white shadow-md rounded-lg text-xs font-medium text-red-600 hover:bg-red-50 border border-gray-200"
+                    className="absolute right-14 top-2 z-10 rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold text-destructive hover:bg-destructive/10"
                 >
                     書き直す
                 </button>
 
-                <div
-                    ref={mapRef}
-                    className="w-full h-[400px] rounded-xl border border-gray-200 shadow-inner"
-                />
+                <div ref={mapRef} className="h-[400px] w-full rounded-xl border border-border" />
             </div>
-            <p className="text-xs text-gray-500 text-center">
+
+            <p className="text-center text-xs text-muted-foreground">
                 地図上の白枠内をタップして頂点を追加し、囲んでください
             </p>
         </div>

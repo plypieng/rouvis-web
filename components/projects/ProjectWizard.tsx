@@ -85,9 +85,9 @@ function WizardProgress({ currentStep, showPlantingHistory }: { currentStep: Wiz
         <div className="mb-6">
             <div className="flex items-center justify-between relative">
                 {/* Connecting line */}
-                <div className="absolute top-4 left-0 right-0 h-0.5 bg-gray-200" />
+                <div className="absolute top-4 left-0 right-0 h-0.5 bg-border/70" />
                 <div
-                    className="absolute top-4 left-0 h-0.5 bg-emerald-500 transition-all duration-500"
+                    className="absolute top-4 left-0 h-0.5 bg-brand-seedling transition-all duration-500"
                     style={{ width: `${(currentIndex / Math.max(steps.length - 1, 1)) * 100}%` }}
                 />
 
@@ -98,16 +98,16 @@ function WizardProgress({ currentStep, showPlantingHistory }: { currentStep: Wiz
                         <div key={step.key} className="flex flex-col items-center relative z-10">
                             <div
                                 className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 ${isDone
-                                    ? 'bg-emerald-500 text-white'
+                                    ? 'bg-brand-seedling text-primary-foreground'
                                     : isCurrent
-                                        ? 'bg-emerald-100 text-emerald-700 ring-2 ring-emerald-500'
-                                        : 'bg-gray-100 text-gray-400'
+                                        ? 'bg-brand-seedling/15 text-foreground ring-2 ring-brand-seedling/50'
+                                        : 'bg-secondary text-muted-foreground'
                                     }`}
                             >
                                 {isDone ? '✓' : step.icon}
                             </div>
                             <span
-                                className={`text-xs mt-1 font-medium ${isCurrent ? 'text-emerald-700' : isDone ? 'text-emerald-600' : 'text-gray-400'
+                                className={`text-xs mt-1 font-medium ${isCurrent ? 'text-foreground' : isDone ? 'text-brand-seedling' : 'text-muted-foreground'
                                     }`}
                             >
                                 {step.label}
@@ -121,9 +121,9 @@ function WizardProgress({ currentStep, showPlantingHistory }: { currentStep: Wiz
 }
 
 function noticeClassName(type: NonNullable<NoticeState>['type']): string {
-    if (type === 'error') return 'border-red-200 bg-red-50 text-red-700';
-    if (type === 'success') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
-    return 'border-blue-200 bg-blue-50 text-blue-700';
+    if (type === 'error') return 'status-critical';
+    if (type === 'success') return 'status-safe';
+    return 'status-watch';
 }
 
 export default function ProjectWizard({ locale }: { locale: string }) {
@@ -552,12 +552,12 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                 <div className="flex items-center justify-between mb-4">
                     <button
                         onClick={() => setStep('project-type')}
-                        className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
+                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
                     >
                         <span className="material-symbols-outlined text-sm">arrow_back</span>
                         戻る
                     </button>
-                    <h2 className="text-xl font-semibold text-center flex-1">{t('title')}</h2>
+                    <h2 className="flex-1 text-center text-xl font-semibold text-foreground">{t('title')}</h2>
                 </div>
 
                 {notice && (
@@ -568,13 +568,13 @@ export default function ProjectWizard({ locale }: { locale: string }) {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Scan Option */}
-                    <div className="bg-white border-2 border-green-100 rounded-2xl p-8 hover:border-green-500 hover:shadow-lg transition">
+                    <div className="surface-base p-8 transition hover:border-brand-seedling/60 hover:bg-secondary/40">
                         <div className="flex flex-col items-center">
-                            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                                <span className="material-symbols-outlined text-3xl text-green-700">qr_code_scanner</span>
+                            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-secondary">
+                                <span className="material-symbols-outlined text-3xl text-brand-seedling">qr_code_scanner</span>
                             </div>
-                            <h3 className="text-lg font-bold text-gray-900 mb-2">{t('scan_seed_bag')}</h3>
-                            <p className="text-sm text-gray-500 text-center mb-4">{t('scan_description')}</p>
+                            <h3 className="mb-2 text-lg font-semibold text-foreground">{t('scan_seed_bag')}</h3>
+                            <p className="mb-4 text-center text-sm text-muted-foreground">{t('scan_description')}</p>
 
                             <input
                                 type="file"
@@ -585,7 +585,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                             />
                             <label
                                 htmlFor="seed-bag-input"
-                                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition cursor-pointer"
+                                className="cursor-pointer rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
                             >
                                 {loading ? '解析中...' : '写真を選択'}
                             </label>
@@ -593,19 +593,19 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                     </div>
 
                     {/* Manual Option */}
-                    <div className="bg-white border-2 border-gray-100 rounded-2xl p-8 hover:border-gray-400 hover:shadow-lg transition">
+                    <div className="surface-base p-8 transition hover:border-border/90 hover:bg-secondary/25">
                         <div className="flex flex-col items-center">
-                            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                                <span className="material-symbols-outlined text-3xl text-gray-600">edit_note</span>
+                            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-secondary">
+                                <span className="material-symbols-outlined text-3xl text-foreground/70">edit_note</span>
                             </div>
-                            <h3 className="text-lg font-bold text-gray-900 mb-2">{t('manual_entry')}</h3>
-                            <p className="text-sm text-gray-500 text-center mb-4">{t('manual_description')}</p>
+                            <h3 className="mb-2 text-lg font-semibold text-foreground">{t('manual_entry')}</h3>
+                            <p className="mb-4 text-center text-sm text-muted-foreground">{t('manual_description')}</p>
 
                             <div className="w-full">
                                 <input
                                     type="text"
                                     placeholder="例: コシヒカリ"
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-2"
+                                    className="control-inset mb-2 w-full px-4 py-2"
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
                                             handleManualCropInput((e.target as HTMLInputElement).value);
@@ -618,7 +618,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                                         handleManualCropInput(input?.value || '');
                                     }}
                                     disabled={loading}
-                                    className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition"
+                                    className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
                                 >
                                     {loading ? '解析中...' : '次へ'}
                                 </button>
@@ -632,7 +632,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
 
     if (!cropAnalysis) {
         return (
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-muted-foreground">
                 作物情報を読み込めませんでした。最初からやり直してください。
             </div>
         );
@@ -651,13 +651,13 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                 <div className="flex justify-end gap-4">
                     <button
                         onClick={() => setStep('selection')}
-                        className="px-6 py-2 text-gray-600 hover:text-gray-800 font-medium"
+                        className="rounded-lg px-6 py-2 font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
                     >
                         戻る
                     </button>
                     <button
                         onClick={handleProceedFromAnalysis}
-                        className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+                        className="rounded-lg bg-primary px-6 py-2 font-semibold text-primary-foreground hover:opacity-90"
                     >
                         {projectType === 'existing' ? '次へ：植付け時期' : '次へ：圃場を選択'}
                     </button>
@@ -682,7 +682,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                 <div className="flex justify-start">
                     <button
                         onClick={() => setStep('crop-analysis')}
-                        className="px-6 py-2 text-gray-600 hover:text-gray-800 font-medium"
+                        className="rounded-lg px-6 py-2 font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
                     >
                         戻る
                     </button>
@@ -722,18 +722,18 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                     </div>
                 )}
                 <CropAnalysisCard analysis={cropAnalysis} />
-                <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4">
+                <div className="surface-base p-4">
                     <div className="mb-3">
-                        <h3 className="text-sm font-semibold text-indigo-900">初回ドラフトの作業スタイル</h3>
-                        <p className="text-xs text-indigo-700">
+                        <h3 className="text-sm font-semibold text-foreground">初回ドラフトの作業スタイル</h3>
+                        <p className="text-xs text-muted-foreground">
                             テンプレートを選ぶと、最初のスケジュールの優先度と作業量が調整されます。
                         </p>
                     </div>
                     {templatesLoading && (
-                        <p className="text-xs text-indigo-700">テンプレートを読み込み中...</p>
+                        <p className="text-xs text-muted-foreground">テンプレートを読み込み中...</p>
                     )}
                     {!templatesLoading && templatesError && (
-                        <p className="text-xs text-amber-700">
+                        <p className="text-xs text-orange-700 dark:text-orange-200">
                             {templatesError} 標準テンプレートで続行します。
                         </p>
                     )}
@@ -748,21 +748,21 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                                         type="button"
                                         onClick={() => setSelectedTemplateId(template.id)}
                                         className={`rounded-lg border px-3 py-3 text-left transition ${selected
-                                            ? 'border-indigo-500 bg-white shadow-sm'
-                                            : 'border-indigo-100 bg-white/70 hover:border-indigo-300'
+                                            ? 'border-brand-seedling/70 bg-secondary/30'
+                                            : 'border-border bg-card hover:border-brand-seedling/50'
                                             }`}
                                     >
                                         <div className="mb-1 flex items-center justify-between gap-2">
-                                            <span className="text-sm font-semibold text-gray-900">
+                                            <span className="text-sm font-semibold text-foreground">
                                                 {template.label}
                                             </span>
                                             {recommended && (
-                                                <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                                                <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold text-secondary-foreground">
                                                     推奨
                                                 </span>
                                             )}
                                         </div>
-                                        <p className="text-xs text-gray-600">{template.description}</p>
+                                        <p className="text-xs text-muted-foreground">{template.description}</p>
                                     </button>
                                 );
                             })}
@@ -776,14 +776,14 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                 <div className="flex justify-end gap-4">
                     <button
                         onClick={() => setStep(projectType === 'existing' ? 'planting-history' : 'crop-analysis')}
-                        className="px-6 py-2 text-gray-600 hover:text-gray-800 font-medium"
+                        className="rounded-lg px-6 py-2 font-medium text-muted-foreground hover:bg-secondary hover:text-foreground"
                     >
                         戻る
                     </button>
                     <button
                         onClick={handleCreateProject}
                         disabled={loading || templatesLoading}
-                        className="px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 font-bold text-lg"
+                        className="rounded-lg bg-primary px-8 py-3 text-lg font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
                     >
                         {loading
                             ? '作成中...'

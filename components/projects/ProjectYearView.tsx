@@ -3,173 +3,133 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import {
-    format,
-    startOfYear,
-    endOfYear,
-    eachMonthOfInterval,
-    startOfMonth,
-    endOfMonth,
-    eachDayOfInterval,
-    isSameDay,
-    isWithinInterval,
-    getDay,
-    isToday
+  eachDayOfInterval,
+  eachMonthOfInterval,
+  endOfMonth,
+  endOfYear,
+  format,
+  getDay,
+  isSameDay,
+  isToday,
+  isWithinInterval,
+  startOfMonth,
+  startOfYear,
 } from 'date-fns';
-import { ja } from 'date-fns/locale';
-
-interface Task {
-    id: string;
-    title: string;
-    dueDate: string;
-    status: string;
-}
+import type { ProjectTaskItem } from '@/types/project-cockpit';
 
 interface ProjectYearViewProps {
-    startDate: string;
-    targetHarvestDate?: string;
-    tasks: Task[];
+  startDate: string;
+  targetHarvestDate?: string;
+  tasks: ProjectTaskItem[];
 }
 
 export default function ProjectYearView({ startDate, targetHarvestDate, tasks }: ProjectYearViewProps) {
-    const t = useTranslations('projects.calendar');
-    const [currentYear, setCurrentYear] = useState(new Date(startDate).getFullYear());
+  const t = useTranslations('projects.calendar');
+  const [currentYear, setCurrentYear] = useState(new Date(startDate).getFullYear());
 
-    const yearStart = startOfYear(new Date(currentYear, 0, 1));
-    const yearEnd = endOfYear(new Date(currentYear, 0, 1));
-    const months = eachMonthOfInterval({ start: yearStart, end: yearEnd });
+  const yearStart = startOfYear(new Date(currentYear, 0, 1));
+  const yearEnd = endOfYear(new Date(currentYear, 0, 1));
+  const months = eachMonthOfInterval({ start: yearStart, end: yearEnd });
 
-    const projectStart = new Date(startDate);
-    const projectEnd = targetHarvestDate ? new Date(targetHarvestDate) : null;
+  const projectStart = new Date(startDate);
+  const projectEnd = targetHarvestDate ? new Date(targetHarvestDate) : null;
 
-    const handlePrevYear = () => setCurrentYear(prev => prev - 1);
-    const handleNextYear = () => setCurrentYear(prev => prev + 1);
+  const weekdays = [t('weekday_sun'), t('weekday_mon'), t('weekday_tue'), t('weekday_wed'), t('weekday_thu'), t('weekday_fri'), t('weekday_sat')];
 
-    const getDayClass = (day: Date) => {
-        let classes = "h-6 w-6 flex items-center justify-center text-[10px] rounded-full relative ";
+  const getTaskIndicator = (day: Date) => {
+    const dayTasks = tasks.filter((task) => isSameDay(new Date(task.dueDate), day));
+    if (dayTasks.length === 0) return null;
 
-        // Base text color
-        if (getDay(day) === 0) classes += "text-red-500 "; // Sunday
-        else if (getDay(day) === 6) classes += "text-blue-500 "; // Saturday
-        else classes += "text-gray-700 ";
+    const hasPending = dayTasks.some((task) => task.status !== 'completed');
+    const toneClass = hasPending ? 'bg-brand-waterline' : 'bg-brand-seedling';
 
-        // Today
-        if (isToday(day)) {
-            classes += "ring-1 ring-blue-500 font-bold ";
-        }
+    return <span className={`absolute -bottom-0.5 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full ${toneClass}`} />;
+  };
 
-        // Project Duration Highlight (Light Green Background)
-        if (projectEnd && isWithinInterval(day, { start: projectStart, end: projectEnd })) {
-            classes += "bg-green-50 ";
-        }
-
-        // Start Date
-        if (isSameDay(day, projectStart)) {
-            classes += "bg-green-600 text-white font-bold shadow-sm ";
-        }
-
-        // Harvest Date
-        if (projectEnd && isSameDay(day, projectEnd)) {
-            classes += "bg-orange-500 text-white font-bold shadow-sm ";
-        }
-
-        return classes;
-    };
-
-    const getTaskIndicator = (day: Date) => {
-        const dayTasks = tasks.filter(task => isSameDay(new Date(task.dueDate), day));
-        if (dayTasks.length === 0) return null;
-
-        const hasPending = dayTasks.some(t => t.status !== 'completed');
-        const color = hasPending ? 'bg-blue-500' : 'bg-green-500';
-
-        return (
-            <div className={`absolute -bottom-0.5 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full ${color}`}></div>
-        );
-    };
-
-    return (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-8">
-            {/* Header */}
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-green-600">calendar_month</span>
-                    {t('year_view')}
-                </h2>
-                <div className="flex items-center gap-4 bg-gray-50 rounded-lg p-1">
-                    <button onClick={handlePrevYear} className="p-1 hover:bg-white hover:shadow-sm rounded-md transition text-gray-500">
-                        <span className="material-symbols-outlined text-lg">chevron_left</span>
-                    </button>
-                    <span className="font-bold text-gray-900 min-w-[60px] text-center">{currentYear}年</span>
-                    <button onClick={handleNextYear} className="p-1 hover:bg-white hover:shadow-sm rounded-md transition text-gray-500">
-                        <span className="material-symbols-outlined text-lg">chevron_right</span>
-                    </button>
-                </div>
-            </div>
-
-            {/* Legend */}
-            <div className="flex flex-wrap gap-4 mb-6 text-xs text-gray-600 px-2">
-                <div className="flex items-center gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-green-600"></div>
-                    <span>{t('start_date')}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-orange-500"></div>
-                    <span>{t('harvest_date')}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
-                    <span>{t('task_pending')}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
-                    <span>{t('task_completed')}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-full border border-blue-500"></div>
-                    <span>{t('today')}</span>
-                </div>
-            </div>
-
-            {/* Year Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-8 gap-y-8">
-                {months.map((month) => {
-                    const monthStart = startOfMonth(month);
-                    const monthEnd = endOfMonth(month);
-                    const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
-                    const startDayOfWeek = getDay(monthStart); // 0 (Sun) - 6 (Sat)
-
-                    return (
-                        <div key={month.toISOString()} className="text-sm">
-                            <h3 className="font-bold text-gray-900 mb-3 border-b border-gray-100 pb-1">
-                                {format(month, 'M月', { locale: ja })}
-                            </h3>
-
-                            <div className="grid grid-cols-7 gap-y-1 text-center mb-1">
-                                {['日', '月', '火', '水', '木', '金', '土'].map((d, i) => (
-                                    <div key={d} className={`text-[10px] font-medium ${i === 0 ? 'text-red-400' : i === 6 ? 'text-blue-400' : 'text-gray-400'}`}>
-                                        {d}
-                                    </div>
-                                ))}
-                            </div>
-
-                            <div className="grid grid-cols-7 gap-y-1 justify-items-center">
-                                {/* Empty cells for start of month */}
-                                {Array.from({ length: startDayOfWeek }).map((_, i) => (
-                                    <div key={`empty-${i}`} className="h-6 w-6"></div>
-                                ))}
-
-                                {/* Days */}
-                                {days.map((day) => (
-                                    <div key={day.toISOString()} className={getDayClass(day)}>
-                                        {format(day, 'd')}
-                                        {getTaskIndicator(day)}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
+  return (
+    <div className="flex h-full min-h-0 flex-col p-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <span className="material-symbols-outlined text-brand-seedling">calendar_month</span>
+          {t('year_view')}
+        </h2>
+        <div className="rounded-lg border border-border bg-secondary p-1">
+          <button type="button" onClick={() => setCurrentYear((prev) => prev - 1)} className="touch-target rounded-md p-1 text-muted-foreground hover:bg-card hover:text-foreground">
+            <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+          </button>
+          <span className="px-3 text-sm font-semibold text-foreground">
+            {t('year_label', { year: currentYear })}
+          </span>
+          <button type="button" onClick={() => setCurrentYear((prev) => prev + 1)} className="touch-target rounded-md p-1 text-muted-foreground hover:bg-card hover:text-foreground">
+            <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+          </button>
         </div>
-    );
+      </div>
+
+      <div className="mb-4 flex flex-wrap gap-3 text-[11px] text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-brand-seedling" />{t('start_date')}</span>
+        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-risk-warning" />{t('harvest_date')}</span>
+        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-brand-waterline" />{t('task_pending')}</span>
+      </div>
+
+      <div className="mobile-scroll min-h-0 flex-1 overflow-y-auto pr-1">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+          {months.map((month) => {
+            const monthStart = startOfMonth(month);
+            const monthEnd = endOfMonth(month);
+            const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
+            const startDayOfWeek = getDay(monthStart);
+
+            return (
+              <section key={month.toISOString()} className="rounded-lg border border-border bg-card p-3">
+                <h3 className="mb-2 border-b border-border pb-1 text-sm font-semibold text-foreground">
+                  {t('month_label', { month: format(month, 'M') })}
+                </h3>
+                <div className="mb-1 grid grid-cols-7 gap-y-1 text-center">
+                  {weekdays.map((label, index) => (
+                    <div key={`${month.toISOString()}-${label}`} className={`text-[10px] font-semibold ${index === 0 ? 'text-risk-critical' : index === 6 ? 'text-brand-waterline' : 'text-muted-foreground'}`}>
+                      {label}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-7 gap-y-1 justify-items-center">
+                  {Array.from({ length: startDayOfWeek }).map((_, index) => (
+                    <div key={`empty-${month.toISOString()}-${index}`} className="h-6 w-6" />
+                  ))}
+
+                  {days.map((day) => {
+                    const isWithinProjectWindow = Boolean(projectEnd && isWithinInterval(day, { start: projectStart, end: projectEnd }));
+                    return (
+                      <div
+                        key={day.toISOString()}
+                        className={`relative flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-medium ${
+                          isSameDay(day, projectStart)
+                            ? 'bg-brand-seedling text-primary-foreground'
+                            : projectEnd && isSameDay(day, projectEnd)
+                              ? 'bg-risk-warning text-primary-foreground'
+                              : isToday(day)
+                                ? 'ring-1 ring-brand-waterline text-brand-waterline'
+                                : isWithinProjectWindow
+                                  ? 'bg-secondary text-foreground'
+                                  : getDay(day) === 0
+                                    ? 'text-risk-critical'
+                                    : getDay(day) === 6
+                                      ? 'text-brand-waterline'
+                                      : 'text-foreground'
+                        }`}
+                      >
+                        {format(day, 'd')}
+                        {getTaskIndicator(day)}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
 }
