@@ -31,7 +31,7 @@ export const authOptions: NextAuthOptions = {
           authorization: {
             params: {
               // Request calendar scope for Google Calendar integration
-              scope: 'openid email profile https://www.googleapis.com/auth/calendar',
+              scope: 'openid email profile',
               access_type: 'offline',
               prompt: 'consent',
             },
