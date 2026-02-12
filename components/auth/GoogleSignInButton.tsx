@@ -1,6 +1,6 @@
 'use client';
 
-import { signIn } from 'next-auth/react';
+import { getSession, signIn, signOut } from 'next-auth/react';
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 
@@ -21,6 +21,12 @@ export function GoogleSignInButton({
     try {
       setIsLoading(true);
       setError(null);
+
+      const currentSession = await getSession();
+      if (currentSession?.user?.email?.endsWith('@demo.local')) {
+        await signOut({ redirect: false });
+      }
+
       await signIn('google', { callbackUrl });
     } catch (err) {
       console.error('Sign in error:', err);
