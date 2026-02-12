@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, Save, Calendar, Clock, MapPin, AlertTriangle } from 'lucide-react';
+import { toastError, toastSuccess } from '@/lib/feedback';
 
 interface Field {
   id: string;
@@ -39,6 +40,7 @@ export function TaskSchedulerModal({
   const [fields, setFields] = useState<Field[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -61,6 +63,7 @@ export function TaskSchedulerModal({
         fieldId: initialFieldId || '',
         dueAt: tomorrow.toISOString().slice(0, 16), // YYYY-MM-DDTHH:MM format
       }));
+      setErrorMessage(null);
     }
   }, [isOpen, initialFieldId]);
 
@@ -100,14 +103,13 @@ export function TaskSchedulerModal({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const submitTask = async () => {
     if (!validateForm()) {
       return;
     }
 
     setSaving(true);
+    setErrorMessage(null);
     try {
       await onSave({
         title: formData.title.trim(),
@@ -127,12 +129,25 @@ export function TaskSchedulerModal({
       setErrors({});
 
       onClose();
+      toastSuccess('タスクを保存しました。');
     } catch (error) {
       console.error('Failed to save task:', error);
-      alert('タスクの保存に失敗しました');
+      const message = error instanceof Error ? error.message : 'タスクの保存に失敗しました';
+      setErrorMessage(message);
+      toastError(message, {
+        label: '再試行',
+        onClick: () => {
+          void submitTask();
+        },
+      });
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await submitTask();
   };
 
   const getSelectedPriority = () => {
@@ -158,6 +173,24 @@ export function TaskSchedulerModal({
 
         {/* Form - Mobile optimized */}
         <form onSubmit={handleSubmit} className="mobile-spacing space-y-4">
+          {errorMessage && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              <div className="flex items-center justify-between gap-3">
+                <span>{errorMessage}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void submitTask();
+                  }}
+                  className="rounded-md border border-current px-2 py-1 text-xs font-semibold hover:bg-white/40"
+                  disabled={saving}
+                >
+                  再試行
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Task Title - Mobile optimized */}
           <div>
             <label className="block text-mobile-sm font-medium text-gray-700 mb-2">

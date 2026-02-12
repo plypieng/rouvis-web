@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { toastError, toastSuccess } from '@/lib/feedback';
 
 interface ProjectEditModalProps {
     project: {
@@ -60,15 +61,19 @@ export default function ProjectEditModal({ project, isOpen, onClose }: ProjectEd
                 throw new Error(t('update_failed'));
             }
 
-            // Show success message
-            alert(t('updated_success'));
+            toastSuccess(t('updated_success'));
 
             // Refresh and close
             router.refresh();
             onClose();
         } catch (error) {
             console.error('Update error:', error);
-            alert(t('update_failed'));
+            toastError(t('update_failed'), {
+                label: '再試行',
+                onClick: () => {
+                    void handleSave();
+                },
+            });
         } finally {
             setSaving(false);
         }

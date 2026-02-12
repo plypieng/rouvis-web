@@ -3,6 +3,8 @@
 import { useTranslations } from 'next-intl';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { toastError, toastInfo, toastSuccess, toastWarning } from '@/lib/feedback';
+import { buildStarterTasks } from '@/lib/starter-tasks';
 
 type GeneratedTask = {
     title: string;
@@ -31,6 +33,7 @@ type TaskPayload = {
     priority?: string;
     status: 'pending' | 'completed';
     isBackfilled?: boolean;
+    isAssumed?: boolean;
 };
 
 type SchedulingPreferences = {
@@ -260,14 +263,30 @@ export default function ProjectAgentOnboarding({
         });
     };
 
+    const persistGeneratedTasks = async (tasks: TaskPayload[]): Promise<void> => {
+        const saveRes = await fetch(`/api/v1/projects/${projectId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                tasks,
+                schedulingPreferences: preferencePayload,
+            }),
+        });
+
+        if (!saveRes.ok) {
+            throw new Error(await extractErrorMessage(saveRes, 'タスク保存に失敗しました'));
+        }
+    };
+
     const handleGenerate = async () => {
         setErrorMessage(null);
         setIsGenerating(true);
         try {
             const saved = await savePreferences(true);
             if (!saved) {
-                throw new Error('Failed to persist preferences before generation');
+                throw new Error('設定の保存に失敗しました。入力内容を確認して再試行してください。');
             }
+            toastInfo('初回ドラフトを生成しています...');
 
             setProgressMessage('🤖 スケジュール生成を開始します...');
 
@@ -276,71 +295,18 @@ export default function ProjectAgentOnboarding({
             const endpoint = isBackfilled
                 ? '/api/v1/agents/generate-backfilled-schedule'
                 : '/api/v1/agents/generate-schedule';
+            const effectiveStartDate = startDate || new Date().toISOString().split('T')[0];
 
             setProgressMessage(`📊 ${crop}の栽培計画を分析中...`);
 
-            // 2. Generate Schedule
-            const genRes = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(isBackfilled ? {
-                    projectId,
-                    schedulingPreferences: preferencePayload,
-                    preferenceTemplate: selectedTemplateId || undefined,
-                    cropAnalysis: {
-                        crop,
-                        startDate: startDate || new Date().toISOString().split('T')[0],
-                        targetHarvestDate: ''
-                    },
-                    plantingDate: startDate,
-                    currentDate: new Date().toISOString().split('T')[0],
-                } : {
-                    projectId,
-                    schedulingPreferences: preferencePayload,
-                    preferenceTemplate: selectedTemplateId || undefined,
-                    cropAnalysis: {
-                        crop,
-                        startDate: startDate || new Date().toISOString().split('T')[0],
-                        targetHarvestDate: ''
-                    },
-                    currentDate: new Date().toISOString().split('T')[0],
-                }),
-            });
-
-            const generatedData = await genRes.json().catch(() => ({}));
-            if (!genRes.ok) {
-                if (
-                    genRes.status === 409
-                    && (generatedData as Record<string, unknown>)?.error === 'SCHEDULING_PREFERENCES_REQUIRED'
-                ) {
-                    const catalog = generatedData as PreferenceTemplateCatalog;
-                    applyTemplateCatalog(catalog);
-                    const templates = Array.isArray(catalog.templates) ? catalog.templates : [];
-                    const recommendedTemplate = templates.find(
-                        (template) => template.id === catalog.recommendedTemplate
-                    ) || templates[0];
-                    if (recommendedTemplate) {
-                        setSelectedTemplateId(recommendedTemplate.id);
-                        setPreferences(normalizePreferences(recommendedTemplate.preferences));
-                    }
-                    throw new Error(
-                        ((generatedData as Record<string, unknown>)?.message as string)
-                        || '先に作業設定テンプレートを選択してから再実行してください。'
-                    );
-                }
-                throw new Error(
-                    ((generatedData as Record<string, unknown>)?.error as string)
-                    || ((generatedData as Record<string, unknown>)?.message as string)
-                    || ((generatedData as Record<string, unknown>)?.details as string)
-                    || 'スケジュールの生成に失敗しました'
-                );
-            }
-
-            setProgressMessage('🌱 タスクを作成中...');
-
-            // 3. Process Tasks
-            const scheduleData = (generatedData as GeneratedScheduleResponse).schedule || generatedData;
-            const toPayload = (task: GeneratedTask, status: TaskPayload['status'], isBackfilledTask?: boolean): TaskPayload => ({
+            let usedFallback = false;
+            let tasks: TaskPayload[] = [];
+            const preferenceTemplate = selectedTemplateId || undefined;
+            const toPayload = (
+                task: GeneratedTask,
+                status: TaskPayload['status'],
+                isBackfilledTask?: boolean
+            ): TaskPayload => ({
                 title: task.title,
                 description: task.description,
                 dueDate: task.dueDate,
@@ -349,43 +315,110 @@ export default function ProjectAgentOnboarding({
                 ...(isBackfilledTask ? { isBackfilled: true } : {}),
             });
 
-            let tasks: TaskPayload[] = [];
-            if (isBackfilled) {
-                const pastTasks = (scheduleData.pastTasks || []).flatMap((week) =>
-                    (week.tasks || []).map((task) => toPayload(task, 'completed', true))
-                );
-                const currentTasks = (scheduleData.currentWeekTasks || []).map((task) => toPayload(task, 'pending'));
-                const futureTasks = (scheduleData.futureTasks || []).flatMap((week) =>
-                    (week.tasks || []).map((task) => toPayload(task, 'pending'))
-                );
-                tasks = [...pastTasks, ...currentTasks, ...futureTasks];
-            } else {
-                tasks = (scheduleData.weeks || []).flatMap((week) =>
-                    (week.tasks || []).map((task) => toPayload(task, 'pending'))
-                );
-            }
+            try {
+                const genRes = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(isBackfilled ? {
+                        projectId,
+                        schedulingPreferences: preferencePayload,
+                        preferenceTemplate,
+                        cropAnalysis: {
+                            crop,
+                            startDate: effectiveStartDate,
+                            targetHarvestDate: ''
+                        },
+                        plantingDate: startDate,
+                        currentDate: new Date().toISOString().split('T')[0],
+                    } : {
+                        projectId,
+                        schedulingPreferences: preferencePayload,
+                        preferenceTemplate,
+                        cropAnalysis: {
+                            crop,
+                            startDate: effectiveStartDate,
+                            targetHarvestDate: ''
+                        },
+                        currentDate: new Date().toISOString().split('T')[0],
+                    }),
+                });
 
-            if (!tasks.length) {
-                throw new Error('AIがタスクを生成できませんでした。条件を調整して再試行してください。');
+                const generatedData = await genRes.json().catch(() => ({}));
+                if (!genRes.ok) {
+                    if (
+                        genRes.status === 409
+                        && (generatedData as Record<string, unknown>)?.error === 'SCHEDULING_PREFERENCES_REQUIRED'
+                    ) {
+                        const catalog = generatedData as PreferenceTemplateCatalog;
+                        applyTemplateCatalog(catalog);
+                        const templates = Array.isArray(catalog.templates) ? catalog.templates : [];
+                        const recommendedTemplate = templates.find(
+                            (template) => template.id === catalog.recommendedTemplate
+                        ) || templates[0];
+                        if (recommendedTemplate) {
+                            setSelectedTemplateId(recommendedTemplate.id);
+                            setPreferences(normalizePreferences(recommendedTemplate.preferences));
+                        }
+                    }
+
+                    throw new Error(
+                        ((generatedData as Record<string, unknown>)?.error as string)
+                        || ((generatedData as Record<string, unknown>)?.message as string)
+                        || ((generatedData as Record<string, unknown>)?.details as string)
+                        || 'スケジュールの生成に失敗しました'
+                    );
+                }
+                setProgressMessage('🌱 タスクを作成中...');
+
+                const scheduleData = (generatedData as GeneratedScheduleResponse).schedule || generatedData;
+                if (isBackfilled) {
+                    const pastTasks = (scheduleData.pastTasks || []).flatMap((week) =>
+                        (week.tasks || []).map((task) => toPayload(task, 'completed', true))
+                    );
+                    const currentTasks = (scheduleData.currentWeekTasks || []).map((task) => toPayload(task, 'pending'));
+                    const futureTasks = (scheduleData.futureTasks || []).flatMap((week) =>
+                        (week.tasks || []).map((task) => toPayload(task, 'pending'))
+                    );
+                    tasks = [...pastTasks, ...currentTasks, ...futureTasks];
+                } else {
+                    tasks = (scheduleData.weeks || []).flatMap((week) =>
+                        (week.tasks || []).map((task) => toPayload(task, 'pending'))
+                    );
+                }
+
+                if (!tasks.length) {
+                    throw new Error('AIがタスクを生成できませんでした');
+                }
+            } catch (generationError) {
+                console.warn('Initial draft generation failed. Using starter tasks.', generationError);
+                usedFallback = true;
+                tasks = buildStarterTasks({
+                    crop,
+                    startDate: effectiveStartDate,
+                    isBackfilled: Boolean(isBackfilled),
+                }).map((task) => ({
+                    title: task.title,
+                    description: task.description,
+                    dueDate: task.dueDate,
+                    priority: task.priority,
+                    status: task.status,
+                    isBackfilled: task.isBackfilled,
+                    isAssumed: task.isAssumed,
+                }));
             }
 
             setProgressMessage(`💾 ${tasks.length}個のタスクを保存中...`);
 
-            // 4. Save Tasks and Preferences
-            const saveRes = await fetch(`/api/v1/projects/${projectId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    tasks,
-                    schedulingPreferences: preferencePayload,
-                }),
-            });
+            await persistGeneratedTasks(tasks);
 
-            if (!saveRes.ok) {
-                throw new Error(await extractErrorMessage(saveRes, 'タスク保存に失敗しました'));
+            if (usedFallback) {
+                const fallbackMessage = 'AI生成が不安定だったため、スタータータスクを作成しました。';
+                setProgressMessage(`⚠️ ${fallbackMessage}`);
+                toastWarning(fallbackMessage);
+            } else {
+                setProgressMessage('✅ スケジュール生成が完了しました！');
+                toastSuccess('初回ドラフトを生成しました。');
             }
-
-            setProgressMessage('✅ スケジュール生成が完了しました！');
 
             // 5. Refresh Page
             setTimeout(() => {
@@ -396,7 +429,14 @@ export default function ProjectAgentOnboarding({
         } catch (error) {
             console.error('Generation error:', error);
             setProgressMessage('');
-            setErrorMessage(error instanceof Error ? error.message : 'スケジュールの生成に失敗しました');
+            const message = error instanceof Error ? error.message : 'スケジュールの生成に失敗しました';
+            setErrorMessage(message);
+            toastError(message, {
+                label: '再試行',
+                onClick: () => {
+                    void handleGenerate();
+                },
+            });
         } finally {
             setIsGenerating(false);
         }

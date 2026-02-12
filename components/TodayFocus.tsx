@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { toastError, toastSuccess } from '@/lib/feedback';
 
 interface Task {
     id: string;
@@ -25,8 +26,14 @@ export default function TodayFocus({ tasks: initialTasks, locale }: TodayFocusPr
     const router = useRouter();
     const [tasks, setTasks] = useState<Task[]>(initialTasks);
     const [completingId, setCompletingId] = useState<string | null>(null);
+    const [notice, setNotice] = useState<{
+        type: 'success' | 'error';
+        message: string;
+        retryTaskId?: string;
+    } | null>(null);
 
     const handleComplete = async (taskId: string) => {
+        setNotice(null);
         setCompletingId(taskId);
         try {
             // 1. Update Task Status
@@ -40,6 +47,11 @@ export default function TodayFocus({ tasks: initialTasks, locale }: TodayFocusPr
 
             // 2. Optimistic Update
             setTasks(prev => prev.filter(t => t.id !== taskId));
+            setNotice({
+                type: 'success',
+                message: 'タスクを完了にしました。',
+            });
+            toastSuccess('タスクを完了にしました。');
 
             // 3. Refresh Server Data
             router.refresh();
@@ -47,7 +59,20 @@ export default function TodayFocus({ tasks: initialTasks, locale }: TodayFocusPr
             // TODO: In the future, prompt to log an activity here
         } catch (error) {
             console.error('Failed to complete task:', error);
-            alert('Failed to update task');
+            const message = 'タスク更新に失敗しました。';
+            setNotice({
+                type: 'error',
+                message,
+                retryTaskId: taskId,
+            });
+            toastError(message, {
+                label: '再試行',
+                onClick: () => {
+                    void handleComplete(taskId);
+                },
+            });
+            setCompletingId(null);
+        } finally {
             setCompletingId(null);
         }
     };
@@ -75,6 +100,29 @@ export default function TodayFocus({ tasks: initialTasks, locale }: TodayFocusPr
                     あと {tasks.length} 件
                 </span>
             </div>
+
+            {notice && (
+                <div
+                    className={`mb-3 rounded-lg border px-4 py-3 text-sm ${
+                        notice.type === 'success'
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                            : 'border-red-200 bg-red-50 text-red-700'
+                    }`}
+                >
+                    <div className="flex items-center justify-between gap-3">
+                        <span>{notice.message}</span>
+                        {notice.retryTaskId && (
+                            <button
+                                type="button"
+                                onClick={() => void handleComplete(notice.retryTaskId as string)}
+                                className="rounded-md border border-current px-2 py-1 text-xs font-semibold hover:bg-white/40"
+                            >
+                                再試行
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
 
             <div className="grid gap-3">
                 {tasks.map(task => {

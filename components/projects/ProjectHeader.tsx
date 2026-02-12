@@ -2,387 +2,428 @@
 
 import { useTranslations } from 'next-intl';
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import ProjectEditModal from './ProjectEditModal';
 import ArchiveConfirmation from './ArchiveConfirmation';
 import UndoSnackbar from '../UndoSnackbar';
-import { SeasonRail } from '@/components/workflow/SeasonRail';
-import { buildSeasonRailState, normalizeCropStage } from '@/lib/workflow-ui';
-import type { CropStage, RiskTone } from '@/types/ui-shell';
+import { toastError, toastSuccess } from '@/lib/feedback';
 
 type StageConfigItem = {
-  key: string;
-  label?: string;
-  threshold: number;
-  personalized?: boolean;
+    key: string;
+    label?: string;
+    threshold: number; // Progress threshold (0-100)
+    personalized?: boolean;
 };
 
 type StageConfig = StageConfigItem[];
 
 const DEFAULT_STAGES: StageConfig = [
-  { key: 'seedling', threshold: 20 },
-  { key: 'vegetative', threshold: 50 },
-  { key: 'flowering', threshold: 80 },
-  { key: 'harvest', threshold: 100 },
+    { key: 'seedling', label: 'Seedling', threshold: 20 },
+    { key: 'vegetative', label: 'Vegetative', threshold: 50 },
+    { key: 'flowering', label: 'Flowering', threshold: 80 },
+    { key: 'harvest', label: 'Harvest', threshold: 100 }
 ];
 
 type KnowledgeStage = {
-  key: string;
-  label: string;
-  duration: number;
-  isPersonalized?: boolean;
+    key: string;
+    label: string;
+    duration: number;
+    isPersonalized?: boolean;
 };
 
 type CropKnowledgeResponse = {
-  knowledge?: {
-    stages?: KnowledgeStage[];
-  };
+    knowledge?: {
+        stages?: KnowledgeStage[];
+    };
 };
 
 interface ProjectHeaderProps {
-  project: {
-    id: string;
-    name: string;
-    crop: string;
-    variety?: string;
-    startDate: string;
-    targetHarvestDate?: string;
-    status: string;
-    notes?: string;
-  };
-  compact?: boolean;
-}
-
-function getCurrentStage(progress: number, config: StageConfig): string {
-  if (!config.length) return 'seedling';
-  for (const stage of config) {
-    if (progress <= stage.threshold) return stage.key;
-  }
-  return config[config.length - 1].key;
-}
-
-function stageMilestones(
-  stages: StageConfig,
-  progress: number,
-  fallbackLabel: (stageKey: string) => string,
-  personalizedLabel: string
-) {
-  const currentStageKey = getCurrentStage(progress, stages);
-  return stages.slice(0, 4).map((stage) => {
-    let state: 'done' | 'current' | 'upcoming' = 'upcoming';
-    if (progress >= stage.threshold) {
-      state = 'done';
-    } else if (stage.key === currentStageKey) {
-      state = 'current';
-    }
-
-    return {
-      id: stage.key,
-      label: stage.label || fallbackLabel(stage.key),
-      stage: normalizeCropStage(stage.key) as CropStage,
-      state,
-      note: stage.personalized ? personalizedLabel : undefined,
+    project: {
+        id: string;
+        name: string;
+        crop: string;
+        variety?: string;
+        startDate: string;
+        targetHarvestDate?: string;
+        status: string;
+        notes?: string;
     };
-  });
-}
-
-function riskFromTimeline(progress: number, dayCount: number, totalDays: number): RiskTone {
-  if (totalDays > 0 && dayCount > totalDays) return 'warning';
-  if (progress < 20) return 'watch';
-  if (progress >= 85) return 'warning';
-  return 'safe';
+    compact?: boolean;
 }
 
 export default function ProjectHeader({ project, compact }: ProjectHeaderProps) {
-  const t = useTranslations('projects');
-  const tw = useTranslations('workflow');
-  const router = useRouter();
-  const params = useParams<{ locale: string }>();
-  const locale = (params?.locale as string) || 'ja';
-  const { data: session } = useSession();
+    const t = useTranslations('projects');
+    const router = useRouter();
+    const params = useParams<{ locale: string }>();
+    const locale = (params?.locale as string) || 'ja';
+    const { data: session } = useSession();
+    const [showMenu, setShowMenu] = useState(false);
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [showArchiveDialog, setShowArchiveDialog] = useState(false);
+    const [showUndoSnackbar, setShowUndoSnackbar] = useState(false);
+    const [archiving, setArchiving] = useState(false);
+    const [lastArchivedId, setLastArchivedId] = useState<string | null>(null);
 
-  const [showMenu, setShowMenu] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showArchiveDialog, setShowArchiveDialog] = useState(false);
-  const [showUndoSnackbar, setShowUndoSnackbar] = useState(false);
-  const [archiving, setArchiving] = useState(false);
-  const [lastArchivedId, setLastArchivedId] = useState<string | null>(null);
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [stages, setStages] = useState<StageConfig>(DEFAULT_STAGES);
+    const [isExpanded, setIsExpanded] = useState(false);
 
-  const start = new Date(project.startDate).getTime();
-  const now = Date.now();
-  const target = project.targetHarvestDate ? new Date(project.targetHarvestDate).getTime() : null;
-  const dayCount = Math.max(0, Math.floor((now - start) / (1000 * 60 * 60 * 24)));
+    // Calculate progress
+    const start = new Date(project.startDate).getTime();
+    const now = new Date().getTime();
+    const target = project.targetHarvestDate ? new Date(project.targetHarvestDate).getTime() : null;
 
-  let progress = 0;
-  let totalDays = 0;
+    let progress = 0;
+    const dayCount = Math.floor((now - start) / (1000 * 60 * 60 * 24));
+    let totalDays = 0;
 
-  if (target) {
-    totalDays = Math.max(0, Math.floor((target - start) / (1000 * 60 * 60 * 24)));
-    progress = totalDays > 0 ? Math.min(100, Math.max(0, (dayCount / totalDays) * 100)) : 0;
-  }
+    if (target) {
+        totalDays = Math.floor((target - start) / (1000 * 60 * 60 * 24));
+        progress = Math.min(100, Math.max(0, (dayCount / totalDays) * 100));
+    }
 
-  useEffect(() => {
-    const fetchStages = async () => {
-      try {
-        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const userId = (session?.user as { id?: string })?.id;
-        const res = await fetch(
-          `${baseUrl}/api/v1/knowledge/crops?crop=${encodeURIComponent(project.crop)}${
-            userId ? `&userId=${encodeURIComponent(userId)}` : ''
-          }`
-        );
+    const handleArchive = async () => {
+        setArchiving(true);
+        try {
+            const res = await fetch(`/api/v1/projects/${project.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'archived' }),
+            });
 
-        if (!res.ok) {
-          setStages(DEFAULT_STAGES);
-          return;
+            if (!res.ok) throw new Error(t('archive_failed'));
+
+            setLastArchivedId(project.id);
+            setShowArchiveDialog(false);
+            setShowUndoSnackbar(true);
+            toastSuccess(t('archived_success', { name: project.name }));
+
+            // Auto-hide snackbar and redirect after 10 seconds
+            setTimeout(() => {
+                setShowUndoSnackbar(false);
+                router.push(`/${locale}/projects`);
+            }, 10000);
+        } catch (error) {
+            console.error('Archive error:', error);
+            toastError(t('archive_failed'), {
+                label: '再試行',
+                onClick: () => {
+                    void handleArchive();
+                },
+            });
+        } finally {
+            setArchiving(false);
         }
-
-        const data = (await res.json()) as CropKnowledgeResponse;
-        const knowledgeStages = data.knowledge?.stages;
-
-        if (!Array.isArray(knowledgeStages) || knowledgeStages.length === 0) {
-          setStages(DEFAULT_STAGES);
-          return;
-        }
-
-        const totalDuration = knowledgeStages.reduce((acc, stage) => acc + stage.duration, 0);
-        let currentDuration = 0;
-
-        const mappedStages: StageConfig = knowledgeStages.map((stage) => {
-          currentDuration += stage.duration;
-          return {
-            key: stage.key,
-            label: stage.label,
-            threshold: totalDuration > 0 ? Math.round((currentDuration / totalDuration) * 100) : 100,
-            personalized: stage.isPersonalized,
-          };
-        });
-
-        setStages(mappedStages);
-      } catch (error) {
-        console.error('Failed to fetch stages:', error);
-        setStages(DEFAULT_STAGES);
-      }
     };
 
-    void fetchStages();
-  }, [project.crop, session?.user]);
+    const handleUndo = async () => {
+        if (!lastArchivedId) return;
 
-  const handleArchive = async () => {
-    setArchiving(true);
-    try {
-      const res = await fetch(`/api/v1/projects/${project.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'archived' }),
-      });
+        try {
+            const res = await fetch(`/api/v1/projects/${lastArchivedId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'active' }),
+            });
 
-      if (!res.ok) throw new Error(t('archive_failed'));
+            if (!res.ok) throw new Error(t('unarchive_failed'));
 
-      setLastArchivedId(project.id);
-      setShowArchiveDialog(false);
-      setShowUndoSnackbar(true);
+            setShowUndoSnackbar(false);
+            toastSuccess(t('unarchived_success', { name: project.name }));
+            router.refresh();
+        } catch (error) {
+            console.error('Unarchive error:', error);
+            toastError(t('unarchive_failed'), {
+                label: '再試行',
+                onClick: () => {
+                    void handleUndo();
+                },
+            });
+        }
+    };
 
-      setTimeout(() => {
-        setShowUndoSnackbar(false);
-        router.push(`/${locale}/projects`);
-      }, 10000);
-    } catch (error) {
-      console.error('Archive error:', error);
-      alert(t('archive_failed'));
-    } finally {
-      setArchiving(false);
+    const [stages, setStages] = useState<StageConfig>(DEFAULT_STAGES);
+
+    // Fetch dynamic stages
+    useEffect(() => {
+        const fetchStages = async () => {
+            try {
+                const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+                const userId = (session?.user as { id?: string })?.id;
+                const res = await fetch(`${baseUrl}/api/v1/knowledge/crops?crop=${encodeURIComponent(project.crop)}${userId ? `&userId=${encodeURIComponent(userId)}` : ''}`);
+                if (!res.ok) {
+                    setStages(DEFAULT_STAGES);
+                    return;
+                }
+
+                const data = await res.json() as CropKnowledgeResponse;
+                const knowledgeStages = data.knowledge?.stages;
+                if (!Array.isArray(knowledgeStages) || knowledgeStages.length === 0) {
+                    setStages(DEFAULT_STAGES);
+                    return;
+                }
+
+                const totalDuration = knowledgeStages.reduce((acc, s) => acc + s.duration, 0);
+                let currentDuration = 0;
+
+                const mappedStages: StageConfig = knowledgeStages.map((s) => {
+                    currentDuration += s.duration;
+                    return {
+                        key: s.key,
+                        label: s.label,
+                        threshold: totalDuration > 0 ? Math.round((currentDuration / totalDuration) * 100) : 100,
+                        personalized: s.isPersonalized,
+                    };
+                });
+
+                setStages(mappedStages);
+            } catch (error) {
+                console.error('Failed to fetch stages:', error);
+                setStages(DEFAULT_STAGES);
+            }
+        };
+
+        fetchStages();
+    }, [project.crop, session?.user]);
+
+    // Helper to get icon for stage key
+    const getStageIcon = (key: string) => {
+        if (key.includes('seedling')) return '🌱';
+        if (key.includes('vegetative') || key.includes('tillering')) return '🌿';
+        if (key.includes('flowering') || key.includes('heading')) return '🌾'; // Changed to rice ear for heading
+        if (key.includes('ripening') || key.includes('fruiting')) return '🍂';
+        if (key.includes('harvest')) return '🚜';
+        return '✨';
+    };
+
+    // Determine current stage based on progress
+    const getCurrentStage = (p: number, config: StageConfig) => {
+        if (!config || config.length === 0) return 'seedling';
+        for (const s of config) {
+            if (p <= s.threshold) return s.key;
+        }
+        return config[config.length - 1].key;
+    };
+
+    const stage = getCurrentStage(progress, stages);
+
+    if (compact) {
+        return (
+            <>
+                <div className={`transition-all duration-300 ease-in-out bg-white border border-gray-200 shadow-sm ${isExpanded ? 'rounded-2xl p-4 w-full' : 'rounded-full px-4 py-2 flex items-center gap-4'}`}>
+
+                    {/* Header Top Row (Always visible or adapted) */}
+                    <div className={`flex items-center justify-between ${isExpanded ? 'mb-4' : 'w-full gap-4'}`}>
+
+                        {/* Left: Title & Back */}
+                        <div className="flex items-center gap-3 min-w-0 shrink-0">
+                            <h1 className="text-sm font-bold text-gray-900 whitespace-nowrap">{project.name}</h1>
+                            {!isExpanded && (
+                                <span className="text-xs text-gray-500 hidden lg:inline-block">
+                                    {project.crop}
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Middle: Compact Progress (Spans entirely) */}
+                        {!isExpanded && (
+                            <div className="flex-1 flex items-center gap-3 min-w-0 px-4">
+                                <div className="flex items-center gap-1.5 text-xs font-medium text-gray-700 shrink-0">
+                                    <span className="text-lg leading-none">{getStageIcon(stage)}</span>
+                                    <span className="hidden sm:inline">{stages.find(s => s.key === stage)?.label || stage}</span>
+                                </div>
+                                <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-green-500 transition-all duration-500"
+                                        style={{ width: `${Math.min(100, progress)}%` }}
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Right: Actions */}
+                        <div className="flex items-center gap-2 shrink-0 ml-auto">
+                            {/* Expand Toggle */}
+                            <button
+                                onClick={() => setIsExpanded(!isExpanded)}
+                                className="p-1 text-gray-400 hover:text-gray-900 rounded-full hover:bg-gray-100 transition-colors"
+                            >
+                                <span className="material-symbols-outlined text-[20px]">
+                                    {isExpanded ? 'expand_less' : 'expand_more'}
+                                </span>
+                            </button>
+
+                            {/* Menu Trigger */}
+                            <div className="relative border-l border-gray-200 pl-2 ml-1">
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
+                                    className="p-1 text-gray-400 hover:text-gray-900 rounded-full hover:bg-gray-100 transition-colors"
+                                >
+                                    <span className="material-symbols-outlined text-[20px]">more_vert</span>
+                                </button>
+                                {showMenu && (
+                                    <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-lg border border-gray-200 shadow-lg py-1 z-50">
+                                        <button
+                                            onClick={() => { setShowMenu(false); setShowEditModal(true); }}
+                                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                        >
+                                            {t('edit_project')}
+                                        </button>
+                                        <button
+                                            onClick={() => { setShowMenu(false); setShowArchiveDialog(true); }}
+                                            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                                        >
+                                            {t('confirm_archive_title')}
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Expanded Content (Full Analysis) */}
+                    {isExpanded && (
+                        <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                            <div className="flex items-center justify-between text-xs mb-2 mt-2">
+                                <span className="text-gray-500">
+                                    {dayCount}日目 {totalDays ? `/ ${totalDays}日` : ''} · {project.crop} {project.variety && `(${project.variety})`}
+                                </span>
+                                <span className="text-green-600 font-medium text-sm flex items-center gap-1">
+                                    {getStageIcon(stage)} {stages.find(s => s.key === stage)?.label || stage}
+                                </span>
+                            </div>
+
+                            <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-2">
+                                <div
+                                    className="h-full bg-green-500 transition-all duration-500"
+                                    style={{ width: `${Math.min(100, progress)}%` }}
+                                />
+                            </div>
+
+                            <div className="flex justify-between text-[11px] text-gray-400">
+                                {stages.map((s) => (
+                                    <div key={s.key} className={`flex flex-col items-center gap-1 ${stage === s.key ? 'text-green-600 font-bold' : ''}`}>
+                                        <span>{s.label || s.key}</span>
+                                        {stage === s.key && <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <ProjectEditModal
+                    project={project}
+                    isOpen={showEditModal}
+                    onClose={() => setShowEditModal(false)}
+                />
+
+                <ArchiveConfirmation
+                    projectName={project.name}
+                    isOpen={showArchiveDialog}
+                    onConfirm={handleArchive}
+                    onCancel={() => setShowArchiveDialog(false)}
+                    isLoading={archiving}
+                />
+
+                <UndoSnackbar
+                    message={t('archived_success', { name: project.name })}
+                    onUndo={handleUndo}
+                    show={showUndoSnackbar}
+                />
+            </>
+        );
     }
-  };
 
-  const handleUndo = async () => {
-    if (!lastArchivedId) return;
-
-    try {
-      const res = await fetch(`/api/v1/projects/${lastArchivedId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'active' }),
-      });
-
-      if (!res.ok) throw new Error(t('unarchive_failed'));
-
-      setShowUndoSnackbar(false);
-      router.refresh();
-    } catch (error) {
-      console.error('Unarchive error:', error);
-      alert(t('unarchive_failed'));
-    }
-  };
-
-  const currentStage = getCurrentStage(progress, stages);
-  const risk = riskFromTimeline(progress, dayCount, totalDays);
-  const dayLabel = totalDays > 0
-    ? tw('day_progress_with_total', { current: dayCount, total: totalDays })
-    : tw('day_progress_simple', { current: dayCount });
-
-  const localizedStageLabel = (stageKey: string) => {
-    const normalizedStage = normalizeCropStage(stageKey);
-    return tw(`stages.${normalizedStage}`);
-  };
-
-  const seasonState = {
-    ...buildSeasonRailState({
-      stage: currentStage,
-      progress,
-      dayCount,
-      totalDays,
-      dayLabel,
-      milestoneLabels: {
-        seedling: tw('milestones.seedling'),
-        vegetative: tw('milestones.vegetative'),
-        flowering: tw('milestones.flowering'),
-        harvest: tw('milestones.harvest'),
-      },
-      risk,
-      windowLabel: project.targetHarvestDate
-        ? t('target_harvest_window', { date: new Date(project.targetHarvestDate).toLocaleDateString(locale) })
-        : t('target_harvest_missing'),
-      note:
-        risk === 'warning'
-          ? t('timeline_warning_note')
-          : t('timeline_on_track_note'),
-    }),
-    milestones: stageMilestones(stages, progress, localizedStageLabel, t('personalized')),
-  };
-
-  const actionMenu = (
-    <div className="absolute right-0 top-full z-30 mt-2 w-44 rounded-lg border border-border bg-card p-1 shadow-lift1">
-      <button
-        onClick={() => {
-          setShowMenu(false);
-          setShowEditModal(true);
-        }}
-        className="w-full rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-secondary"
-      >
-        {t('edit_project')}
-      </button>
-      <button
-        onClick={() => {
-          setShowMenu(false);
-          setShowArchiveDialog(true);
-        }}
-        className="w-full rounded-md px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
-      >
-        {t('confirm_archive_title')}
-      </button>
-    </div>
-  );
-
-  if (compact) {
     return (
-      <>
-        <div className="surface-base p-3 sm:p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                {project.crop}
-                {project.variety ? ` · ${project.variety}` : ''}
-              </p>
-              <h1 className="truncate text-base font-semibold text-foreground sm:text-lg">{project.name}</h1>
+        <>
+
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+                {/* Top row: Title + Menu */}
+                <div className="flex justify-between items-start mb-2">
+                    <div>
+                        <h1 className="text-lg font-bold text-gray-900">{project.name}</h1>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                            {project.crop} {project.variety && `· ${project.variety}`}
+                        </p>
+                    </div>
+
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowMenu(!showMenu)}
+                            className="p-1.5 text-gray-400 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition-colors flex items-center justify-center"
+                        >
+                            <span className="material-symbols-outlined text-xl">more_vert</span>
+                        </button>
+
+                        {showMenu && (
+                            <div className="absolute right-0 bottom-full mb-1 w-40 bg-white rounded-lg border border-gray-200 shadow-lg py-1 z-30">
+                                <button
+                                    onClick={() => { setShowMenu(false); setShowEditModal(true); }}
+                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                >
+                                    {t('edit_project')}
+                                </button>
+                                <button
+                                    onClick={() => { setShowMenu(false); setShowArchiveDialog(true); }}
+                                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                                >
+                                    {t('confirm_archive_title')}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Progress info */}
+                <div className="flex items-center justify-between text-xs mb-2">
+                    <span className="text-gray-500">
+                        {dayCount}日目 {totalDays ? `/ ${totalDays}日` : ''}
+                    </span>
+                    <span className="text-green-600 font-medium">
+                        {getStageIcon(stage)} {stages.find(s => s.key === stage)?.label || stage}
+                    </span>
+                </div>
+
+                {/* Simple progress bar */}
+                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                        className="h-full bg-green-500 transition-all duration-500"
+                        style={{ width: `${Math.min(100, progress)}%` }}
+                    />
+                </div>
+
+                {/* Stage labels below */}
+                <div className="flex justify-between mt-1.5 text-[10px] text-gray-400">
+                    {stages.map((s) => (
+                        <span
+                            key={s.key}
+                            className={stage === s.key ? 'text-green-600 font-bold' : ''}
+                        >
+                            {s.label || s.key}
+                        </span>
+                    ))}
+                </div>
             </div>
 
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setIsExpanded((prev) => !prev)}
-                className="touch-target rounded-md p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
-                aria-expanded={isExpanded}
-                aria-label={isExpanded ? t('collapse_details') : t('expand_details')}
-              >
-                <span className="material-symbols-outlined text-[20px]">{isExpanded ? 'expand_less' : 'expand_more'}</span>
-              </button>
+            <ProjectEditModal
+                project={project}
+                isOpen={showEditModal}
+                onClose={() => setShowEditModal(false)}
+            />
 
-              <div className="relative">
-                <button
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setShowMenu((prev) => !prev);
-                  }}
-                  className="touch-target rounded-md p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
-                  aria-label={t('project_menu')}
-                >
-                  <span className="material-symbols-outlined text-[20px]">more_vert</span>
-                </button>
-                {showMenu ? actionMenu : null}
-              </div>
-            </div>
-          </div>
+            <ArchiveConfirmation
+                projectName={project.name}
+                isOpen={showArchiveDialog}
+                onConfirm={handleArchive}
+                onCancel={() => setShowArchiveDialog(false)}
+                isLoading={archiving}
+            />
 
-          <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-            <span>{dayLabel}</span>
-            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${risk === 'safe' ? 'status-safe' : risk === 'watch' ? 'status-watch' : risk === 'warning' ? 'status-warning' : 'status-critical'}`}>
-              {localizedStageLabel(currentStage)}
-            </span>
-          </div>
-
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary">
-            <div className="h-full rounded-full bg-brand-seedling transition-[width] duration-300" style={{ width: `${Math.min(100, progress)}%` }} />
-          </div>
-
-          {isExpanded ? <SeasonRail state={seasonState} className="mt-3" /> : null}
-        </div>
-
-        <ProjectEditModal project={project} isOpen={showEditModal} onClose={() => setShowEditModal(false)} />
-
-        <ArchiveConfirmation
-          projectName={project.name}
-          isOpen={showArchiveDialog}
-          onConfirm={handleArchive}
-          onCancel={() => setShowArchiveDialog(false)}
-          isLoading={archiving}
-        />
-
-        <UndoSnackbar message={t('archived_success', { name: project.name })} onUndo={handleUndo} show={showUndoSnackbar} />
-      </>
+            <UndoSnackbar
+                message={t('archived_success', { name: project.name })}
+                onUndo={handleUndo}
+                show={showUndoSnackbar}
+            />
+        </>
     );
-  }
-
-  return (
-    <>
-      <section className="surface-raised p-5">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              {project.crop}
-              {project.variety ? ` · ${project.variety}` : ''}
-            </p>
-            <h1 className="text-2xl font-semibold text-foreground">{project.name}</h1>
-          </div>
-
-          <div className="relative">
-            <button
-              onClick={() => setShowMenu((prev) => !prev)}
-              className="touch-target rounded-md p-2 text-muted-foreground hover:bg-secondary hover:text-foreground"
-              aria-label={t('project_menu')}
-            >
-              <span className="material-symbols-outlined text-[20px]">more_vert</span>
-            </button>
-            {showMenu ? actionMenu : null}
-          </div>
-        </div>
-
-        <SeasonRail state={seasonState} />
-      </section>
-
-      <ProjectEditModal project={project} isOpen={showEditModal} onClose={() => setShowEditModal(false)} />
-
-      <ArchiveConfirmation
-        projectName={project.name}
-        isOpen={showArchiveDialog}
-        onConfirm={handleArchive}
-        onCancel={() => setShowArchiveDialog(false)}
-        isLoading={archiving}
-      />
-
-      <UndoSnackbar message={t('archived_success', { name: project.name })} onUndo={handleUndo} show={showUndoSnackbar} />
-    </>
-  );
 }

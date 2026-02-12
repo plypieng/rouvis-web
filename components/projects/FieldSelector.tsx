@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import MapDrawer from './MapDrawer';
+import { toastError, toastSuccess } from '@/lib/feedback';
 
 interface Field {
     id: string;
@@ -29,6 +30,11 @@ export default function FieldSelector({ selectedFieldId, onChange }: FieldSelect
     const [fields, setFields] = useState<Field[]>([]);
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [notice, setNotice] = useState<{
+        type: 'error' | 'success';
+        message: string;
+        retry?: () => void;
+    } | null>(null);
 
     // Fetch Fields
     const fetchFields = async () => {
@@ -38,9 +44,22 @@ export default function FieldSelector({ selectedFieldId, onChange }: FieldSelect
             if (res.ok) {
                 const data = await res.json();
                 setFields(data.fields || []);
+                return;
             }
+            const payload = await res.json().catch(() => ({}));
+            throw new Error(payload?.error || '圃場一覧の取得に失敗しました');
         } catch (error) {
             console.error('Failed to fetch fields', error);
+            const message = error instanceof Error ? error.message : '圃場一覧の取得に失敗しました';
+            setNotice({
+                type: 'error',
+                message,
+                retry: () => { void fetchFields(); },
+            });
+            toastError(message, {
+                label: '再試行',
+                onClick: () => { void fetchFields(); },
+            });
         } finally {
             setLoading(false);
         }
@@ -52,6 +71,7 @@ export default function FieldSelector({ selectedFieldId, onChange }: FieldSelect
 
     const handleSaveNewField = async (fieldData: NewFieldData) => {
         try {
+            setNotice(null);
             // Use local API proxy to avoid cross-origin auth issues
             const res = await fetch('/api/v1/fields', {
                 method: 'POST',
@@ -71,12 +91,31 @@ export default function FieldSelector({ selectedFieldId, onChange }: FieldSelect
                 await fetchFields();
                 onChange(data.field.id);
                 setIsDrawerOpen(false);
+                setNotice({
+                    type: 'success',
+                    message: '圃場を保存しました',
+                });
+                toastSuccess('圃場を保存しました');
             } else {
-                alert('Failed to save field');
+                const payload = await res.json().catch(() => ({}));
+                throw new Error(payload?.error || '圃場の保存に失敗しました');
             }
         } catch (error) {
             console.error('Error saving field', error);
-            alert('Error saving field');
+            const message = error instanceof Error ? error.message : '圃場の保存に失敗しました';
+            setNotice({
+                type: 'error',
+                message,
+                retry: () => {
+                    void handleSaveNewField(fieldData);
+                },
+            });
+            toastError(message, {
+                label: '再試行',
+                onClick: () => {
+                    void handleSaveNewField(fieldData);
+                },
+            });
         }
     };
 
@@ -85,6 +124,29 @@ export default function FieldSelector({ selectedFieldId, onChange }: FieldSelect
     return (
         <div className="space-y-3">
             <label className="block text-sm font-medium text-gray-700">Select Field (Location)</label>
+
+            {notice && (
+                <div
+                    className={`rounded-lg border px-3 py-2 text-sm ${
+                        notice.type === 'success'
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                            : 'border-red-200 bg-red-50 text-red-700'
+                    }`}
+                >
+                    <div className="flex items-center justify-between gap-3">
+                        <span>{notice.message}</span>
+                        {notice.retry && (
+                            <button
+                                type="button"
+                                onClick={notice.retry}
+                                className="rounded-md border border-current px-2 py-1 text-xs font-semibold hover:bg-white/40"
+                            >
+                                再試行
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
 
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {/* Existing Fields */}

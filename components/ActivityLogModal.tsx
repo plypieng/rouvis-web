@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, Save, MapPin, Calendar } from 'lucide-react';
+import { toastError, toastSuccess } from '@/lib/feedback';
 
 interface Field {
   id: string;
@@ -44,6 +45,7 @@ export function ActivityLogModal({
   const [fields, setFields] = useState<Field[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     fieldId: initialFieldId || '',
@@ -57,6 +59,7 @@ export function ActivityLogModal({
   useEffect(() => {
     if (isOpen) {
       fetchFields();
+      setErrorMessage(null);
       setFormData(prev => ({
         ...prev,
         fieldId: initialFieldId || '',
@@ -80,15 +83,16 @@ export function ActivityLogModal({
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const submitActivity = async () => {
     if (!formData.type) {
-      alert('活動タイプを選択してください');
+      const message = '活動タイプを選択してください';
+      setErrorMessage(message);
+      toastError(message);
       return;
     }
 
     setSaving(true);
+    setErrorMessage(null);
     try {
       await onSave({
         fieldId: formData.fieldId || undefined,
@@ -110,12 +114,25 @@ export function ActivityLogModal({
       });
 
       onClose();
+      toastSuccess('活動を保存しました。');
     } catch (error) {
       console.error('Failed to save activity:', error);
-      alert('活動の保存に失敗しました');
+      const message = error instanceof Error ? error.message : '活動の保存に失敗しました';
+      setErrorMessage(message);
+      toastError(message, {
+        label: '再試行',
+        onClick: () => {
+          void submitActivity();
+        },
+      });
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await submitActivity();
   };
 
   const selectedActivityType = ACTIVITY_TYPES.find(type => type.value === formData.type);
@@ -139,6 +156,22 @@ export function ActivityLogModal({
 
         {/* Form - Mobile optimized */}
         <form onSubmit={handleSubmit} className="mobile-spacing space-y-4">
+          {errorMessage && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              <div className="flex items-center justify-between gap-3">
+                <span>{errorMessage}</span>
+                <button
+                  type="button"
+                  onClick={() => { void submitActivity(); }}
+                  className="rounded-md border border-current px-2 py-1 text-xs font-semibold hover:bg-white/40"
+                  disabled={saving}
+                >
+                  再試行
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Field Selection - Mobile optimized */}
           <div>
             <label className="block text-mobile-sm font-medium text-gray-700 mb-2">

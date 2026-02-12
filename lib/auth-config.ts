@@ -69,49 +69,53 @@ export const authOptions: NextAuthOptions = {
               },
             });
 
-            // Seed Demo Project
-            const today = new Date();
-            const targetHarvest = new Date(today);
-            targetHarvest.setDate(today.getDate() + 120);
+            // Best-effort demo seed: auth must succeed even if local schema/data is behind.
+            try {
+              const today = new Date();
+              const targetHarvest = new Date(today);
+              targetHarvest.setDate(today.getDate() + 120);
 
-            await prisma.userProfile.create({
-              data: {
-                userId: user.id,
-                farmingType: 'conventional',
-                experienceLevel: 'beginner',
-                region: 'Demo Region',
-              }
-            });
+              await prisma.userProfile.create({
+                data: {
+                  userId: user.id,
+                  farmingType: 'conventional',
+                  experienceLevel: 'beginner',
+                  region: 'Demo Region',
+                }
+              });
 
-            const project = await prisma.project.create({
-              data: {
-                userId: user.id,
-                name: 'Demo Farm 2025',
-                crop: 'Rice',
-                startDate: today,
-                targetHarvestDate: targetHarvest,
-                status: 'active',
-              }
-            });
+              const project = await prisma.project.create({
+                data: {
+                  userId: user.id,
+                  name: 'Demo Farm 2025',
+                  crop: 'Rice',
+                  startDate: today,
+                  targetHarvestDate: targetHarvest,
+                  status: 'active',
+                }
+              });
 
-            await prisma.task.create({
-              data: {
-                projectId: project.id,
-                title: 'Check water level',
-                dueDate: today,
-                status: 'pending',
-                priority: 'high',
-              }
-            });
+              await prisma.task.create({
+                data: {
+                  projectId: project.id,
+                  title: 'Check water level',
+                  dueDate: today,
+                  status: 'pending',
+                  priority: 'high',
+                }
+              });
 
-            await prisma.activity.create({
-              data: {
-                projectId: project.id,
-                type: 'inspection',
-                note: 'Initial demo inspection',
-                performedAt: today,
-              }
-            });
+              await prisma.activity.create({
+                data: {
+                  projectId: project.id,
+                  type: 'inspection',
+                  note: 'Initial demo inspection',
+                  performedAt: today,
+                }
+              });
+            } catch (seedError) {
+              console.warn('[DemoAuth] Optional demo seed failed, continuing sign-in.', seedError);
+            }
           }
 
           return user;

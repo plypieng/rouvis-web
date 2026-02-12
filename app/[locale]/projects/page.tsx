@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useState, useEffect } from 'react';
+import { toastError, toastSuccess, toastWarning } from '@/lib/feedback';
 
 import { use } from 'react';
 
@@ -16,8 +17,10 @@ type Project = {
 };
 
 type NoticeState = {
-    type: 'success' | 'error';
+    type: 'success' | 'error' | 'warning';
     message: string;
+    actionLabel?: string;
+    onAction?: () => void;
 } | null;
 
 export default function ProjectsPage(props: { params: Promise<{ locale: string }> }) {
@@ -85,14 +88,8 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
         }
     };
 
-    const handleDelete = async (project: Project, e: React.MouseEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
+    const handleDeleteConfirmed = async (project: Project) => {
         setNotice(null);
-
-        if (!confirm(t('delete_confirm_message', { name: project.name }))) {
-            return;
-        }
 
         try {
             const res = await fetch(`/api/v1/projects/${project.id}`, {
@@ -106,26 +103,65 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
 
             // Refresh projects list
             fetchProjects();
-            setNotice({
+            const successNotice: NoticeState = {
                 type: 'success',
                 message: t('delete_success'),
-            });
+            };
+            setNotice(successNotice);
+            toastSuccess(successNotice.message);
         } catch (error) {
             console.error('Delete error:', error);
 
             // Show detailed error if available
             const errorMessage = error instanceof Error ? error.message : t('delete_error');
-            setNotice({
+            const message = errorMessage.startsWith('Failed') ? errorMessage : t('delete_error');
+            const errorNotice: NoticeState = {
                 type: 'error',
-                message: errorMessage.startsWith('Failed') ? errorMessage : t('delete_error'),
+                message,
+                actionLabel: '再試行',
+                onAction: () => {
+                    void handleDeleteConfirmed(project);
+                },
+            };
+            setNotice(errorNotice);
+            toastError(message, {
+                label: '再試行',
+                onClick: () => {
+                    void handleDeleteConfirmed(project);
+                },
             });
         }
+    };
+
+    const handleDelete = async (project: Project, e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const message = t('delete_confirm_message', { name: project.name });
+        setNotice({
+            type: 'warning',
+            message,
+            actionLabel: '削除する',
+            onAction: () => {
+                void handleDeleteConfirmed(project);
+            },
+        });
+        toastWarning(message, {
+            label: '削除する',
+            onClick: () => {
+                void handleDeleteConfirmed(project);
+            },
+        });
     };
 
     // Filter projects based on showArchived toggle
     const activeProjects = projects.filter(p => p.status !== 'archived');
     const archivedProjects = projects.filter(p => p.status === 'archived');
     const displayProjects = showArchived ? [...activeProjects, ...archivedProjects] : activeProjects;
+    const emptyProjectsChatHref = `/${locale}/chat?${new URLSearchParams({
+        intent: 'project',
+        prompt: 'まだプロジェクトがありません。最初のプロジェクト候補と今日の一歩を提案して',
+        fresh: '1',
+    }).toString()}`;
 
     if (loading) {
         return (
@@ -144,10 +180,23 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
                     className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
                         notice.type === 'success'
                             ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                            : 'border-red-200 bg-red-50 text-red-700'
+                            : notice.type === 'warning'
+                                ? 'border-amber-200 bg-amber-50 text-amber-700'
+                                : 'border-red-200 bg-red-50 text-red-700'
                     }`}
                 >
-                    {notice.message}
+                    <div className="flex items-center justify-between gap-3">
+                        <span>{notice.message}</span>
+                        {notice.actionLabel && notice.onAction && (
+                            <button
+                                type="button"
+                                onClick={notice.onAction}
+                                className="rounded-md border border-current px-2 py-1 text-xs font-semibold hover:bg-white/40"
+                            >
+                                {notice.actionLabel}
+                            </button>
+                        )}
+                    </div>
                 </div>
             )}
             <div className="flex justify-between items-center mb-6">
@@ -182,17 +231,32 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
             {displayProjects.length === 0 ? (
                 <div className="text-center py-12 bg-white rounded-lg border border-dashed border-gray-300">
                     <p className="text-gray-500 mb-4">{t('no_projects')}</p>
-                    <Link
-                        href={`/${locale}/projects/create`}
-                        className="text-green-600 hover:underline font-medium"
-                    >
-                        {t('create_new')}
-                    </Link>
+                    <div className="flex flex-wrap items-center justify-center gap-3">
+                        <Link
+                            href={`/${locale}/projects/create`}
+                            className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-green-700"
+                        >
+                            {t('create_new')}
+                        </Link>
+                        <Link
+                            href={emptyProjectsChatHref}
+                            data-testid="projects-empty-ai-link"
+                            className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100"
+                        >
+                            AIに相談
+                        </Link>
+                    </div>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {displayProjects.map((project) => {
                         const isArchived = project.status === 'archived';
+                        const projectChatHref = `/${locale}/chat?${new URLSearchParams({
+                            intent: 'project',
+                            projectId: project.id,
+                            prompt: `${project.name}の今週の優先作業を整理して`,
+                            fresh: '1',
+                        }).toString()}`;
                         return (
                             <div key={project.id} className="relative h-full">
                                 <Link href={`/${locale}/projects/${project.id}`} className="block group h-full">
@@ -242,6 +306,15 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
                                 >
                                     <span className="material-symbols-outlined text-xl">delete</span>
                                 </button>
+
+                                <Link
+                                    href={projectChatHref}
+                                    data-testid={`project-ai-link-${project.id}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="absolute bottom-3 left-3 z-10 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
+                                >
+                                    AIに相談
+                                </Link>
                             </div>
                         );
                     })}

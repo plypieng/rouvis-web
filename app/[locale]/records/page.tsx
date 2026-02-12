@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ActivityDashboard } from '../../../components/ActivityDashboard';
 import { ActivityLogModal } from '../../../components/ActivityLogModal';
 import { TaskSchedulerModal } from '../../../components/TaskSchedulerModal';
@@ -10,8 +10,24 @@ export default function RecordsPage() {
   const params = useParams<{ locale: string }>();
   const locale = (params?.locale as string) || 'ja';
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [showLogModal, setShowLogModal] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
+  const action = searchParams.get('action');
+
+  useEffect(() => {
+    if (action === 'log') {
+      setShowLogModal(true);
+    }
+    if (action === 'schedule') {
+      setShowTaskModal(true);
+    }
+  }, [action]);
+
+  const clearActionQuery = () => {
+    if (!action) return;
+    router.replace(`/${locale}/records`);
+  };
 
   return (
     <div className="container mx-auto py-6 px-4 space-y-6">
@@ -25,7 +41,10 @@ export default function RecordsPage() {
 
       <ActivityLogModal
         isOpen={showLogModal}
-        onClose={() => setShowLogModal(false)}
+        onClose={() => {
+          setShowLogModal(false);
+          clearActionQuery();
+        }}
         onSave={async (activity) => {
           const res = await fetch('/api/v1/activities', {
             method: 'POST',
@@ -51,7 +70,10 @@ export default function RecordsPage() {
 
       <TaskSchedulerModal
         isOpen={showTaskModal}
-        onClose={() => setShowTaskModal(false)}
+        onClose={() => {
+          setShowTaskModal(false);
+          clearActionQuery();
+        }}
         onSave={async (task) => {
           const res = await fetch('/api/v1/tasks', {
             method: 'POST',

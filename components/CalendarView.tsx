@@ -4,26 +4,15 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import {
-  addMonths,
-  eachDayOfInterval,
-  endOfMonth,
-  format,
-  isSameDay,
-  isSameMonth,
-  isToday,
-  startOfMonth,
-  subMonths,
-} from 'date-fns';
-import { ModuleBlueprint } from '@/components/workflow/ModuleBlueprint';
-import { SeasonRail } from '@/components/workflow/SeasonRail';
-import { buildSeasonRailState } from '@/lib/workflow-ui';
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, isToday } from 'date-fns';
+import { toastError, toastSuccess } from '@/lib/feedback';
 
 type CalendarEvent = {
   id: string;
   title: string;
   date: string;
   type: 'planting' | 'harvesting' | 'fertilizing' | 'watering' | 'maintenance';
+  crop?: string;
   location?: string;
 };
 
@@ -43,35 +32,43 @@ interface CalendarViewProps {
   locale: string;
 }
 
-function weekdayPalette(index: number): string {
-  if (index === 0) return 'text-red-600 dark:text-red-300';
-  if (index === 6) return 'text-blue-600 dark:text-blue-300';
-  return 'text-muted-foreground';
-}
-
 export function CalendarView({ tasks = [], locale }: CalendarViewProps) {
   const t = useTranslations();
-  const tw = useTranslations('workflow');
   const router = useRouter();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [localTasks, setLocalTasks] = useState<Task[]>(tasks);
 
   useEffect(() => {
     setLocalTasks(tasks);
   }, [tasks]);
 
-  const events: CalendarEvent[] = useMemo(
-    () =>
-      localTasks.map((task, index) => ({
-        id: task.id || `task-${index}`,
-        title: task.title,
-        date: format(task.dueAt, 'yyyy-MM-dd'),
-        type: 'maintenance',
-        location: task.projectName,
-      })),
-    [localTasks]
-  );
+  const events: CalendarEvent[] = useMemo(() => (
+    localTasks.map(task => ({
+      id: task.id || `task-${Date.now()}`,
+      title: task.title,
+      date: format(task.dueAt, 'yyyy-MM-dd'),
+      type: 'maintenance',
+      location: task.projectName,
+    }))
+  ), [localTasks]);
+
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'planting':
+        return '🌱';
+      case 'harvesting':
+        return '🌾';
+      case 'fertilizing':
+        return '🧪';
+      case 'watering':
+        return '💧';
+      case 'maintenance':
+        return '🔧';
+      default:
+        return '📋';
+    }
+  };
 
   const previousMonth = () => {
     setCurrentDate(subMonths(currentDate, 1));
@@ -87,25 +84,29 @@ export function CalendarView({ tasks = [], locale }: CalendarViewProps) {
     setSelectedDate(now);
   };
 
+  // Generate days for the current month view including previous/next month days
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
 
+  // Get first day of week (including previous month days)
   const firstDayOfWeek = new Date(monthStart);
   firstDayOfWeek.setDate(monthStart.getDate() - monthStart.getDay());
 
+  // Get last day of week (including next month days)
   const lastDayOfWeek = new Date(monthEnd);
   lastDayOfWeek.setDate(monthEnd.getDate() + (6 - monthEnd.getDay()));
 
+  // Include all visible days
   const days = eachDayOfInterval({ start: firstDayOfWeek, end: lastDayOfWeek });
 
+  // Get events for a specific day
   const getEventsForDay = (day: Date) => {
-    const dayKey = format(day, 'yyyy-MM-dd');
-    return events.filter((event) => event.date === dayKey);
+    const dayStr = format(day, 'yyyy-MM-dd');
+    return events.filter(event => event.date === dayStr);
   };
 
   const handleCompleteTask = async (taskId?: string) => {
     if (!taskId) return;
-
     const res = await fetch(`/api/v1/tasks/${taskId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -113,198 +114,218 @@ export function CalendarView({ tasks = [], locale }: CalendarViewProps) {
     });
 
     if (!res.ok) {
-      alert(tw('calendar.task_update_failed'));
+      toastError('タスク更新に失敗しました', {
+        label: '再試行',
+        onClick: () => {
+          void handleCompleteTask(taskId);
+        },
+      });
       return;
     }
 
-    setLocalTasks((prev) => prev.filter((task) => task.id !== taskId));
+    setLocalTasks(prev => prev.filter(t => t.id !== taskId));
+    toastSuccess('タスクを完了にしました。');
     router.refresh();
   };
 
   const selectedDayTasks = useMemo(() => {
-    const selectedKey = format(selectedDate, 'yyyy-MM-dd');
+    const selectedStr = format(selectedDate, 'yyyy-MM-dd');
     return localTasks
-      .filter((task) => format(task.dueAt, 'yyyy-MM-dd') === selectedKey)
+      .filter(t => format(t.dueAt, 'yyyy-MM-dd') === selectedStr)
       .sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime());
   }, [localTasks, selectedDate]);
 
-  const monthDayCount = monthEnd.getDate();
-  const seasonState = buildSeasonRailState({
-    stage: selectedDayTasks.length > 0 ? 'vegetative' : 'seedling',
-    progress: Math.round((selectedDate.getDate() / Math.max(monthDayCount, 1)) * 100),
-    dayCount: selectedDate.getDate(),
-    totalDays: monthDayCount,
-    dayLabel: tw('day_progress_with_total', { current: selectedDate.getDate(), total: monthDayCount }),
-    milestoneLabels: {
-      seedling: tw('milestones.seedling'),
-      vegetative: tw('milestones.vegetative'),
-      flowering: tw('milestones.flowering'),
-      harvest: tw('milestones.harvest'),
-    },
-    windowLabel: format(currentDate, locale === 'ja' ? 'yyyy年M月' : 'MMMM yyyy'),
-    risk: selectedDayTasks.length > 4 ? 'warning' : selectedDayTasks.length > 1 ? 'watch' : 'safe',
-    note:
-      selectedDayTasks.length > 0
-        ? tw('calendar.tasks_selected_note', { count: selectedDayTasks.length })
-        : tw('calendar.no_tasks_selected_note'),
-  });
+  const buildCalendarChatHref = () => {
+    const dateKey = format(selectedDate, 'yyyy-MM-dd');
+    const topTasks = selectedDayTasks.slice(0, 3).map((task) => task.title).join('、');
+    const prompt = topTasks
+      ? `${dateKey}の予定（${topTasks}）を、優先順位と天気リスクを踏まえて並べ替えて`
+      : `${dateKey}の作業計画を立てたい。優先順位を提案して`;
+    const query = new URLSearchParams({
+      intent: 'calendar',
+      date: dateKey,
+      prompt,
+      fresh: '1',
+    });
+    return `/${locale}/chat?${query.toString()}`;
+  };
 
   return (
-    <div className="space-y-4" style={{ scrollbarGutter: 'stable' }}>
-      <SeasonRail state={seasonState} />
-
-      <section className="surface-base p-4">
-        <div className="mb-5 flex items-center justify-between gap-3">
+    <div className="h-full w-full" style={{ scrollbarGutter: 'stable' }}>
+      <div className="flex justify-between items-center mb-6 bg-gradient-to-r from-blue-600 via-cyan-600 to-emerald-600 text-white p-4 rounded-xl shadow-lg">
+        <button
+          onClick={previousMonth}
+          className="p-2 rounded-lg hover:bg-white/20 transition-all transform hover:scale-110"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <div className="text-center">
+          <h2 className="text-2xl font-bold tracking-wide">
+            {format(currentDate, locale === 'ja' ? 'yyyy年 M月' : 'MMMM yyyy')}
+          </h2>
+          <p className="text-xs mt-1 opacity-90">{t('calendar.title')}</p>
           <button
             type="button"
-            onClick={previousMonth}
-            className="touch-target rounded-lg border border-border bg-secondary px-3 py-2 text-sm font-semibold text-secondary-foreground hover:bg-secondary/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            onClick={goToCurrentMonth}
+            className="mt-2 inline-flex items-center rounded-full bg-white/20 px-3 py-1 text-xs font-semibold hover:bg-white/30"
           >
-            {tw('calendar.prev_month')}
-          </button>
-
-          <div className="text-center">
-            <h2 className="text-xl font-semibold text-foreground">
-              {format(currentDate, locale === 'ja' ? 'yyyy年 M月' : 'MMMM yyyy')}
-            </h2>
-            <p className="text-xs text-muted-foreground">{t('calendar.title')}</p>
-            <button
-              type="button"
-              onClick={goToCurrentMonth}
-              className="mt-2 rounded-full border border-border bg-background px-3 py-1 text-xs font-semibold text-foreground hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {tw('calendar.back_to_current_month')}
-            </button>
-          </div>
-
-          <button
-            type="button"
-            onClick={nextMonth}
-            className="touch-target rounded-lg border border-border bg-secondary px-3 py-2 text-sm font-semibold text-secondary-foreground hover:bg-secondary/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            {tw('calendar.next_month')}
+            {locale === 'ja' ? '今日へ' : 'Today'}
           </button>
         </div>
+        <button
+          onClick={nextMonth}
+          className="p-2 rounded-lg hover:bg-white/20 transition-all transform hover:scale-110"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
 
-        <div className="mb-2 grid grid-cols-7 gap-2">
+      {/* Calendar Grid */}
+      <div className="w-full">
+        {/* Day Headers */}
+        <div className="grid grid-cols-7 gap-2 mb-3">
           {[
-            t('weather.sun'),
-            t('weather.mon'),
-            t('weather.tue'),
-            t('weather.wed'),
-            t('weather.thu'),
-            t('weather.fri'),
-            t('weather.sat'),
-          ].map((dayName, index) => (
-            <div key={dayName} className={`py-1 text-center text-xs font-semibold uppercase tracking-[0.1em] ${weekdayPalette(index)}`}>
-              {dayName}
+            { name: t('weather.sun'), color: 'text-red-600' },
+            { name: t('weather.mon'), color: 'text-gray-700' },
+            { name: t('weather.tue'), color: 'text-gray-700' },
+            { name: t('weather.wed'), color: 'text-gray-700' },
+            { name: t('weather.thu'), color: 'text-gray-700' },
+            { name: t('weather.fri'), color: 'text-gray-700' },
+            { name: t('weather.sat'), color: 'text-blue-600' }
+          ].map((day) => (
+            <div key={day.name} className={`text-sm font-bold text-center py-2 ${day.color}`}>
+              {day.name}
             </div>
           ))}
         </div>
 
+        {/* Calendar Days */}
         <div className="grid grid-cols-7 gap-2">
           {days.map((day) => {
             const dayEvents = getEventsForDay(day);
             const isCurrentMonth = isSameMonth(day, currentDate);
-            const isSelected = isSameDay(day, selectedDate);
-
             return (
-              <button
-                key={day.toISOString()}
-                type="button"
+              <div
+                key={day.toString()}
                 onClick={() => setSelectedDate(day)}
-                className={`min-h-[108px] rounded-lg border p-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                  isToday(day)
-                    ? 'border-brand-seedling/70 bg-brand-seedling/10'
-                    : isCurrentMonth
-                      ? 'border-border bg-card hover:border-brand-seedling/50'
-                      : 'border-border/60 bg-secondary/35 text-muted-foreground'
-                } ${isSelected ? 'ring-2 ring-brand-seedling/40' : ''}`}
-                aria-pressed={isSelected}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') setSelectedDate(day);
+                }}
+                className={`h-28 p-2 border-2 rounded-xl transition-all transform hover:scale-105 hover:shadow-xl cursor-pointer ${isToday(day)
+                  ? 'bg-gradient-to-br from-emerald-50 via-green-50 to-cyan-50 border-emerald-400 shadow-lg ring-2 ring-emerald-300'
+                  : isCurrentMonth
+                    ? 'bg-white border-gray-200 hover:border-blue-300 shadow-sm'
+                    : 'bg-gradient-to-br from-gray-50 to-gray-100 border-gray-200 opacity-50 hover:opacity-75'
+                  } ${isSameDay(day, selectedDate) ? 'ring-2 ring-blue-500' : ''}`}
               >
-                <div className="mb-1 flex items-center justify-between">
+                <div className="flex flex-col items-center w-full h-full overflow-hidden">
+                  {/* Date */}
                   <span
-                    className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
-                      isToday(day) ? 'bg-brand-seedling text-primary-foreground' : 'bg-secondary text-secondary-foreground'
-                    }`}
+                    className={`text-sm font-bold inline-flex items-center justify-center rounded-full w-7 h-7 ${isToday(day)
+                      ? 'bg-gradient-to-br from-emerald-600 to-green-600 text-white shadow-md'
+                      : 'text-gray-700'
+                      }`}
                   >
                     {format(day, 'd')}
                   </span>
-                  {dayEvents.length > 0 ? (
-                    <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold text-secondary-foreground">
-                      {dayEvents.length}
-                    </span>
-                  ) : null}
-                </div>
 
-                <div className="space-y-1">
-                  {dayEvents.slice(0, 3).map((event) => (
-                    <p key={event.id} className="truncate rounded bg-background/80 px-1.5 py-0.5 text-[10px] text-foreground">
-                      {event.title}
-                    </p>
-                  ))}
-                  {dayEvents.length > 3 ? (
-                    <p className="text-[10px] font-semibold text-muted-foreground">+{dayEvents.length - 3}</p>
-                  ) : null}
+                  {/* Event Count */}
+                  {dayEvents.length > 0 && (
+                    <span className="text-[9px] font-semibold px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full whitespace-nowrap">
+                      {dayEvents.length}件
+                    </span>
+                  )}
+
+                  {/* Icons Grid */}
+                  {dayEvents.length > 0 && (
+                    <div className="flex flex-wrap gap-0.5 justify-center mt-1">
+                      {dayEvents.slice(0, 3).map((event) => (
+                        <span
+                          key={event.id}
+                          className="text-sm"
+                          title={event.title}
+                        >
+                          {getTypeIcon(event.type)}
+                        </span>
+                      ))}
+                      {dayEvents.length > 3 && (
+                        <span className="text-[8px] font-semibold text-blue-600 pl-0.5">
+                          +{dayEvents.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>
-      </section>
+      </div>
 
-      <section className="surface-base p-4">
+      <div className="mt-6 rounded-xl border border-gray-200 bg-white p-4">
         <div className="flex items-center justify-between gap-3">
-          <h3 className="text-base font-semibold text-foreground">
+          <h3 className="text-base font-bold text-gray-900">
             {format(selectedDate, locale === 'ja' ? 'M月d日' : 'MMM d')}
           </h3>
-          <Link
-            href={`/${locale}/projects`}
-            className="text-sm font-semibold text-brand-seedling hover:text-brand-seedling/80"
-          >
-            {tw('calendar.projects')}
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href={buildCalendarChatHref()}
+              data-testid="calendar-ai-link"
+              className="text-sm text-amber-700 hover:underline"
+            >
+              AIに相談 →
+            </Link>
+            <Link
+              href={`/${locale}/projects`}
+              className="text-sm text-blue-700 hover:underline"
+            >
+              プロジェクト一覧 →
+            </Link>
+          </div>
         </div>
 
         {selectedDayTasks.length === 0 ? (
-          <div className="mt-3">
-            <ModuleBlueprint
-              title={tw('calendar.no_tasks_for_day_title')}
-              description={tw('calendar.no_tasks_for_day_description')}
-              tone="watch"
-            />
-          </div>
+          <p className="mt-3 text-sm text-gray-600">この日の予定はありません。</p>
         ) : (
           <ul className="mt-3 space-y-2">
             {selectedDayTasks.map((task) => (
-              <li key={task.id} className="rounded-lg border border-border bg-background/70 p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-foreground">{task.title}</p>
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">{task.projectName || '—'}</p>
-                    {task.projectId ? (
-                      <Link
-                        href={`/${locale}/projects/${task.projectId}`}
-                        className="mt-1 inline-block text-xs font-semibold text-brand-seedling hover:text-brand-seedling/80"
-                      >
-                        {tw('calendar.open_project')}
-                      </Link>
-                    ) : null}
+              <li key={task.id} className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 p-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm" aria-hidden="true">🔧</span>
+                    <p className="font-medium text-gray-900 truncate">{task.title}</p>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleCompleteTask(task.id)}
-                    className="touch-target rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    {tw('calendar.done')}
-                  </button>
+                  <p className="mt-0.5 text-xs text-gray-600 truncate">
+                    {task.projectName || '—'}
+                  </p>
+                  {task.projectId && (
+                    <Link
+                      href={`/${locale}/projects/${task.projectId}`}
+                      className="mt-1 inline-block text-xs text-blue-700 hover:underline"
+                    >
+                      プロジェクトへ →
+                    </Link>
+                  )}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => handleCompleteTask(task.id)}
+                  className="shrink-0 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
+                >
+                  完了
+                </button>
               </li>
             ))}
           </ul>
         )}
-      </section>
+      </div>
+
     </div>
   );
 }

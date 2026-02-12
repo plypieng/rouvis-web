@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
 import FieldSelector from './FieldSelector';
+import { toastError, toastSuccess } from '@/lib/feedback';
 
 interface InitialProjectData {
     name?: string;
@@ -16,11 +17,19 @@ interface InitialProjectData {
     fieldId?: string;
 }
 
+type NoticeState = {
+    type: 'error' | 'success';
+    message: string;
+    actionLabel?: string;
+    onAction?: () => void;
+} | null;
+
 export default function CreateProjectForm({ locale, initialData }: { locale: string; initialData?: InitialProjectData }) {
     const t = useTranslations('projects.create');
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [suggesting, setSuggesting] = useState(false);
+    const [notice, setNotice] = useState<NoticeState>(null);
     const [formData, setFormData] = useState({
         name: initialData?.name || (initialData?.crop ? `${initialData.crop} ${new Date().getFullYear()}` : ''),
         crop: initialData?.crop || '',
@@ -69,9 +78,12 @@ export default function CreateProjectForm({ locale, initialData }: { locale: str
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setNotice(null);
 
         if (!formData.fieldId) {
-            alert('Please select a field');
+            const message = '圃場を選択してください。';
+            setNotice({ type: 'error', message });
+            toastError(message);
             return;
         }
 
@@ -92,18 +104,60 @@ export default function CreateProjectForm({ locale, initialData }: { locale: str
             }
 
             const data = await res.json();
+            const successMessage = t('success');
+            setNotice({ type: 'success', message: successMessage });
+            toastSuccess(successMessage);
             router.push(`/${locale}/projects/${data.project.id}`);
             router.refresh();
         } catch (error) {
             console.error('Error creating project:', error);
-            alert(t('error'));
+            const message = t('error');
+            setNotice({
+                type: 'error',
+                message,
+                actionLabel: '再試行',
+                onAction: () => {
+                    const form = document.getElementById('create-project-form') as HTMLFormElement | null;
+                    form?.requestSubmit();
+                },
+            });
+            toastError(message, {
+                label: '再試行',
+                onClick: () => {
+                    const form = document.getElementById('create-project-form') as HTMLFormElement | null;
+                    form?.requestSubmit();
+                },
+            });
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+        <form id="create-project-form" onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+            {notice && (
+                <div
+                    className={`rounded-lg border px-4 py-3 text-sm ${
+                        notice.type === 'success'
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                            : 'border-red-200 bg-red-50 text-red-700'
+                    }`}
+                >
+                    <div className="flex items-center justify-between gap-3">
+                        <span>{notice.message}</span>
+                        {notice.actionLabel && notice.onAction && (
+                            <button
+                                type="button"
+                                onClick={notice.onAction}
+                                className="rounded-md border border-current px-2 py-1 text-xs font-semibold hover:bg-white/40"
+                                disabled={loading}
+                            >
+                                {notice.actionLabel}
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {/* Field Selector Section */}
             <div>

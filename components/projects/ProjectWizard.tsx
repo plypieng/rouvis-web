@@ -9,6 +9,8 @@ import FieldSelector from './FieldSelector';
 import ProjectTypeSelector from './ProjectTypeSelector';
 import PlantingHistoryInput from './PlantingHistoryInput';
 import AIProcessingOverlay from './AIProcessingOverlay';
+import { toastError, toastInfo, toastSuccess, toastWarning } from '@/lib/feedback';
+import { buildStarterTasks } from '@/lib/starter-tasks';
 
 type WizardStep = 'project-type' | 'selection' | 'crop-analysis' | 'planting-history' | 'field-context';
 
@@ -45,6 +47,7 @@ type TaskPayload = {
     priority?: string;
     status: 'pending' | 'completed';
     isBackfilled?: boolean;
+    isAssumed?: boolean;
 };
 
 type NoticeState = {
@@ -247,7 +250,27 @@ export default function ProjectWizard({ locale }: { locale: string }) {
         );
     };
 
-    const generateAndPersistInitialSchedule = async (projectId: string): Promise<number> => {
+    const persistGeneratedTasks = async (projectId: string, tasks: TaskPayload[]): Promise<void> => {
+        const selectedTemplatePreferences = preferenceTemplates.find(
+            (template) => template.id === selectedTemplateId
+        )?.preferences;
+        const saveResponse = await fetch(`/api/v1/projects/${projectId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                tasks,
+                ...(selectedTemplatePreferences ? { schedulingPreferences: selectedTemplatePreferences } : {}),
+            }),
+        });
+
+        if (!saveResponse.ok) {
+            throw new Error(await extractErrorMessage(saveResponse, '生成したタスクの保存に失敗しました'));
+        }
+    };
+
+    const generateAndPersistInitialSchedule = async (
+        projectId: string
+    ): Promise<{ taskCount: number; usedFallback: boolean }> => {
         if (!cropAnalysis) throw new Error('作物情報が見つかりません');
 
         const isBackfilled = projectType === 'existing' && !!plantingDate;
@@ -255,81 +278,90 @@ export default function ProjectWizard({ locale }: { locale: string }) {
         const endpoint = isBackfilled
             ? '/api/v1/agents/generate-backfilled-schedule'
             : '/api/v1/agents/generate-schedule';
-
         const preferenceTemplate = selectedTemplateId || FALLBACK_TEMPLATE_ID;
-        const scheduleResponse = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(
-                isBackfilled
-                    ? {
-                        projectId,
-                        preferenceTemplate,
-                        cropAnalysis: {
-                            crop: cropAnalysis.crop,
-                            variety: cropAnalysis.variety,
-                            startDate: effectivePlantingDate,
-                            targetHarvestDate: cropAnalysis.targetHarvestDate || '',
-                            notes: cropAnalysis.notes,
-                        },
-                        plantingDate: effectivePlantingDate,
-                        currentDate: new Date().toISOString().split('T')[0],
-                    }
-                    : {
-                        projectId,
-                        preferenceTemplate,
-                        cropAnalysis: {
-                            crop: cropAnalysis.crop,
-                            variety: cropAnalysis.variety,
-                            startDate: cropAnalysis.startDate || new Date().toISOString().split('T')[0],
-                            targetHarvestDate: cropAnalysis.targetHarvestDate || '',
-                            notes: cropAnalysis.notes,
-                        },
-                        currentDate: new Date().toISOString().split('T')[0],
-                    }
-            ),
-        });
+        let usedFallback = false;
+        let tasks: TaskPayload[] = [];
 
-        const generatedData = await scheduleResponse.json().catch(() => ({}));
-        if (!scheduleResponse.ok) {
-            if (
-                scheduleResponse.status === 409
-                && (generatedData as Record<string, unknown>)?.error === 'SCHEDULING_PREFERENCES_REQUIRED'
-            ) {
-                applyTemplateCatalog(generatedData as PreferenceTemplateCatalog);
+        try {
+            const scheduleResponse = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(
+                    isBackfilled
+                        ? {
+                            projectId,
+                            preferenceTemplate,
+                            cropAnalysis: {
+                                crop: cropAnalysis.crop,
+                                variety: cropAnalysis.variety,
+                                startDate: effectivePlantingDate,
+                                targetHarvestDate: cropAnalysis.targetHarvestDate || '',
+                                notes: cropAnalysis.notes,
+                            },
+                            plantingDate: effectivePlantingDate,
+                            currentDate: new Date().toISOString().split('T')[0],
+                        }
+                        : {
+                            projectId,
+                            preferenceTemplate,
+                            cropAnalysis: {
+                                crop: cropAnalysis.crop,
+                                variety: cropAnalysis.variety,
+                                startDate: cropAnalysis.startDate || new Date().toISOString().split('T')[0],
+                                targetHarvestDate: cropAnalysis.targetHarvestDate || '',
+                                notes: cropAnalysis.notes,
+                            },
+                            currentDate: new Date().toISOString().split('T')[0],
+                        }
+                ),
+            });
+
+            const generatedData = await scheduleResponse.json().catch(() => ({}));
+            if (!scheduleResponse.ok) {
+                if (
+                    scheduleResponse.status === 409
+                    && (generatedData as Record<string, unknown>)?.error === 'SCHEDULING_PREFERENCES_REQUIRED'
+                ) {
+                    applyTemplateCatalog(generatedData as PreferenceTemplateCatalog);
+                }
+
                 throw new Error(
-                    ((generatedData as Record<string, unknown>)?.message as string)
-                    || '初回ドラフトの前に、作業設定テンプレートを選択してください。'
+                    ((generatedData as Record<string, unknown>)?.error as string)
+                    || ((generatedData as Record<string, unknown>)?.message as string)
+                    || ((generatedData as Record<string, unknown>)?.details as string)
+                    || '初回スケジュールの生成に失敗しました'
                 );
             }
 
-            throw new Error(
-                ((generatedData as Record<string, unknown>)?.error as string)
-                || ((generatedData as Record<string, unknown>)?.message as string)
-                || ((generatedData as Record<string, unknown>)?.details as string)
-                || '初回スケジュールの生成に失敗しました'
-            );
+            const schedule: GeneratedSchedule = generatedData?.schedule || generatedData;
+            tasks = buildTaskPayloads(schedule, isBackfilled);
+            if (!tasks.length) {
+                throw new Error('初回スケジュールにタスクが含まれていませんでした');
+            }
+        } catch (generationError) {
+            console.warn('Schedule generation failed. Falling back to starter tasks.', generationError);
+            usedFallback = true;
+            tasks = buildStarterTasks({
+                crop: cropAnalysis.crop,
+                startDate: effectivePlantingDate,
+                isBackfilled,
+            }).map((task) => ({
+                title: task.title,
+                description: task.description,
+                dueDate: task.dueDate,
+                priority: task.priority,
+                status: task.status,
+                isBackfilled: task.isBackfilled,
+                isAssumed: task.isAssumed,
+            }));
         }
 
-        const schedule: GeneratedSchedule = generatedData?.schedule || generatedData;
-        const tasks = buildTaskPayloads(schedule, isBackfilled);
         if (!tasks.length) {
-            throw new Error('初回スケジュールにタスクが含まれていませんでした');
+            throw new Error('初回タスクの作成に失敗しました');
         }
 
-        const saveResponse = await fetch(`/api/v1/projects/${projectId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                tasks,
-            }),
-        });
-
-        if (!saveResponse.ok) {
-            throw new Error(await extractErrorMessage(saveResponse, '生成したタスクの保存に失敗しました'));
-        }
-
-        return tasks.length;
+        await persistGeneratedTasks(projectId, tasks);
+        return { taskCount: tasks.length, usedFallback };
     };
 
     // Step 0: Project Type Selection (FIRST STEP)
@@ -392,10 +424,12 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                 }
             } catch (error) {
                 console.error('Scan error:', error);
+                const message = `画像の読み込みに失敗しました: ${error instanceof Error ? error.message : 'Unknown error'}`;
                 setNotice({
                     type: 'error',
-                    message: `画像の読み込みに失敗しました: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                    message,
                 });
+                toastError(message);
             } finally {
                 setLoading(false);
                 setLoadingMode(null);
@@ -444,9 +478,16 @@ export default function ProjectWizard({ locale }: { locale: string }) {
             setStep('crop-analysis');
         } catch (error) {
             console.error('Analysis error:', error);
+            const message = error instanceof Error ? error.message : '作物分析に失敗しました';
             setNotice({
                 type: 'error',
-                message: error instanceof Error ? error.message : '作物分析に失敗しました',
+                message,
+            });
+            toastError(message, {
+                label: '再試行',
+                onClick: () => {
+                    void handleManualCropInput(cropName);
+                },
             });
         } finally {
             setLoading(false);
@@ -483,6 +524,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
 
             if (!projectId) {
                 setNotice({ type: 'info', message: 'プロジェクトを作成しています...' });
+                toastInfo('プロジェクトを作成しています...');
                 const payload = {
                     name: `${cropAnalysis.crop} ${new Date().getFullYear()}`,
                     crop: cropAnalysis.crop,
@@ -517,8 +559,17 @@ export default function ProjectWizard({ locale }: { locale: string }) {
             }
 
             setNotice({ type: 'info', message: 'AIが初回スケジュールを作成しています...' });
-            const taskCount = await generateAndPersistInitialSchedule(projectId);
-            setNotice({ type: 'success', message: `初回スケジュールを作成しました（${taskCount}件）` });
+            toastInfo('AIが初回スケジュールを作成しています...');
+            const { taskCount, usedFallback } = await generateAndPersistInitialSchedule(projectId);
+            if (usedFallback) {
+                const fallbackMessage = `AI生成が不安定だったため、スタータータスクを作成しました（${taskCount}件）`;
+                setNotice({ type: 'info', message: fallbackMessage });
+                toastWarning(fallbackMessage);
+            } else {
+                const successMessage = `初回スケジュールを作成しました（${taskCount}件）`;
+                setNotice({ type: 'success', message: successMessage });
+                toastSuccess(successMessage);
+            }
 
             // Refresh session so onboarding guard sees the new project immediately.
             try {
@@ -530,11 +581,18 @@ export default function ProjectWizard({ locale }: { locale: string }) {
             router.push(`/${locale}/projects/${projectId}`);
         } catch (error) {
             console.error('Project creation error:', error);
+            const message = error instanceof Error
+                ? error.message
+                : 'プロジェクトまたは初回スケジュールの作成に失敗しました';
             setNotice({
                 type: 'error',
-                message: error instanceof Error
-                    ? error.message
-                    : 'プロジェクトまたは初回スケジュールの作成に失敗しました',
+                message,
+            });
+            toastError(message, {
+                label: '再試行',
+                onClick: () => {
+                    void handleCreateProject();
+                },
             });
         } finally {
             setLoading(false);

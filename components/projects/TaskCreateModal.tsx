@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { format } from 'date-fns';
+import { toastError, toastSuccess } from '@/lib/feedback';
 
 interface TaskCreateModalProps {
     projectId: string;
@@ -78,6 +79,7 @@ export default function TaskCreateModal({ projectId, isOpen, onClose, initialDat
             // Refresh and close
             router.refresh();
             onClose();
+            toastSuccess(t('success'));
             // Reset form
             setFormData({
                 title: '',
@@ -87,7 +89,12 @@ export default function TaskCreateModal({ projectId, isOpen, onClose, initialDat
             });
         } catch (error) {
             console.error('Create error:', error);
-            alert(t('error'));
+            toastError(t('error'), {
+                label: '再試行',
+                onClick: () => {
+                    void handleSave();
+                },
+            });
         } finally {
             setSaving(false);
         }

@@ -3,15 +3,20 @@
 import { forwardRef, useImperativeHandle, useRef, useEffect, useState, useCallback } from 'react';
 import { Send, Loader2, RefreshCw, Undo2, Paperclip, X, ArrowRight } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import type { QuickApplyResult } from '@/types/project-cockpit';
+import { toastError } from '@/lib/feedback';
 
 export type ChatMode = 'default' | 'reschedule' | 'diagnosis' | 'logging';
+export type ChatSuggestion = {
+  label: string;
+  message: string;
+  mode?: ChatMode;
+  isCancel?: boolean;
+};
 
 export interface RouvisChatKitRef {
-  sendMessage: (message: string, overrideMode?: ChatMode) => Promise<void>;
-  setSuggestions: (suggestions: { label: string; message: string; isCancel?: boolean }[]) => void;
+  sendMessage: (message: string, overrideMode?: ChatMode) => void;
+  setSuggestions: (suggestions: ChatSuggestion[]) => void;
   setChatMode: (mode: ChatMode) => void;
-  runRescheduleQuickApply: (options: { prompt: string; confirmMessage?: string }) => Promise<QuickApplyResult>;
 }
 
 interface ActionConfirmation {
@@ -44,6 +49,9 @@ interface RouvisChatKitProps {
   className?: string;
   projectId?: string;
   initialThreadId?: string;
+  initialInput?: string;
+  initialSuggestions?: ChatSuggestion[];
+  initialMode?: ChatMode;
   onTaskUpdate?: () => void;
   onDiagnosisComplete?: (result: unknown) => void;
   onDraftCreate?: (draft: any) => void;
@@ -91,12 +99,6 @@ function stripHiddenBlocks(content: string): string {
     .trim();
 }
 
-function extractReschedulePlanBlock(content: string): string | null {
-  if (!content) return null;
-  const matched = content.match(/\[\[RESCHEDULE_PLAN:\s*([\s\S]*?)\]\]/);
-  return matched?.[0] || null;
-}
-
 // Time-aware greetings
 function getGreeting(weather?: { condition?: string }): { main: string; sub: string } {
   const hour = new Date().getHours();
@@ -116,9 +118,9 @@ function getGreeting(weather?: { condition?: string }): { main: string; sub: str
 }
 
 // Quick action suggestions (text links, not buttons)
-function getQuickSuggestions(growthStage?: string): { label: string; message: string; mode?: ChatMode }[] {
+function getQuickSuggestions(growthStage?: string): ChatSuggestion[] {
   const hour = new Date().getHours();
-  const suggestions: { label: string; message: string; mode?: ChatMode }[] = [];
+  const suggestions: ChatSuggestion[] = [];
 
   if (hour >= 5 && hour < 12) {
     suggestions.push({ label: '今日の予定は？', message: '今日の作業予定を教えて' });
@@ -141,6 +143,9 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   className,
   projectId,
   initialThreadId,
+  initialInput,
+  initialSuggestions,
+  initialMode,
   onTaskUpdate,
   onDiagnosisComplete,
   onDraftCreate,
@@ -148,7 +153,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   growthStage,
 }, ref) => {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState(initialInput || '');
   const [isLoading, setIsLoading] = useState(false);
   const [threadId, setThreadId] = useState<string | undefined>(initialThreadId);
   const [currentStatus, setCurrentStatus] = useState<string>('');
@@ -158,13 +163,10 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   const [isUserNearBottom, setIsUserNearBottom] = useState(true);
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
   const [chatMode, setChatModeState] = useState<ChatMode>('default'); // New state
+  const [customSuggestions, setCustomSuggestions] = useState<ChatSuggestion[] | null>(initialSuggestions || null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const lastAssistantRawRef = useRef('');
-  const lastAssistantFailedRef = useRef(false);
-  const quickApplyInFlightRef = useRef(false);
-  const lastActionTypeRef = useRef<ActionConfirmation['type'] | null>(null);
 
   // Load chat history on mount
   useEffect(() => {
@@ -215,11 +217,28 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     loadHistory();
   }, [threadId, projectId]);
 
+  useEffect(() => {
+    if (!initialMode) return;
+    setChatModeState(initialMode);
+  }, [initialMode]);
+
+  useEffect(() => {
+    if (!initialInput) return;
+    if (messages.length > 0) return;
+    setInput(initialInput);
+  }, [initialInput, messages.length]);
+
+  useEffect(() => {
+    if (!initialSuggestions || initialSuggestions.length === 0) return;
+    if (messages.length > 0) return;
+    setCustomSuggestions(initialSuggestions);
+  }, [initialSuggestions, messages.length]);
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        alert('画像サイズは5MB以下にしてください');
+        toastError('画像サイズは5MB以下にしてください');
         return;
       }
       const reader = new FileReader();
@@ -259,10 +278,6 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
 
   const sendMessage = useCallback(async (content: string, overrideMode?: ChatMode) => {
     if ((!content.trim() && !selectedImage) || isLoading) return;
-    let assistantRawContent = '';
-    let assistantFailed = false;
-    lastAssistantRawRef.current = '';
-    lastAssistantFailedRef.current = false;
 
     // Capture image before clearing state
     const currentImageUrl = selectedImage;
@@ -335,8 +350,6 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
           if (line.startsWith('0:')) {
             try {
               const text = JSON.parse(line.slice(2));
-              assistantRawContent += text;
-              lastAssistantRawRef.current = assistantRawContent;
               setMessages(prev => prev.map(m =>
                 m.id === assistantId ? { ...m, content: m.content + text } : m
               ));
@@ -374,8 +387,6 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
             // Content
             if (event.type === 'content' && event.delta?.content) {
               const content = event.delta.content;
-              assistantRawContent += content;
-              lastAssistantRawRef.current = assistantRawContent;
               setMessages(prev => prev.map(m =>
                 m.id === assistantId ? { ...m, content: m.content + content } : m
               ));
@@ -397,7 +408,6 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
                   event.action.type === 'task_updated'
                   ? event.action.type
                   : 'task_updated';
-              lastActionTypeRef.current = actionType;
               const confirmation: ActionConfirmation = {
                 id: `confirm-${Date.now()}`,
                 type: actionType,
@@ -424,7 +434,6 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
 
             // Mark error
             if (event.type === 'tool_call_delta' && event.delta?.status === 'error') {
-              assistantFailed = true;
               setMessages(prev => prev.map(m =>
                 m.id === assistantId ? { ...m, hasError: true } : m
               ));
@@ -459,7 +468,6 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
 
       onTaskUpdate?.();
     } catch (error) {
-      assistantFailed = true;
       console.error('Chat error:', error);
       setMessages(prev => prev.map(m =>
         m.id === assistantId
@@ -467,52 +475,10 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
           : m
       ));
     } finally {
-      lastAssistantRawRef.current = assistantRawContent;
-      lastAssistantFailedRef.current = assistantFailed;
       setIsLoading(false);
       setCurrentStatus('');
     }
-  }, [messages, projectId, threadId, isLoading, selectedImage, onTaskUpdate, onDiagnosisComplete, onDraftCreate, chatMode]);
-
-  const runRescheduleQuickApply = useCallback(async (
-    options: { prompt: string; confirmMessage?: string }
-  ): Promise<QuickApplyResult> => {
-    const prompt = options.prompt?.trim() || '';
-    if (!prompt) return { applied: false, reason: 'missing_prompt' };
-    if (quickApplyInFlightRef.current || isLoading) return { applied: false, reason: 'in_flight' };
-
-    quickApplyInFlightRef.current = true;
-    setChatModeState('reschedule');
-    setCustomSuggestions(null);
-
-    try {
-      await sendMessage(prompt, 'reschedule');
-      if (lastAssistantFailedRef.current) {
-        return { applied: false, reason: 'proposal_failed' };
-      }
-
-      const proposalRaw = lastAssistantRawRef.current;
-      const planBlock = extractReschedulePlanBlock(proposalRaw);
-      if (!planBlock) {
-        return { applied: false, reason: 'no_plan' };
-      }
-
-      lastActionTypeRef.current = null;
-      await sendMessage(options.confirmMessage?.trim() || 'この内容でお願いします', 'reschedule');
-      if (lastAssistantFailedRef.current) {
-        return { applied: false, reason: 'apply_failed' };
-      }
-
-      const confirmationRaw = lastAssistantRawRef.current;
-      const appliedByAction = lastActionTypeRef.current === 'task_updated';
-      const appliedByText = /予定を調整しました|更新しました|反映済み/.test(confirmationRaw);
-      return appliedByAction || appliedByText
-        ? { applied: true }
-        : { applied: false, reason: 'apply_unconfirmed' };
-    } finally {
-      quickApplyInFlightRef.current = false;
-    }
-  }, [isLoading, sendMessage]);
+  }, [messages, projectId, threadId, isLoading, selectedImage, onTaskUpdate, onDiagnosisComplete, chatMode]);
 
   const handleRetry = useCallback(() => {
     setMessages(prev => {
@@ -526,8 +492,6 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     }, 100);
   }, [messages, sendMessage]);
 
-  const [customSuggestions, setCustomSuggestions] = useState<{ label: string; message: string }[] | null>(null);
-
   useImperativeHandle(ref, () => ({
     sendMessage,
     setSuggestions: (suggestions) => {
@@ -537,8 +501,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     setChatMode: (mode: ChatMode) => {
       setChatModeState(mode);
       setIsUserNearBottom(true);
-    },
-    runRescheduleQuickApply,
+    }
   }));
 
   useEffect(() => {
@@ -663,7 +626,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
                 setHasUnreadMessages(false);
                 setIsUserNearBottom(true);
               }}
-              className="rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-md hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-medium shadow-md hover:opacity-90"
             >
               最新のメッセージへ
             </button>
@@ -687,7 +650,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
                 {!!confirmation.undoData && Date.now() < confirmation.expiresAt && (
                   <button
                     onClick={() => handleUndo(confirmation)}
-                    className="flex items-center gap-1 rounded px-1 text-xs underline opacity-70 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="flex items-center gap-1 text-xs underline opacity-70 hover:opacity-100"
                   >
                     <Undo2 className="w-3 h-3" />
                     取り消す
@@ -705,20 +668,20 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
               <button
                 key={s.label}
                 onClick={() => {
-                  if ((s as any).isCancel) {
+                  if (s.isCancel) {
                     setCustomSuggestions(null);
                     setChatModeState('default'); // Also exit mode on cancel
                   } else {
-                    const mode = (s as any).mode;
+                    const mode = s.mode;
                     if (mode) setChatModeState(mode);
                     sendMessage(s.message, mode);
                     setCustomSuggestions(null); // Clear after selection
                   }
                 }}
-                className={`group flex w-full items-center justify-between rounded-md border border-border/60 bg-background px-3 py-2 text-left text-xs font-medium transition-all hover:border-primary/50 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${(s as any).isCancel ? 'text-muted-foreground' : 'text-foreground'}`}
+                className={`w-full text-left px-3 py-2 text-xs font-medium bg-background border border-border/60 hover:border-primary/50 hover:bg-muted/50 rounded-md transition-all flex items-center justify-between group ${s.isCancel ? 'text-muted-foreground' : 'text-foreground'}`}
               >
                 <span className="truncate">{s.label}</span>
-                {!((s as any).isCancel) && (
+                {!s.isCancel && (
                   <ArrowRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-primary transition-colors" />
                 )}
               </button>
@@ -737,7 +700,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
               />
               <button
                 onClick={handleRemoveImage}
-                className="absolute -top-2 -right-2 rounded-full bg-destructive p-1 text-destructive-foreground shadow-sm transition-colors hover:bg-destructive/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 shadow-sm hover:bg-destructive/90 transition-colors"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -758,7 +721,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="ml-1 rounded-full p-2 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="p-2 ml-1 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full transition-colors"
               disabled={isLoading}
             >
               <Paperclip className="w-5 h-5" />
@@ -774,7 +737,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
             <button
               type="submit"
               disabled={isLoading || (!input.trim() && !selectedImage)}
-              className={`flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full p-3 text-primary-foreground transition-all hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${chatMode !== 'default' ? chatMode === 'reschedule' ? 'bg-amber-600' : chatMode === 'diagnosis' ? 'bg-teal-600' : 'bg-blue-600' : 'bg-primary'}`}
+              className={`text-primary-foreground rounded-full p-3 min-w-[44px] min-h-[44px] flex items-center justify-center hover:opacity-90 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed transition-all ${chatMode !== 'default' ? chatMode === 'reschedule' ? 'bg-amber-600' : chatMode === 'diagnosis' ? 'bg-teal-600' : 'bg-blue-600' : 'bg-primary'}`}
             >
               {isLoading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -796,7 +759,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
             </div>
             <button
               onClick={() => setChatModeState('default')}
-              className="rounded px-1 text-[10px] uppercase tracking-wider opacity-80 hover:opacity-100 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="hover:underline opacity-80 hover:opacity-100 uppercase tracking-wider text-[10px]"
             >
               終了
             </button>

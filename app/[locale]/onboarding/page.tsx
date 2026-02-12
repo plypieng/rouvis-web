@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { z } from 'zod';
 import { Loader2, ChevronDown, Info, Check, ArrowRight } from 'lucide-react';
 import { PREFECTURES, EXPERIENCE_OPTIONS, FARMING_TYPES, COMMON_CROPS } from '../../../lib/prefectures';
@@ -39,13 +39,45 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+function getRouteLabel(path: string): string {
+  const normalized = path.split('?')[0];
+  const routeLabels: Record<string, string> = {
+    '/calendar': 'カレンダー',
+    '/projects': 'プロジェクト一覧',
+    '/projects/create': 'プロジェクト作成',
+    '/records': '活動記録',
+    '/chat': 'AIチャット',
+    '/map': 'マップ',
+    '/settings': '設定',
+  };
+
+  return routeLabels[normalized] || normalized;
+}
+
+function getOnboardingReasonMessage(reason: string | null, from: string | null): string | null {
+  if (reason !== 'onboarding_required') return null;
+  const safeFrom = (from || '').startsWith('/') ? from : '';
+
+  if (safeFrom && safeFrom !== '/' && safeFrom !== '/onboarding') {
+    return `「${getRouteLabel(safeFrom)}」へ進む前に初期設定の完了が必要です。完了後は通常の画面に進めます。`;
+  }
+
+  return '初期設定が未完了のため、この手順を完了してからアプリをご利用ください。';
+}
+
 export default function OnboardingPage() {
   const { data: session, status, update } = useSession();
   const params = useParams<{ locale: string }>();
+  const searchParams = useSearchParams();
   const locale = (params?.locale as string) || 'ja';
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fieldEntryMode, setFieldEntryMode] = useState<'quick' | 'detailed'>('quick');
+  const onboardingReasonMessage = getOnboardingReasonMessage(
+    searchParams.get('reason'),
+    searchParams.get('from')
+  );
 
   const hasSeenLoading = useRef(false);
   const hasPrefilledName = useRef(false);
@@ -279,7 +311,7 @@ export default function OnboardingPage() {
   // Step 1: Welcome
   if (step === 1) {
     return (
-      <OnboardingLayout step={1} totalSteps={3}>
+      <OnboardingLayout step={1} totalSteps={3} reasonMessage={onboardingReasonMessage}>
         <div className="text-center space-y-6">
           <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto">
             <span className="text-3xl">🌾</span>
@@ -317,7 +349,7 @@ export default function OnboardingPage() {
   // Step 2: Profile
   if (step === 2) {
     return (
-      <OnboardingLayout step={2} totalSteps={3}>
+      <OnboardingLayout step={2} totalSteps={3} reasonMessage={onboardingReasonMessage}>
         <div className="space-y-6">
           <div className="text-center mb-4">
             <h2 className="text-xl font-bold text-gray-900">基本情報</h2>
@@ -421,7 +453,7 @@ export default function OnboardingPage() {
   // Step 3: Field Creation
   if (step === 3) {
     return (
-      <OnboardingLayout step={3} totalSteps={3}>
+      <OnboardingLayout step={3} totalSteps={3} reasonMessage={onboardingReasonMessage}>
         <div className="space-y-6">
           <div className="text-center mb-4">
             <h2 className="text-xl font-bold text-gray-900">最初の畑を登録</h2>
@@ -434,27 +466,58 @@ export default function OnboardingPage() {
             </div>
           )}
 
-
-
-          {/* Map Editor for Field Creation */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              畑の場所と形
-              <span className="text-gray-400 font-normal ml-2">地図をタップして囲むと面積が自動計算されます</span>
-            </label>
-
-            <FieldMapEditor
-              onFieldChange={(data) => {
-                setFieldData(prev => ({
-                  ...prev,
-                  area: data.area,
-                  // Store polygon/location for API
-                  polygon: data.polygon,
-                  location: data.location
-                }));
-              }}
-            />
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+            <p className="mb-2 text-sm font-medium text-gray-800">入力モード</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setFieldEntryMode('quick')}
+                className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                  fieldEntryMode === 'quick'
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-white text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                かんたん登録
+              </button>
+              <button
+                type="button"
+                onClick={() => setFieldEntryMode('detailed')}
+                className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                  fieldEntryMode === 'detailed'
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-white text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                地図も登録
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-gray-600">
+              {fieldEntryMode === 'quick'
+                ? '圃場名と面積だけで先に開始できます。地図は後から編集可能です。'
+                : '地図で囲んで面積を自動計算し、より正確な記録にできます。'}
+            </p>
           </div>
+
+          {fieldEntryMode === 'detailed' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                畑の場所と形
+                <span className="text-gray-400 font-normal ml-2">地図をタップして囲むと面積が自動計算されます</span>
+              </label>
+
+              <FieldMapEditor
+                onFieldChange={(data) => {
+                  setFieldData(prev => ({
+                    ...prev,
+                    area: data.area,
+                    polygon: data.polygon,
+                    location: data.location
+                  }));
+                }}
+              />
+            </div>
+          )}
 
           {/* Area (Read-only / Manual Override) */}
           <div>
@@ -467,11 +530,15 @@ export default function OnboardingPage() {
               step="0.01"
               value={fieldData.area?.toString() || ''}
               onChange={(e) => setFieldData({ ...fieldData, area: parseFloat(e.target.value) || 0 })}
-              placeholder="地図から自動計算"
+              placeholder={fieldEntryMode === 'detailed' ? '地図から自動計算' : '例: 0.3'}
               className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${errors.area ? 'border-red-500' : 'border-gray-200'
                 }`}
             />
-            <p className="mt-1 text-xs text-gray-400">地図で囲むと自動入力されます（手動修正も可）</p>
+            <p className="mt-1 text-xs text-gray-400">
+              {fieldEntryMode === 'detailed'
+                ? '地図で囲むと自動入力されます（手動修正も可）'
+                : 'おおよその面積でOKです。後で地図編集で精度を上げられます。'}
+            </p>
             {errors.area && <p className="mt-1 text-sm text-red-600">{errors.area}</p>}
           </div>
 
@@ -577,10 +644,12 @@ export default function OnboardingPage() {
 function OnboardingLayout({
   step,
   totalSteps,
+  reasonMessage,
   children,
 }: {
   step: number;
   totalSteps: number;
+  reasonMessage?: string | null;
   children: React.ReactNode;
 }) {
   return (
@@ -595,6 +664,13 @@ function OnboardingLayout({
 
       <div className="flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-md">
+          {reasonMessage && (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <p className="font-semibold">先に初期設定が必要です</p>
+              <p className="mt-1">{reasonMessage}</p>
+              <p className="mt-1 text-xs text-amber-700">必須フロー: 基本情報 {'>'} 圃場登録 {'>'} 最初のプロジェクト作成</p>
+            </div>
+          )}
           {children}
         </div>
       </div>

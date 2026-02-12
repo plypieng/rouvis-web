@@ -4,8 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { googleMapsLoader } from '@/lib/google-maps';
 import { useTranslations } from 'next-intl';
 import FieldMapEditor from './fields/FieldMapEditor';
-import { SeasonRail } from '@/components/workflow/SeasonRail';
-import { buildSeasonRailState } from '@/lib/workflow-ui';
+import { toastError, toastSuccess } from '@/lib/feedback';
 
 type LatLng = { lat: number; lng: number };
 
@@ -28,9 +27,13 @@ interface FieldFormData {
     location?: string | LatLng | null;
 }
 
+type NoticeState = {
+    type: 'success' | 'error';
+    message: string;
+} | null;
+
 export default function MapTab() {
     const t = useTranslations('fields');
-    const tw = useTranslations('workflow');
     const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
     const mapRef = useRef<HTMLDivElement>(null);
     const polygonsRef = useRef<{ [key: string]: google.maps.Polygon }>({});
@@ -43,6 +46,7 @@ export default function MapTab() {
     const [editingField, setEditingField] = useState<Field | null>(null);
     const [formData, setFormData] = useState<FieldFormData>({ name: '', crop: '', color: '#10B981', area: 0 });
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [notice, setNotice] = useState<NoticeState>(null);
 
     // Refresh fields helper
     const refreshFields = async () => {
@@ -75,8 +79,8 @@ export default function MapTab() {
         setIsModalOpen(true);
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const saveField = async () => {
+        setNotice(null);
         setIsSubmitting(true);
 
         try {
@@ -99,16 +103,34 @@ export default function MapTab() {
                 body: JSON.stringify(payload),
             });
 
-            if (!res.ok) throw new Error(t('save_error'));
+            if (!res.ok) throw new Error('Failed to save field');
 
             await refreshFields();
             setIsModalOpen(false);
+            const message = editingField ? '圃場を更新しました。' : '圃場を作成しました。';
+            setNotice({ type: 'success', message });
+            toastSuccess(message);
         } catch (error) {
             console.error('Error saving field:', error);
-            alert(t('save_error'));
+            const message = error instanceof Error ? error.message : '圃場の保存に失敗しました';
+            setNotice({
+                type: 'error',
+                message: '圃場の保存に失敗しました。内容を確認して再試行してください。',
+            });
+            toastError(message, {
+                label: '再試行',
+                onClick: () => {
+                    void saveField();
+                },
+            });
         } finally {
             setIsSubmitting(false);
         }
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        await saveField();
     };
 
     // Fetch fields
@@ -284,71 +306,60 @@ export default function MapTab() {
         if (hasValidBounds) map.fitBounds(bounds);
     };
 
-    const mappedFields = fields.filter((field) => !!field.polygon).length;
-    const seasonState = buildSeasonRailState({
-        stage: mappedFields > 0 ? 'vegetative' : 'seedling',
-        progress: Math.round((mappedFields / Math.max(fields.length, 1)) * 100),
-        dayCount: mappedFields,
-        totalDays: Math.max(fields.length, 1),
-        dayLabel: tw('day_progress_with_total', { current: mappedFields, total: Math.max(fields.length, 1) }),
-        milestoneLabels: {
-            seedling: tw('milestones.seedling'),
-            vegetative: tw('milestones.vegetative'),
-            flowering: tw('milestones.flowering'),
-            harvest: tw('milestones.harvest'),
-        },
-        windowLabel: t('title'),
-        risk: fields.length === 0 ? 'watch' : mappedFields < fields.length ? 'warning' : 'safe',
-        note: fields.length === 0
-            ? t('map_draw_first_note')
-            : t('map_boundaries_note', { mapped: mappedFields, total: fields.length }),
-    });
-
     return (
-        <div className="w-full space-y-5 p-4">
-            <SeasonRail state={seasonState} />
-
-            <div className="surface-raised relative h-[calc(100vh-140px)] w-full overflow-hidden">
+        <div className="flex flex-col items-center p-4 w-full">
+            {notice && (
+                <div
+                    className={`mb-4 w-full max-w-6xl rounded-xl border px-4 py-3 text-sm ${
+                        notice.type === 'success'
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                            : 'border-red-200 bg-red-50 text-red-700'
+                    }`}
+                >
+                    {notice.message}
+                </div>
+            )}
+            <div className="relative h-[calc(100vh-140px)] w-full max-w-6xl rounded-2xl overflow-hidden shadow-2xl border-4 border-white/80 dark:border-gray-800/80 ring-1 ring-gray-900/5 transition-all">
                 {/* Map Container */}
                 <div ref={mapRef} className="h-full w-full" />
 
                 {/* Empty State / Instructions if no fields */}
                 {fields.length === 0 && (
-                    <div className="absolute left-4 right-4 top-4 rounded-lg border border-border bg-card/90 p-3 text-center shadow-lift1 backdrop-blur">
-                        <p className="text-sm text-muted-foreground">{t('no_fields_mapped')}</p>
+                    <div className="absolute top-4 left-4 right-4 bg-white/90 dark:bg-gray-900/90 backdrop-blur rounded-lg p-3 shadow text-center">
+                        <p className="text-sm text-gray-600 dark:text-gray-300">No fields mapped yet.</p>
                     </div>
                 )}
 
                 {/* Recenter Button */}
                 <button
                     onClick={handleRecenter}
-                    className="touch-target absolute right-4 top-4 rounded-full border border-border bg-card p-2 text-foreground shadow-lift1 hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    title={t('recenter_map')}
+                    className="absolute top-4 right-4 bg-white dark:bg-gray-800 p-2 rounded-full shadow-md text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    title="Recenter Map"
                 >
                     <span className="material-symbols-outlined">my_location</span>
                 </button>
             </div>
 
             {/* Field List */}
-            <div className="w-full mt-2">
-                <div className="mb-4 flex items-center justify-between px-1">
-                    <h3 className="text-lg font-semibold text-foreground">{t('title')}</h3>
+            <div className="w-full max-w-6xl mt-6">
+                <div className="flex justify-between items-center mb-4 px-1">
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">{t('title')}</h3>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {/* Add Field Button */}
                     <button
                         onClick={() => handleOpenModal()}
-                        className="surface-base group flex min-h-[140px] flex-col items-center justify-center border-2 border-dashed p-8 text-muted-foreground transition hover:border-brand-seedling/60 hover:bg-secondary/35 hover:text-foreground"
+                        className="flex flex-col items-center justify-center p-8 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 text-gray-500 hover:border-green-500 hover:text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 transition group min-h-[140px]"
                     >
-                        <span className="material-symbols-outlined mb-2 cursor-pointer text-4xl transition group-hover:scale-110">add_circle</span>
+                        <span className="material-symbols-outlined text-4xl mb-2 group-hover:scale-110 transition cursor-pointer">add_circle</span>
                         <span className="font-medium">{t('add_new')}</span>
                     </button>
 
                     {fields.map((field) => (
                         <div
                             key={field.id}
-                            className="surface-base group relative p-4 transition hover:border-brand-seedling/40"
+                            className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition group relative"
                         >
                             {/* Card Content Click Area - triggers Map Focus */}
                             <div
@@ -366,18 +377,18 @@ export default function MapTab() {
                                         className="w-4 h-4 rounded-full"
                                         style={{ backgroundColor: field.color || '#10B981' }}
                                     />
-                                    <h3 className="font-semibold text-foreground group-hover:text-brand-seedling transition">{field.name}</h3>
+                                    <h3 className="font-bold text-gray-900 dark:text-gray-100 group-hover:text-green-600 transition">{field.name}</h3>
                                 </div>
 
-                                <div className="space-y-1 text-sm text-muted-foreground">
+                                <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
                                     <div className="flex justify-between">
                                         <span>{t('crop')}:</span>
-                                        <span className="font-medium text-foreground">{field.crop || '-'}</span>
+                                        <span className="font-medium text-gray-900 dark:text-gray-200">{field.crop || '-'}</span>
                                     </div>
                                     {field.area !== undefined && (
                                         <div className="flex justify-between">
                                             <span>{t('area')}:</span>
-                                            <span className="font-medium text-foreground">
+                                            <span className="font-medium text-gray-900 dark:text-gray-200">
                                                 {(field.area / 10000).toFixed(2)} ha
                                             </span>
                                         </div>
@@ -391,7 +402,7 @@ export default function MapTab() {
                                     e.stopPropagation();
                                     handleOpenModal(field);
                                 }}
-                                className="touch-target absolute right-4 top-4 rounded-full p-1 text-muted-foreground transition hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-700 p-1 rounded-full transition"
                                 title={t('edit_field')}
                             >
                                 <span className="material-symbols-outlined text-[20px]">edit</span>
@@ -403,19 +414,19 @@ export default function MapTab() {
 
             {/* Edit/Create Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm">
-                    <div className="surface-overlay relative max-h-[90vh] w-full max-w-2xl overflow-y-auto p-6">
-                        <h2 className="mb-4 text-xl font-semibold text-foreground">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-2xl shadow-2xl p-6 relative max-h-[90vh] overflow-y-auto">
+                        <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">
                             {editingField ? t('edit_field') : t('add_new')}
                         </h2>
 
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
-                                <label className="mb-1 block text-sm font-medium text-muted-foreground">{t('name_label')}</label>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('name_label')}</label>
                                 <input
                                     type="text"
                                     required
-                                    className="control-inset w-full px-3 py-2"
+                                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 outline-none"
                                     value={formData.name}
                                     onChange={e => setFormData({ ...formData, name: e.target.value })}
                                     placeholder={t('name_placeholder')}
@@ -423,7 +434,7 @@ export default function MapTab() {
                             </div>
 
                             {/* Map Editor */}
-                            <div className="overflow-hidden rounded-xl border border-border">
+                            <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
                                 <FieldMapEditor
                                     initialPolygon={editingField?.polygon}
                                     onFieldChange={(data) => {
@@ -439,20 +450,20 @@ export default function MapTab() {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="mb-1 block text-sm font-medium text-muted-foreground">{t('area_label')} (ha)</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('area_label')} (ha)</label>
                                     <input
                                         type="number"
-                                        className="control-inset w-full bg-secondary px-3 py-2"
+                                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 outline-none bg-gray-50"
                                         value={formData.area}
                                         readOnly
-                                        placeholder={t('auto_calculated')}
+                                        placeholder="Auto-calculated"
                                     />
                                 </div>
                                 <div>
-                                    <label className="mb-1 block text-sm font-medium text-muted-foreground">{t('crop_label')}</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('crop_label')}</label>
                                     <input
                                         type="text"
-                                        className="control-inset w-full px-3 py-2"
+                                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 outline-none"
                                         value={formData.crop}
                                         onChange={e => setFormData({ ...formData, crop: e.target.value })}
                                         placeholder={t('crop_placeholder')}
@@ -461,14 +472,14 @@ export default function MapTab() {
                             </div>
 
                             <div>
-                                <label className="mb-1 block text-sm font-medium text-muted-foreground">{t('color_label')}</label>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('color_label')}</label>
                                 <div className="flex gap-2 mt-1">
                                     {['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6'].map(color => (
                                         <button
                                             key={color}
                                             type="button"
                                             onClick={() => setFormData({ ...formData, color })}
-                                            className={`h-8 w-8 rounded-full border-2 transition ${formData.color === color ? 'scale-110 border-foreground/60' : 'border-transparent'}`}
+                                            className={`w-8 h-8 rounded-full border-2 transition ${formData.color === color ? 'border-gray-600 dark:border-gray-300 scale-110' : 'border-transparent'}`}
                                             style={{ backgroundColor: color }}
                                         />
                                     ))}
@@ -479,14 +490,14 @@ export default function MapTab() {
                                 <button
                                     type="button"
                                     onClick={() => setIsModalOpen(false)}
-                                    className="rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+                                    className="px-4 py-2 rounded-lg text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
                                 >
                                     {t('cancel')}
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={isSubmitting}
-                                    className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
+                                    className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 transition font-medium"
                                 >
                                     {isSubmitting ? t('saving') : t('save')}
                                 </button>

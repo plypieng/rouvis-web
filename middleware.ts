@@ -87,11 +87,15 @@ export default async function middleware(request: NextRequest) {
   if (!onboardingComplete) {
     if (isProjectCreateRoute && !profileComplete) {
       const onboardingUrl = new URL(`/${locale}/onboarding`, request.url);
+      onboardingUrl.searchParams.set('reason', 'onboarding_required');
+      onboardingUrl.searchParams.set('from', pathWithoutLocale);
       return NextResponse.redirect(onboardingUrl);
     }
 
     if (!isOnboardingRoute) {
       const onboardingUrl = new URL(`/${locale}/onboarding`, request.url);
+      onboardingUrl.searchParams.set('reason', 'onboarding_required');
+      onboardingUrl.searchParams.set('from', pathWithoutLocale);
       return NextResponse.redirect(onboardingUrl);
     }
   }

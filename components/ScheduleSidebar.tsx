@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { toastSuccess } from '@/lib/feedback';
 
 type ActivityType = 'planting' | 'harvesting' | 'fertilizing' | 'watering' | 'maintenance';
 
@@ -32,7 +33,7 @@ export function ScheduleSidebar() {
     e.preventDefault();
     // In a real application, this would call an API to save the activity
     console.log('Scheduled activity:', form);
-    alert('Activity scheduled successfully!');
+    toastSuccess('Activity scheduled successfully!');
     
     // Reset form
     setForm({
