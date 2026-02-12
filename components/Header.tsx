@@ -1,13 +1,15 @@
 'use client';
 
-import Link from 'next/link';
 import Image from 'next/image';
-import { useEffect, useRef, useState, useCallback } from 'react';
+import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { useTranslations } from 'next-intl';
-import { Locale } from '../i18n/config';
-import LanguageSwitcher from './LanguageSwitcher';
 import { signOut, useSession } from 'next-auth/react';
+import { useTranslations } from 'next-intl';
+import { Bell, CalendarDays, LayoutDashboard, ListChecks, MapIcon, MessageSquare, Menu, X } from 'lucide-react';
+import LanguageSwitcher from './LanguageSwitcher';
+import type { Locale } from '../i18n/config';
+import type { ShellNavItem, StatusBadgeProps } from '@/types/ui-shell';
 
 type ThemeMode = 'light' | 'dark' | 'system';
 
@@ -21,17 +23,11 @@ interface JMAWarning {
   code: string;
   name: string;
   severity: 'advisory' | 'warning' | 'emergency';
-  issued_at: string;
-  areas: string[];
 }
 
 interface JMATyphoonInfo {
   id: string;
   name: string;
-  center_lat: number;
-  center_lon: number;
-  pressure: number;
-  max_wind_speed: number;
 }
 
 interface KPIs {
@@ -41,7 +37,6 @@ interface KPIs {
 
 interface HeaderProps {
   locale: Locale;
-  // Placeholder for future auth integration (e.g. next-auth)
   user?: {
     name?: string;
     email?: string;
@@ -54,357 +49,437 @@ interface HeaderProps {
 function useTheme(): [ThemeMode, (m: ThemeMode) => void] {
   const [mode, setMode] = useState<ThemeMode>('system');
 
-  const apply = useCallback((m: ThemeMode) => {
-    // Persist preference
+  const apply = (value: ThemeMode) => {
     try {
-      localStorage.setItem('theme', m);
-    } catch {
-      // ignore
-    }
-
-    // Apply to <html>
-    try {
-      const prefersDark = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const shouldDark = m === 'dark' || (m === 'system' && prefersDark);
+      localStorage.setItem('theme', value);
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const shouldDark = value === 'dark' || (value === 'system' && prefersDark);
       document.documentElement.classList.toggle('dark', shouldDark);
     } catch {
-      // ignore
+      // noop
     }
-  }, []);
+  };
 
   useEffect(() => {
     try {
       const saved = (localStorage.getItem('theme') as ThemeMode) || 'system';
       setMode(saved);
-      // Also apply on mount
-      const prefersDark = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const shouldDark = saved === 'dark' || (saved === 'system' && prefersDark);
-      document.documentElement.classList.toggle('dark', shouldDark);
+      apply(saved);
     } catch {
-      // ignore
+      // noop
     }
   }, []);
 
-  const set = useCallback((m: ThemeMode) => {
-    setMode(m);
-    apply(m);
-  }, [apply]);
+  return [mode, (value) => {
+    setMode(value);
+    apply(value);
+  }];
+}
 
-  return [mode, set];
+function statusClassForWarning(severity: JMAWarning['severity']): StatusBadgeProps['tone'] {
+  if (severity === 'emergency') return 'critical';
+  if (severity === 'warning') return 'warning';
+  return 'watch';
+}
+
+function StatusBadge({ tone, label, icon, size = 'sm' }: StatusBadgeProps) {
+  const toneClass =
+    tone === 'critical'
+      ? 'status-critical'
+      : tone === 'warning'
+        ? 'status-warning'
+        : tone === 'watch'
+          ? 'status-watch'
+          : tone === 'safe'
+            ? 'status-safe'
+            : 'border border-border/90 bg-muted/80 text-muted-foreground';
+
+  const sizeClass = size === 'md' ? 'px-3 py-1.5 text-xs' : 'px-2.5 py-1 text-[11px]';
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full font-medium ${toneClass} ${sizeClass}`}>
+      {icon}
+      <span>{label}</span>
+    </span>
+  );
+}
+
+function getRouteLabel(locale: Locale, key: 'projects' | 'records' | 'map'): string {
+  if (locale === 'ja') {
+    if (key === 'projects') return 'プロジェクト';
+    if (key === 'records') return '記録';
+    return 'マップ';
+  }
+
+  if (key === 'projects') return 'Projects';
+  if (key === 'records') return 'Records';
+  return 'Map';
 }
 
 export default function Header({ locale, user = null, alerts = [], kpis }: HeaderProps) {
   const t = useTranslations();
+  const pathname = usePathname();
+  const base = `/${locale}`;
   const [mobileOpen, setMobileOpen] = useState(false);
   const [theme, setTheme] = useTheme();
   const [liveWarnings, setLiveWarnings] = useState<JMAWarning[]>([]);
   const [typhoons, setTyphoons] = useState<JMATyphoonInfo[]>([]);
-  const base = `/${locale}`;
-  const pathname = usePathname();
-
-  // Use client-side session for real-time auth state (updates after OAuth without page refresh)
   const { data: session, status: sessionStatus } = useSession();
 
-  // Debug logging
-  console.log('[Header] useSession result:', { session, sessionStatus, user });
-
-  // Use client-side session if available, otherwise fall back to server-passed user prop
   const currentUser = session?.user || user;
   const isSessionLoading = sessionStatus === 'loading';
 
+  const navItems: ShellNavItem[] = useMemo(
+    () => [
+      { id: 'dashboard', href: `${base}`, label: t('header.nav.dashboard') },
+      { id: 'projects', href: `${base}/projects`, label: getRouteLabel(locale, 'projects') },
+      { id: 'calendar', href: `${base}/calendar`, label: t('header.nav.calendar') },
+      { id: 'records', href: `${base}/records`, label: getRouteLabel(locale, 'records') },
+      { id: 'map', href: `${base}/map`, label: getRouteLabel(locale, 'map') },
+      { id: 'chat', href: `${base}/chat`, label: t('header.nav.chat') },
+    ],
+    [base, locale, t]
+  );
 
-
-  // Fetch live warnings from JMA API
   useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+
+    const currentOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = currentOverflow;
+    };
+  }, [mobileOpen]);
+
+  useEffect(() => {
+    let ignore = false;
+
     const fetchWarnings = async () => {
       try {
         const response = await fetch('/api/weather?type=warnings,typhoon');
-        if (!response.ok) {
-          console.error('Failed to fetch warnings:', response.status);
-          return;
-        }
+        if (!response.ok) return;
         const data = await response.json();
-        setLiveWarnings(data.warnings || []);
-        setTyphoons(data.typhoons || []);
-      } catch (error) {
-        console.error('Failed to fetch warnings:', error);
+        if (ignore) return;
+
+        setLiveWarnings(Array.isArray(data.warnings) ? data.warnings : []);
+        setTyphoons(Array.isArray(data.typhoons) ? data.typhoons : []);
+      } catch {
+        // noop
       }
     };
 
     fetchWarnings();
-    const interval = setInterval(fetchWarnings, 300000); // Refresh every 5 min
-    return () => clearInterval(interval);
+    const interval = setInterval(fetchWarnings, 300000);
+    return () => {
+      ignore = true;
+      clearInterval(interval);
+    };
   }, []);
 
-  const panelRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    if (!mobileOpen) return;
-    const el = panelRef.current;
-    if (!el) return;
-    const focusable = el.querySelectorAll<HTMLElement>('a,button,[role="menuitem"],[tabindex]:not([tabindex="-1"])');
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMobileOpen(false);
-      if (e.key === 'Tab' && first && last) {
-        if (e.shiftKey && document.activeElement === first) {
-          last.focus(); e.preventDefault();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          first.focus(); e.preventDefault();
-        }
-      }
-    };
-    document.addEventListener('keydown', onKey);
-    first?.focus();
-    return () => document.removeEventListener('keydown', onKey);
-  }, [mobileOpen]);
+  const isAuthPage = pathname?.includes('/login') || pathname?.includes('/signup');
+  const isLandingPage = pathname === `/${locale}` || pathname === '/';
 
-  const closeOnOutsideClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget) setMobileOpen(false);
-  };
-
-  const NavLinks = ({ onNavigate }: { onNavigate?: () => void }) => {
-    const handle = () => onNavigate?.();
-    return (
-      <ul className="flex flex-col md:flex-row md:items-center gap-1 md:gap-2">
-        <li><Link href={`${base}`} className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600" onClick={handle}>{t('header.nav.dashboard')}</Link></li>
-        <li><Link href={`${base}/projects`} className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600" onClick={handle}>マイプロジェクト</Link></li>
-        <li><Link href={`${base}/map`} className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600" onClick={handle}>マップ</Link></li>
-        <li><Link href={`${base}/calendar`} className="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600" onClick={handle}>{t('header.nav.calendar')}</Link></li>
-      </ul>
-    );
-  };
-
-  const SettingsMenu = () => (
-    <details className="relative">
-      <summary aria-label={t('header.settings')} className="list-none cursor-pointer px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600">
-        {t('header.settings')}
-      </summary>
-      <div className="absolute right-0 mt-1 w-72 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-30 p-2 space-y-2">
-        <div className="px-1 text-xs font-semibold text-gray-500 dark:text-gray-400">{t('header.language')}</div>
-        <div className="px-1"><LanguageSwitcher locale={locale} /></div>
-        <div className="px-1 pt-2 text-xs font-semibold text-gray-500 dark:text-gray-400">{t('header.theme')}</div>
-        <div className="px-1 flex items-center gap-1">
-          <button type="button" onClick={() => setTheme('light')} className="px-3 py-1.5 rounded-md text-sm border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800" role="menuitem" aria-pressed={theme === 'light'}>{t('header.theme_light')}</button>
-          <button type="button" onClick={() => setTheme('dark')} className="px-3 py-1.5 rounded-md text-sm border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800" role="menuitem" aria-pressed={theme === 'dark'}>{t('header.theme_dark')}</button>
-          <button type="button" onClick={() => setTheme('system')} className="px-3 py-1.5 rounded-md text-sm border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800" role="menuitem" aria-pressed={theme === 'system'}>{t('header.theme_system')}</button>
-        </div>
-      </div>
-    </details>
-  );
-
-  const getSeverityColor = (severity: 'advisory' | 'warning' | 'emergency') => {
-    switch (severity) {
-      case 'emergency':
-        return 'bg-rose-600 text-white'; // Red
-      case 'warning':
-        return 'bg-amber-500 text-white'; // Orange
-      case 'advisory':
-        return 'bg-sky-100 text-sky-700 dark:bg-sky-200/20'; // Blue
-    }
-  };
-
-  const AlertChips = () => {
-    // Merge manual alerts (from props) with live warnings
-    const manualAlerts = alerts || [];
-    const hasManualAlerts = manualAlerts.length > 0;
-    const hasLiveWarnings = liveWarnings.length > 0;
-    const hasTyphoons = typhoons.length > 0;
-
-    if (!hasManualAlerts && !hasLiveWarnings && !hasTyphoons) return null;
-
-    return (
-      <div className="hidden md:flex items-center gap-2 ml-4">
-        {/* Typhoon alert (highest priority) */}
-        {hasTyphoons && (
-          <div className="flex items-center gap-2 rounded-full bg-rose-600 text-white px-3 py-1 text-xs font-medium">
-            <span className="material-symbols-outlined !text-base">warning</span>
-            <span>台風{typhoons[0].name}接近中</span>
-          </div>
-        )}
-
-        {/* Live JMA warnings */}
-        {liveWarnings.map((warning, idx) => {
-          let icon = 'warning';
-          const label = warning.name;
-
-          // Determine icon based on warning type
-          if (warning.name && warning.name.includes('高温')) {
-            icon = 'thermostat';
-          } else if (warning.name && (warning.name.includes('霜') || warning.name.includes('低温'))) {
-            icon = 'ac_unit';
-          } else if (warning.name && warning.name.includes('大雨')) {
-            icon = 'water_drop';
-          } else if (warning.name && (warning.name.includes('暴風') || warning.name.includes('強風'))) {
-            icon = 'air';
-          }
-
-          return (
-            <div
-              key={`jma-${idx}`}
-              className={`flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${getSeverityColor(warning.severity)}`}
-            >
-              <span className="material-symbols-outlined !text-base">{icon}</span>
-              <span>{label}</span>
-            </div>
-          );
-        })}
-
-        {/* Manual alerts from props (for backward compatibility) */}
-        {manualAlerts.map((alert, idx) => {
-          let icon = 'warning';
-          let bgClass = 'bg-rose-100/80 text-rose-700 dark:bg-rose-200/20';
-          let label = '';
-
-          switch (alert.type) {
-            case 'high_temp':
-              icon = 'thermostat';
-              bgClass = 'bg-rose-100/80 text-rose-700 dark:bg-rose-200/20';
-              label = t('alerts.high_temp_warning', { value: alert.value });
-              break;
-            case 'pest':
-              icon = 'bug_report';
-              bgClass = 'bg-amber-100/80 text-amber-700 dark:bg-amber-200/20';
-              label = t('alerts.pest_warning', { name: alert.name || alert.value });
-              break;
-            case 'frost':
-              icon = 'ac_unit';
-              bgClass = 'bg-sky-100/80 text-sky-700 dark:bg-sky-200/20';
-              label = t('alerts.frost_warning', { temp: alert.value });
-              break;
-          }
-
-          return (
-            <div key={`manual-${idx}`} className={`flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${bgClass}`}>
-              <span className="material-symbols-outlined !text-base">{icon}</span>
-              <span>{label}</span>
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
-
-  const KPIIndicators = () => {
-    if (!kpis) return null;
-
-    const getHealthColor = (health: number) => {
-      if (health >= 80) return 'text-crop-700 bg-crop-100/80 dark:bg-crop-200/20';
-      if (health >= 60) return 'text-amber-700 bg-amber-100/80 dark:bg-amber-200/20';
-      return 'text-rose-700 bg-rose-100/80 dark:bg-rose-200/20';
-    };
-
-    return (
-      <div className="hidden lg:flex items-center gap-2 mr-2">
-        <div className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${getHealthColor(kpis.health)}`}>
-          <span className="material-symbols-outlined !text-base">agriculture</span>
-          <span className="hidden xl:inline">{t('kpis.overall_health')}: </span>
-          <span className="font-bold">{kpis.health}%</span>
-        </div>
-        <div className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium bg-crop-100/80 text-crop-700 dark:bg-crop-200/20">
-          <span className="material-symbols-outlined !text-base">trending_up</span>
-          <span className="hidden xl:inline">{t('kpis.yield_forecast')}: </span>
-          <span className="font-bold">{kpis.yieldForecast}</span>
-        </div>
-      </div>
-    );
-  };
-
-  const AuthMenu = () => {
-    // Use top-level session state
-    if (isSessionLoading) {
-      return (
-        <div className="flex items-center gap-2">
-          <div className="w-20 h-8 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse" />
-        </div>
-      );
-    }
-
-    if (!currentUser) {
-      return (
-        <div className="flex items-center gap-2">
-          <Link href={`${base}/login`} className="px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800">{t('header.sign_in')}</Link>
-          <Link href={`${base}/signup`} className="px-3 py-1.5 text-sm rounded-md bg-emerald-600 text-white hover:bg-emerald-700">{t('header.sign_up')}</Link>
-        </div>
-      );
-    }
-    const initials = (currentUser.name || currentUser.email || 'U').slice(0, 1).toUpperCase();
-    // Handle both avatarUrl (from server prop) and image (from session)
-    const avatarSrc = (currentUser as { avatarUrl?: string }).avatarUrl || (currentUser as { image?: string }).image;
-    return (
-      <details className="relative">
-        <summary className="list-none cursor-pointer flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800">
-          {avatarSrc ? (<img src={avatarSrc} alt={currentUser.name || 'User'} className="w-7 h-7 rounded-full" />) : (<div className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center text-sm font-semibold">{initials}</div>)}
-          <span className="text-sm">{currentUser.name || currentUser.email}</span>
-        </summary>
-        <div className="absolute right-0 mt-1 w-56 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-30 p-1">
-          <Link href={`${base}/profile`} className="block px-3 py-2 rounded-md text-sm hover:bg-gray-100 dark:hover:bg-gray-800">{t('header.profile')}</Link>
-          <button
-            type="button"
-            onClick={() => signOut({ callbackUrl: `${base}/login` })}
-            className="block w-full text-left px-3 py-2 rounded-md text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
-          >
-            {t('header.sign_out')}
-          </button>
-        </div>
-      </details>
-    );
-  };
-
-  // Hide header on login/signup pages
-  if (pathname?.includes('/login') || pathname?.includes('/signup')) {
+  if (isAuthPage) {
     return null;
   }
 
-  // Hide header on landing page for unauthenticated users (after session check completes)
-  if (!isSessionLoading && !currentUser && (pathname === `/${locale}` || pathname === '/')) {
+  if (!isSessionLoading && !currentUser && isLandingPage) {
     return null;
   }
+
+  const isActive = (href: string) => {
+    if (href === base) {
+      return pathname === base || pathname === `${base}/`;
+    }
+
+    return pathname?.startsWith(href);
+  };
+
+  const initials = (currentUser?.name || currentUser?.email || 'U').slice(0, 1).toUpperCase();
+  const avatarSrc =
+    (currentUser as { avatarUrl?: string } | null)?.avatarUrl ||
+    (currentUser as { image?: string } | null)?.image;
+
+  const warningChips = [
+    ...alerts.map((manualAlert) => ({
+      id: `manual-${manualAlert.type}-${manualAlert.value}`,
+      tone: manualAlert.type === 'high_temp' ? 'warning' : manualAlert.type === 'pest' ? 'watch' : 'critical',
+      label:
+        manualAlert.type === 'high_temp'
+          ? t('alerts.high_temp_warning', { value: manualAlert.value })
+          : manualAlert.type === 'pest'
+            ? t('alerts.pest_warning', { name: manualAlert.name || manualAlert.value })
+            : t('alerts.frost_warning', { temp: manualAlert.value }),
+    })),
+    ...liveWarnings.slice(0, 2).map((warning) => ({
+      id: `jma-${warning.code}`,
+      tone: statusClassForWarning(warning.severity),
+      label: warning.name,
+    })),
+    ...(typhoons[0]
+      ? [{ id: `typhoon-${typhoons[0].id}`, tone: 'critical', label: `${typhoons[0].name} 接近` }]
+      : []),
+  ] as Array<{ id: string; tone: StatusBadgeProps['tone']; label: string }>;
 
   return (
-    <header role="banner" className="sticky top-0 z-40 glass-panel border-b-0">
-      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-white focus:text-black focus:px-3 focus:py-1 focus:rounded focus:shadow">{t('header.a11y.skip_to_content')}</a>
-      <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+    <header role="banner" className="shell-header sticky top-0 z-40">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-md focus:bg-card focus:px-3 focus:py-2 focus:text-foreground"
+      >
+        {t('header.a11y.skip_to_content')}
+      </a>
+
+      <div className="mx-auto flex h-16 w-full max-w-[1440px] items-center justify-between px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center gap-4">
           <Link href={base} className="flex items-center gap-2" aria-label={t('header.logo_alt')}>
-            <Image src="/logo.svg" alt={t('header.logo_alt')} width={100} height={100} priority />
+            <Image src="/logo.svg" alt={t('header.logo_alt')} width={28} height={28} priority />
+            <span className="hidden text-sm font-semibold text-foreground sm:inline-block">{t('header.app_name')}</span>
           </Link>
-          <nav role="navigation" aria-label="Primary" className="hidden md:block ml-4"><NavLinks /></nav>
+
+          <nav className="hidden items-center gap-1 lg:flex" aria-label="Primary">
+            {navItems.map((item) => {
+              const active = isActive(item.href);
+              return (
+                <Link
+                  key={item.id}
+                  href={item.href}
+                  className={`rounded-lg px-3 py-2 text-sm transition-colors ${
+                    active
+                      ? 'bg-primary/12 text-primary font-semibold'
+                      : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
+                  }`}
+                  aria-current={active ? 'page' : undefined}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
         </div>
-        <div className="hidden md:flex items-center gap-2">
-          <AlertChips />
-          <KPIIndicators />
-          <SettingsMenu />
-          <AuthMenu />
-        </div>
-        <div className="md:hidden flex items-center">
-          <AuthMenu />
-        </div>
-      </div>
-      {mobileOpen && (
-        <div className="md:hidden fixed inset-0 z-50 bg-black/20" onClick={closeOnOutsideClick} aria-hidden="true">
-          <div id="mobile-menu" ref={panelRef} role="dialog" aria-modal="true" className="absolute top-0 right-0 w-80 max-w-[85vw] h-full shadow-xl p-4 flex flex-col gap-4 border-l border-gray-200 dark:border-gray-800" style={{ backgroundColor: '#ffffff' }}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Image src="/logo.svg" alt={t('header.logo_alt')} width={28} height={28} />
-              </div>
-              <button type="button" className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600" onClick={() => setMobileOpen(false)} aria-label={t('header.a11y.close_menu')}>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
+
+        <div className="hidden items-center gap-2 lg:flex">
+          {warningChips.length > 0 && (
+            <div className="mr-1 hidden items-center gap-1 xl:flex">
+              {warningChips.map((chip) => (
+                <StatusBadge key={chip.id} tone={chip.tone} label={chip.label} icon={<Bell className="h-3.5 w-3.5" />} />
+              ))}
             </div>
-            <nav role="navigation" aria-label="Primary (mobile)"><NavLinks onNavigate={() => setMobileOpen(false)} /></nav>
-            <div className="mt-auto flex flex-col gap-3 border-t border-gray-200 dark:border-gray-800 pt-3">
-              <div className="px-1 text-sm font-semibold text-gray-800 dark:text-gray-200">{t('header.settings')}</div>
-              <div className="px-1"><LanguageSwitcher locale={locale} /></div>
-              <div className="px-1">
-                <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">{t('header.theme')}</div>
-                <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => setTheme('light')} className="px-3 py-1.5 rounded-md text-sm border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800" aria-pressed={theme === 'light'}>{t('header.theme_light')}</button>
-                  <button type="button" onClick={() => setTheme('dark')} className="px-3 py-1.5 rounded-md text-sm border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800" aria-pressed={theme === 'dark'}>{t('header.theme_dark')}</button>
-                  <button type="button" onClick={() => setTheme('system')} className="px-3 py-1.5 rounded-md text-sm border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800" aria-pressed={theme === 'system'}>{t('header.theme_system')}</button>
+          )}
+
+          {kpis && (
+            <StatusBadge
+              tone={kpis.health >= 80 ? 'safe' : kpis.health >= 60 ? 'watch' : 'warning'}
+              label={`${t('kpis.overall_health')}: ${kpis.health}%`}
+              icon={<ListChecks className="h-3.5 w-3.5" />}
+            />
+          )}
+
+          <details className="relative">
+            <summary className="list-none cursor-pointer rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted/70 hover:text-foreground">
+              {t('header.settings')}
+            </summary>
+            <div className="surface-overlay absolute right-0 mt-2 w-72 p-3">
+              <div className="mb-3">
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('header.language')}</p>
+                <LanguageSwitcher locale={locale} />
+              </div>
+              <div>
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('header.theme')}</p>
+                <div className="flex items-center gap-1">
+                  {(['light', 'dark', 'system'] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setTheme(mode)}
+                      className={`rounded-md px-2.5 py-1.5 text-xs ${
+                        theme === mode
+                          ? 'bg-primary/15 text-primary font-semibold'
+                          : 'bg-muted text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {mode === 'light' ? t('header.theme_light') : mode === 'dark' ? t('header.theme_dark') : t('header.theme_system')}
+                    </button>
+                  ))}
                 </div>
               </div>
-              <div className="px-1"><AuthMenu /></div>
+            </div>
+          </details>
+
+          {isSessionLoading ? (
+            <div className="h-8 w-20 animate-pulse rounded-md bg-muted" />
+          ) : !currentUser ? (
+            <div className="flex items-center gap-2">
+              <Link href={`${base}/login`} className="rounded-lg border border-border px-3 py-1.5 text-sm text-foreground hover:bg-muted/60">
+                {t('header.sign_in')}
+              </Link>
+              <Link href={`${base}/signup`} className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground hover:opacity-95">
+                {t('header.sign_up')}
+              </Link>
+            </div>
+          ) : (
+            <details className="relative">
+              <summary className="list-none cursor-pointer rounded-full ring-offset-background hover:ring-2 hover:ring-border">
+                {avatarSrc ? (
+                  <img src={avatarSrc} alt={currentUser.name || 'User'} className="h-8 w-8 rounded-full" />
+                ) : (
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                    {initials}
+                  </div>
+                )}
+              </summary>
+              <div className="surface-overlay absolute right-0 mt-2 w-56 p-2">
+                <Link href={`${base}/profile`} className="block rounded-md px-3 py-2 text-sm hover:bg-muted">
+                  {t('header.profile')}
+                </Link>
+                <Link href={`${base}/account`} className="block rounded-md px-3 py-2 text-sm hover:bg-muted">
+                  {t('header.account')}
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => signOut({ callbackUrl: `${base}/login` })}
+                  className="block w-full rounded-md px-3 py-2 text-left text-sm hover:bg-muted"
+                >
+                  {t('header.sign_out')}
+                </button>
+              </div>
+            </details>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 lg:hidden">
+          {currentUser && (
+            <Link href={`${base}/profile`} className="rounded-full ring-offset-background hover:ring-2 hover:ring-border">
+              {avatarSrc ? (
+                <img src={avatarSrc} alt={currentUser.name || 'User'} className="h-8 w-8 rounded-full" />
+              ) : (
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                  {initials}
+                </div>
+              )}
+            </Link>
+          )}
+          <button
+            type="button"
+            className="rounded-lg border border-border p-2 text-foreground"
+            onClick={() => setMobileOpen((open) => !open)}
+            aria-label={mobileOpen ? t('header.a11y.close_menu') : t('header.a11y.open_menu')}
+          >
+            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
+      </div>
+
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 bg-black/30 lg:hidden" onClick={() => setMobileOpen(false)}>
+          <div
+            className="surface-overlay absolute right-0 top-0 h-full w-[88vw] max-w-sm overflow-y-auto p-4"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between border-b border-border pb-3">
+              <div className="flex items-center gap-2">
+                <Image src="/logo.svg" alt={t('header.logo_alt')} width={24} height={24} />
+                <span className="text-sm font-semibold text-foreground">{t('header.app_name')}</span>
+              </div>
+              <button type="button" onClick={() => setMobileOpen(false)} className="rounded-md p-2 hover:bg-muted" aria-label={t('header.a11y.close_menu')}>
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <nav className="space-y-1" aria-label="Primary mobile">
+              {navItems.map((item) => {
+                const active = isActive(item.href);
+                const Icon =
+                  item.id === 'dashboard'
+                    ? LayoutDashboard
+                    : item.id === 'projects'
+                      ? ListChecks
+                      : item.id === 'calendar'
+                        ? CalendarDays
+                        : item.id === 'records'
+                          ? ListChecks
+                          : item.id === 'map'
+                            ? MapIcon
+                            : MessageSquare;
+
+                return (
+                  <Link
+                    key={item.id}
+                    href={item.href}
+                    className={`flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm ${
+                      active ? 'bg-primary/12 text-primary font-semibold' : 'text-foreground hover:bg-muted'
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+
+            <div className="mt-5 border-t border-border pt-4">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('header.language')}</p>
+              <LanguageSwitcher locale={locale} />
+
+              <p className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('header.theme')}</p>
+              <div className="flex items-center gap-1">
+                {(['light', 'dark', 'system'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setTheme(mode)}
+                    className={`rounded-md px-2.5 py-1.5 text-xs ${
+                      theme === mode ? 'bg-primary/15 text-primary font-semibold' : 'bg-muted text-muted-foreground'
+                    }`}
+                  >
+                    {mode === 'light' ? t('header.theme_light') : mode === 'dark' ? t('header.theme_dark') : t('header.theme_system')}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {warningChips.length > 0 && (
+              <div className="mt-5 border-t border-border pt-4">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Alerts</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {warningChips.map((chip) => (
+                    <StatusBadge key={chip.id} tone={chip.tone} label={chip.label} icon={<Bell className="h-3.5 w-3.5" />} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="mt-5 border-t border-border pt-4">
+              {!currentUser ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <Link href={`${base}/login`} className="rounded-lg border border-border px-3 py-2 text-center text-sm">
+                    {t('header.sign_in')}
+                  </Link>
+                  <Link href={`${base}/signup`} className="rounded-lg bg-primary px-3 py-2 text-center text-sm font-semibold text-primary-foreground">
+                    {t('header.sign_up')}
+                  </Link>
+                </div>
+              ) : (
+                <>
+                  <Link href={`${base}/profile`} className="block rounded-lg px-3 py-2 text-sm hover:bg-muted">
+                    {t('header.profile')}
+                  </Link>
+                  <Link href={`${base}/account`} className="block rounded-lg px-3 py-2 text-sm hover:bg-muted">
+                    {t('header.account')}
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => signOut({ callbackUrl: `${base}/login` })}
+                    className="mt-1 block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-muted"
+                  >
+                    {t('header.sign_out')}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

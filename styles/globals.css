@@ -2,7 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Skeleton loading animation */
 @keyframes shimmer {
   100% {
     transform: translateX(100%);
@@ -11,74 +10,109 @@
 
 @layer base {
   :root {
-    /* Warmer, organic background (Earth-50) */
-    --background: 36 20% 98%;
-    /* Softer, deep brown-grey foreground */
-    --foreground: 20 10% 20%;
+    color-scheme: light;
 
-    /* White cards with subtle warmth */
-    --card: 0 0% 100%;
-    --card-foreground: 20 10% 20%;
+    --canvas-fog: 46 26% 97%;
+    --surface-soil-0: 42 20% 95%;
+    --surface-soil-1: 40 22% 98%;
+    --surface-soil-2: 38 18% 92%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 20 10% 20%;
+    --ink-primary: 28 18% 18%;
+    --ink-secondary: 30 11% 33%;
+    --ink-tertiary: 30 10% 46%;
+    --ink-muted: 32 9% 56%;
 
-    /* Vibrant but natural green */
-    --primary: 142 76% 36%;
-    --primary-foreground: 355 100% 98%;
+    --brand-seedling: 147 53% 33%;
+    --brand-waterline: 199 58% 40%;
+    --risk-watch: 43 67% 46%;
+    --risk-warning: 31 74% 48%;
+    --risk-critical: 2 61% 48%;
+    --state-success: 147 53% 36%;
 
-    /* Warm grey secondary */
-    --secondary: 30 10% 96%;
-    --secondary-foreground: 20 10% 20%;
+    --border-soft: 36 17% 86%;
+    --border-strong: 35 19% 75%;
+    --control-bg: 39 15% 92%;
+    --control-border: 35 16% 80%;
 
-    /* Soft muted tones */
-    --muted: 30 15% 96%;
-    --muted-foreground: 25 5% 45%;
+    --background: var(--canvas-fog);
+    --foreground: var(--ink-primary);
+    --card: var(--surface-soil-1);
+    --card-foreground: var(--ink-primary);
+    --popover: var(--surface-soil-1);
+    --popover-foreground: var(--ink-primary);
 
-    --accent: 30 15% 96%;
-    --accent-foreground: 20 10% 20%;
+    --primary: var(--brand-seedling);
+    --primary-foreground: 42 16% 98%;
 
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 98%;
+    --secondary: var(--surface-soil-0);
+    --secondary-foreground: var(--ink-secondary);
 
-    /* Warm border */
-    --border: 30 10% 90%;
-    --input: 30 10% 90%;
-    --ring: 142 76% 36%;
+    --muted: var(--surface-soil-0);
+    --muted-foreground: var(--ink-tertiary);
 
-    --radius: 1rem;
-    /* More rounded, friendly corners */
+    --accent: var(--surface-soil-2);
+    --accent-foreground: var(--ink-primary);
+
+    --destructive: var(--risk-critical);
+    --destructive-foreground: 42 16% 98%;
+
+    --border: var(--border-soft);
+    --input: var(--control-border);
+    --ring: var(--brand-seedling);
+
+    --radius: 0.9rem;
   }
 
   .dark {
-    /* Deep organic dark mode */
-    --background: 20 10% 10%;
-    --foreground: 30 10% 98%;
+    color-scheme: dark;
 
-    --card: 20 10% 12%;
-    --card-foreground: 30 10% 98%;
+    --canvas-fog: 28 11% 10%;
+    --surface-soil-0: 30 11% 13%;
+    --surface-soil-1: 28 10% 16%;
+    --surface-soil-2: 30 10% 20%;
 
-    --popover: 20 10% 12%;
-    --popover-foreground: 30 10% 98%;
+    --ink-primary: 42 18% 92%;
+    --ink-secondary: 40 10% 76%;
+    --ink-tertiary: 36 9% 66%;
+    --ink-muted: 35 8% 57%;
 
-    --primary: 142 70% 45%;
-    --primary-foreground: 145 80% 10%;
+    --brand-seedling: 147 45% 48%;
+    --brand-waterline: 198 56% 55%;
+    --risk-watch: 43 72% 52%;
+    --risk-warning: 31 72% 57%;
+    --risk-critical: 3 68% 58%;
+    --state-success: 147 48% 50%;
 
-    --secondary: 20 10% 16%;
-    --secondary-foreground: 30 10% 98%;
+    --border-soft: 30 9% 24%;
+    --border-strong: 30 8% 33%;
+    --control-bg: 30 11% 18%;
+    --control-border: 30 9% 30%;
 
-    --muted: 20 10% 16%;
-    --muted-foreground: 30 10% 65%;
+    --background: var(--canvas-fog);
+    --foreground: var(--ink-primary);
+    --card: var(--surface-soil-1);
+    --card-foreground: var(--ink-primary);
+    --popover: var(--surface-soil-1);
+    --popover-foreground: var(--ink-primary);
 
-    --accent: 20 10% 16%;
-    --accent-foreground: 30 10% 98%;
+    --primary: var(--brand-seedling);
+    --primary-foreground: 28 11% 10%;
 
-    --destructive: 0 62% 30%;
-    --destructive-foreground: 30 10% 98%;
+    --secondary: var(--surface-soil-0);
+    --secondary-foreground: var(--ink-secondary);
 
-    --border: 20 10% 16%;
-    --input: 20 10% 16%;
-    --ring: 142 76% 45%;
+    --muted: var(--surface-soil-0);
+    --muted-foreground: var(--ink-tertiary);
+
+    --accent: var(--surface-soil-2);
+    --accent-foreground: var(--ink-primary);
+
+    --destructive: var(--risk-critical);
+    --destructive-foreground: 42 18% 92%;
+
+    --border: var(--border-soft);
+    --input: var(--control-border);
+    --ring: var(--brand-seedling);
   }
 }
 
@@ -87,8 +121,17 @@
     @apply border-border;
   }
 
+  html,
+  body {
+    height: 100%;
+  }
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    background-image:
+      radial-gradient(circle at 8% 10%, hsl(var(--surface-soil-2) / 0.45), transparent 25%),
+      radial-gradient(circle at 84% 0%, hsl(var(--surface-soil-2) / 0.42), transparent 24%);
   }
 
   h1,
@@ -97,62 +140,72 @@
   h4,
   h5,
   h6 {
-    @apply font-heading font-semibold tracking-tight;
+    @apply font-heading tracking-tight;
   }
 }
 
 @layer utilities {
+  .shell-canvas {
+    @apply bg-background text-foreground;
+  }
+
+  .shell-header {
+    @apply border-b border-border/80 bg-card/85 backdrop-blur;
+  }
+
+  .shell-footer {
+    @apply border-t border-border/80 bg-card/70 backdrop-blur;
+  }
+
+  .shell-main {
+    @apply mx-auto w-full max-w-[1440px] px-4 sm:px-6 lg:px-8;
+  }
+
+  .surface-base {
+    @apply rounded-xl border border-border/90 bg-card text-card-foreground;
+  }
+
+  .surface-raised {
+    @apply rounded-2xl border border-border/95 bg-card text-card-foreground shadow-[0_6px_20px_-16px_rgba(17,24,39,0.45)];
+  }
+
+  .surface-overlay {
+    @apply rounded-2xl border border-border bg-popover text-popover-foreground shadow-[0_20px_35px_-20px_rgba(17,24,39,0.55)];
+  }
+
+  .control-inset {
+    @apply rounded-lg border border-input bg-[hsl(var(--control-bg))] text-foreground;
+  }
+
+  .status-safe {
+    @apply border border-emerald-200/80 bg-emerald-50/80 text-emerald-800 dark:border-emerald-700/60 dark:bg-emerald-900/20 dark:text-emerald-200;
+  }
+
+  .status-watch {
+    @apply border border-amber-200/80 bg-amber-50/80 text-amber-800 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-200;
+  }
+
+  .status-warning {
+    @apply border border-orange-200/80 bg-orange-50/80 text-orange-800 dark:border-orange-700/60 dark:bg-orange-900/20 dark:text-orange-200;
+  }
+
+  .status-critical {
+    @apply border border-red-200/80 bg-red-50/80 text-red-800 dark:border-red-700/60 dark:bg-red-900/20 dark:text-red-200;
+  }
+
   .glass-panel {
-    @apply bg-white/80 dark:bg-black/50 backdrop-blur-md border border-white/20 shadow-glass;
-  }
-
-  .organic-border {
-    @apply border-border/50;
-  }
-
-  .soft-shadow {
-    @apply shadow-soft hover:shadow-soft-lg transition-shadow duration-300;
+    @apply shell-header;
   }
 
   .text-balance {
     text-wrap: balance;
   }
 
-  /* Touch-friendly button sizes */
-  .touch-target {
-    @apply min-w-[44px] min-h-[44px];
-  }
-
-  /* Mobile-optimized spacing */
-  .mobile-spacing {
-    @apply px-4 py-3 sm:px-6 sm:py-4;
-  }
-
-  /* Mobile-first text sizes */
-  .text-mobile-sm {
-    @apply text-sm sm:text-base;
-  }
-
-  .text-mobile-base {
-    @apply text-base sm:text-lg;
-  }
-
-  .text-mobile-lg {
-    @apply text-lg sm:text-xl;
-  }
-
-  /* Mobile-optimized containers */
-  .mobile-container {
-    @apply w-full max-w-none px-4 sm:px-6 lg:px-8 sm:max-w-2xl lg:max-w-4xl xl:max-w-6xl mx-auto;
-  }
-
-  /* Mobile keyboard viewport fix */
   .mobile-viewport {
     @apply min-h-screen;
     padding-bottom: env(safe-area-inset-bottom);
   }
 
-  /* Safe area insets for notched devices */
   .safe-top {
     padding-top: env(safe-area-inset-top);
   }
@@ -169,79 +222,54 @@
     padding-right: env(safe-area-inset-right);
   }
 
-  /* Mobile-optimized focus states */
-  .focus-mobile:focus {
-    @apply outline-none ring-2 ring-primary-500 ring-offset-2;
-  }
-
-  /* Mobile scrolling improvements */
-  .mobile-scroll jScrollPane1 {
+  .mobile-scroll {
     -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border-strong)) transparent;
   }
 
   .mobile-scroll::-webkit-scrollbar {
-    display: none;
+    width: 8px;
+    height: 8px;
   }
 
-  /* Mobile animations */
+  .mobile-scroll::-webkit-scrollbar-thumb {
+    background: hsl(var(--border-strong));
+    border-radius: 999px;
+  }
+
+  .mobile-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .mobile-nav-height {
+    height: calc(5.25rem + env(safe-area-inset-bottom));
+  }
+
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
   .mobile-tap {
-    @apply active:scale-95 transition-transform duration-75;
+    @apply active:scale-95 transition-transform duration-100;
   }
 
-  /* Mobile grid layouts */
-  .mobile-grid {
-    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6;
-  }
-
-  .mobile-grid-2 {
-    @apply grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4;
-  }
-
-  /* Mobile card layouts */
-  .mobile-card {
-    @apply bg-white rounded-lg border border-gray-200 p-4 sm:p-6 shadow-sm;
-  }
-
-  /* Mobile form elements */
-  .mobile-input {
-    @apply w-full px-3 py-3 text-base border border-gray-300 rounded-lg focus-mobile bg-white;
-  }
-
-  /* Mobile button styles */
   .mobile-btn {
-    @apply touch-target mobile-tap px-4 py-3 text-base font-medium rounded-lg transition-all duration-200;
+    @apply touch-target rounded-lg px-4 py-3 text-base font-medium transition;
   }
 
   .mobile-btn-primary {
-    @apply mobile-btn bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800;
+    @apply mobile-btn bg-primary text-primary-foreground hover:opacity-95;
   }
 
   .mobile-btn-secondary {
-    @apply mobile-btn bg-gray-100 text-gray-900 hover:bg-gray-200 active:bg-gray-300;
+    @apply mobile-btn bg-secondary text-secondary-foreground hover:bg-accent;
   }
 
-  /* Mobile-optimized evidence cards */
-  .mobile-evidence-card {
-    @apply rounded-xl border-2 p-3 sm:p-4 mb-3 transition-all duration-300;
+  .focus-visible:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
   }
 
-  /* Mobile chat optimizations */
-  .mobile-chat-input {
-    @apply flex items-end gap-2 p-3 bg-white border-t border-gray-200;
-  }
-
-  .mobile-message-bubble {
-    @apply max-w-[85%] sm:max-w-[80%] lg:max-w-[75%] rounded-lg p-3 sm:p-4;
-  }
-
-  /* Mobile navigation spacing */
-  .mobile-nav-height {
-    height: calc(5rem + env(safe-area-inset-bottom));
-  }
-
-  /* Accessibility improvements for mobile */
   .sr-only {
     position: absolute;
     width: 1px;
@@ -265,109 +293,45 @@
     white-space: normal;
   }
 
-  /* High contrast mode support */
-  @media (prefers-contrast: high) {
-    .mobile-btn-primary {
-      border: 2px solid;
-    }
-
-    .mobile-btn-secondary {
-      border: 2px solid;
-      background-color: transparent;
-    }
-  }
-
-  /* Reduced motion support */
   @media (prefers-reduced-motion: reduce) {
-
-    .mobile-tap,
-    .mobile-btn,
-    .mobile-btn-primary,
-    .mobile-btn-secondary {
-      transition: none;
-      transform: none !important;
-    }
-
-    .animate-fadeIn {
-      animation: none;
-    }
-
-    .animate-bounce {
-      animation: none;
-    }
-
-    .animate-spin {
-      animation: none;
-    }
-  }
-
-  /* Focus visible for keyboard navigation */
-  .focus-visible:focus-visible {
-    @apply ring-2 ring-primary-500 ring-offset-2;
-  }
-
-  /* Mobile-specific accessibility */
-  .mobile-accessible {
-    @apply focus-visible;
-  }
-
-  /* Large text support */
-  @media (min-resolution: 2dppx) {
-
-    .mobile-input,
-    .mobile-btn {
-      font-size: 16px;
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
     }
   }
 }
 
 /* ChatKit full-bleed layout overrides
    Apply wrapper class "ck-full-bleed" to the ChatKit container on the page.
-   This removes the internal left rail (thread list/sidebar) and forces a 1‑column layout so the chat fills the card. */
+   This removes the internal left rail (thread list/sidebar) and forces a one-column layout so the chat fills the card. */
 .ck-full-bleed {
   height: 100%;
 }
 
-.ck-full-bleed>div {
+.ck-full-bleed > div {
   height: 100% !important;
   width: 100% !important;
 }
 
-.ck-full-bleed>div>div {
-  height: 100% !important;
-  width: 100% !important;
-  max-width: none !important;
-}
-
-/* Collapse any built-in two-column grid inside ChatKit */
-.ck-full-bleed>div>div {
+.ck-full-bleed > div > div {
   display: grid !important;
   grid-template-columns: 1fr !important;
   gap: 0 !important;
+  height: 100% !important;
+  max-width: none !important;
+  width: 100% !important;
 }
 
-/* Hide the first column if present (thread list / sidebar) */
-.ck-full-bleed>div>div> :first-child {
+.ck-full-bleed > div > div > :first-child {
   display: none !important;
 }
 
-/* Defensive selectors for class-name based internals (if present in this ChatKit build) */
 .ck-full-bleed [class*="Sidebar"],
 .ck-full-bleed [class*="ThreadList"],
 .ck-full-bleed [class*="LeftRail"] {
   display: none !important;
-}
-
-.ck-full-bleed [class*="Layout"],
-.ck-full-bleed [class*="Container"] {
-  max-width: none !important;
-  width: 100% !important;
-}
-
-/* Ensure the main chat area stretches */
-.ck-full-bleed [class*="Main"],
-.ck-full-bleed [class*="Thread"],
-.ck-full-bleed [class*="Chat"] {
-  width: 100% !important;
-  height: 100% !important;
 }

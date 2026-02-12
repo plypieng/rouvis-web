@@ -1,11 +1,10 @@
-import { Inter, Outfit } from 'next/font/google';
+import { JetBrains_Mono, Shippori_Mincho_B1, Zen_Kaku_Gothic_New } from 'next/font/google';
 import '../../styles/globals.css';
 import { NextIntlClientProvider } from 'next-intl';
 import { notFound } from 'next/navigation';
 import { getMessages } from 'next-intl/server';
 import { locales } from '../../i18n';
 import { BottomNav } from '../../components/BottomNav';
-// import LanguageSwitcher from '../../components/LanguageSwitcher';
 import Header from '../../components/Header';
 import Footer from '../../components/Footer';
 import { Providers } from '../../components/Providers';
@@ -14,42 +13,32 @@ import OnboardingTour from '../../components/OnboardingTour';
 import AlertToastBridge from '../../components/AlertToastBridge';
 import { getServerSessionFromToken } from '../../lib/server-auth';
 import type { Locale } from '../../i18n/config';
+import type { AppShellProps } from '@/types/ui-shell';
 
-const inter = Inter({
+const zenKaku = Zen_Kaku_Gothic_New({
   subsets: ['latin'],
-  variable: '--font-inter',
+  weight: ['400', '500', '700', '900'],
+  variable: '--font-zen-kaku',
   display: 'swap',
 });
 
-const outfit = Outfit({
+const shippori = Shippori_Mincho_B1({
   subsets: ['latin'],
-  variable: '--font-outfit',
+  weight: ['400', '500', '600', '700', '800'],
+  variable: '--font-shippori',
   display: 'swap',
 });
 
-// Generate static params for all supported locales
-// Generate static params removed to allow dynamic rendering for auth and search params
-// export function generateStaticParams() {
-//   return locales.map(locale => ({ locale }));
-// }
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-jetbrains',
+  display: 'swap',
+});
 
-/**
- * Root Layout - Farmer-first navigation
- *
- * Principles (FARMER_UX_VISION.md):
- * - Mobile-first: Bottom navigation in thumb zone
- * - Simplified: Only essential pages
- * - Context-aware: Chat is the main interface
- *
- * Navigation (simplified):
- * Mobile: Bottom nav (今日, 今週, 記録, 知識)
- * Desktop: Minimal top nav (language switcher only)
- */
 export default async function RootLayout(props: {
   children: React.ReactNode;
   params: Promise<{ locale: string }>;
 }) {
-  // In Next.js 15, params are async and need to be awaited
   const { children } = props;
   const params = await props.params;
   const locale = params.locale;
@@ -58,62 +47,58 @@ export default async function RootLayout(props: {
     notFound();
   }
 
-  // Get messages for the locale
   const messages = await getMessages();
   const session = await getServerSessionFromToken();
 
-  // Debug: log server session
-  console.log('[Layout] Server session:', session);
-
   const typedLocale = locale as Locale;
   const isAuthenticated = Boolean(session?.user?.id);
-  const onboardingComplete = Boolean((session?.user as { onboardingComplete?: boolean } | undefined)?.onboardingComplete);
+  const onboardingComplete = Boolean(
+    (session?.user as { onboardingComplete?: boolean } | undefined)?.onboardingComplete
+  );
   const isOnboardingIncompleteUser = isAuthenticated && !onboardingComplete;
   const headerUser = session?.user
     ? {
-      name: session.user.name ?? undefined,
-      email: session.user.email ?? undefined,
-      avatarUrl: (session.user as { image?: string | null }).image ?? undefined,
-    }
+        name: session.user.name ?? undefined,
+        email: session.user.email ?? undefined,
+        avatarUrl: (session.user as { image?: string | null }).image ?? undefined,
+      }
     : null;
 
-  console.log('[Layout] headerUser:', headerUser);
+  const shellProps: AppShellProps = {
+    locale,
+    isAuthenticated,
+    isOnboardingIncomplete: isOnboardingIncompleteUser,
+  };
 
   return (
     <NextIntlClientProvider locale={locale} messages={messages}>
       <Providers session={session}>
-        {/* Full-height layout with mobile optimizations */}
-        <div className={`${inter.variable} ${outfit.variable} font-sans mobile-viewport bg-background flex flex-col`} lang={locale}>
-          {!isOnboardingIncompleteUser && (
-            <Header locale={typedLocale} user={headerUser} />
-          )}
+        <div
+          className={`${zenKaku.variable} ${shippori.variable} ${jetbrainsMono.variable} shell-canvas mobile-viewport flex min-h-screen flex-col font-sans`}
+          lang={locale}
+          data-authenticated={shellProps.isAuthenticated ? 'true' : 'false'}
+        >
+          {!isOnboardingIncompleteUser && <Header locale={typedLocale} user={headerUser} />}
 
-          {/* Main Content - Full height minus bottom nav on mobile */}
           <main
             id="main-content"
-            className={`flex-1 overflow-auto mobile-scroll safe-bottom ${isOnboardingIncompleteUser ? 'pb-0' : 'pb-20 lg:pb-0'}`}
+            className={`shell-main flex-1 overflow-auto mobile-scroll safe-bottom ${
+              isOnboardingIncompleteUser ? 'pb-0' : 'pb-28 lg:pb-6'
+            }`}
           >
             {children}
           </main>
 
-          {!isOnboardingIncompleteUser && (
-            <Footer locale={typedLocale} user={session?.user} />
-          )}
-
-          {/* Feedback Button - Alpha Testing (Authenticated users only) */}
+          {!isOnboardingIncompleteUser && <Footer locale={typedLocale} user={session?.user} />}
           {!isOnboardingIncompleteUser && session?.user && <FeedbackButton />}
-
-          {/* Onboarding Tour - Shows once for new users */}
           {!isOnboardingIncompleteUser && session?.user && <OnboardingTour />}
 
-          {/* Bottom Navigation - Mobile Only - Enhanced */}
           {!isOnboardingIncompleteUser && (
-            <div className="mobile-nav-height">
+            <div className="mobile-nav-height lg:hidden">
               <BottomNav locale={typedLocale} user={session?.user} />
             </div>
           )}
 
-          {/* Global non-blocking replacement for window.alert() */}
           <AlertToastBridge />
         </div>
       </Providers>

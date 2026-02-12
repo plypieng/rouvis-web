@@ -3,13 +3,23 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useTranslations } from 'next-intl';
-import { Locale } from '../i18n/config';
-
 import { usePathname } from 'next/navigation';
+import type { Locale } from '../i18n/config';
+import type { ShellNavItem } from '@/types/ui-shell';
 
 interface FooterProps {
   locale: Locale;
   user?: unknown;
+}
+
+function getSecondaryNav(locale: Locale, base: string, t: (key: string) => string): ShellNavItem[] {
+  return [
+    { id: 'dashboard', href: `${base}`, label: t('header.nav.dashboard') },
+    { id: 'projects', href: `${base}/projects`, label: locale === 'ja' ? 'プロジェクト' : 'Projects' },
+    { id: 'records', href: `${base}/records`, label: locale === 'ja' ? '記録' : 'Records' },
+    { id: 'chat', href: `${base}/chat`, label: t('header.nav.chat') },
+    { id: 'menu', href: `${base}/menu`, label: t('footer.more') },
+  ];
 }
 
 export default function Footer({ locale, user }: FooterProps) {
@@ -17,89 +27,50 @@ export default function Footer({ locale, user }: FooterProps) {
   const pathname = usePathname();
   const base = `/${locale}`;
 
-  // Hide global footer on landing page for unauthenticated users
-  // Landing page path is usually `/${locale}` or just `/`
-  const isLandingPage = pathname === `/${locale}` || pathname === '/';
-
-  // Also hide on auth pages for a cleaner look
   const isAuthPage = pathname?.includes('/login') || pathname?.includes('/signup');
+  const isLandingPage = pathname === `/${locale}` || pathname === '/';
 
   if ((!user && isLandingPage) || isAuthPage) {
     return null;
   }
 
+  const navItems = getSecondaryNav(locale, base, t);
+
   return (
-    <footer
-      role="contentinfo"
-      className="mt-8 border-t border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-900/70 backdrop-blur"
-      aria-label="Footer"
-    >
-      <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-          {/* Brand */}
+    <footer role="contentinfo" className="shell-footer mt-10" aria-label="Footer">
+      <div className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8">
+        <div className="flex flex-col gap-5 border-b border-border/80 pb-5 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-2">
-            <Image src="/logo.svg" alt={t('header.logo_alt')} width={24} height={24} />
-            <span className="text-sm font-semibold text-gray-900 dark:text-gray-50">
-              {t('header.app_name')}
-            </span>
+            <Image src="/logo.svg" alt={t('header.logo_alt')} width={22} height={22} />
+            <span className="text-sm font-semibold text-foreground">{t('header.app_name')}</span>
           </div>
 
-          {/* Footer nav */}
           <nav aria-label="Footer navigation">
-            <ul className="flex flex-wrap items-center gap-3 sm:gap-4">
-              <li>
-                <Link
-                  href={`${base}/profile`}
-                  className="text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white underline-offset-4 hover:underline focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-600 rounded"
-                >
-                  {t('footer.about')}
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href={`${base}/projects`}
-                  className="text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white underline-offset-4 hover:underline focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-600 rounded"
-                >
-                  {t('footer.explore')}
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href={`${base}/chat`}
-                  className="text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white underline-offset-4 hover:underline focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-600 rounded"
-                >
-                  {t('footer.help')}
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href={`${base}/menu`}
-                  className="text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white underline-offset-4 hover:underline focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-600 rounded"
-                >
-                  {t('footer.more')}
-                </Link>
-              </li>
+            <ul className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              {navItems.map((item) => (
+                <li key={item.id}>
+                  <Link
+                    href={item.href}
+                    className="text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+                  >
+                    {item.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </nav>
         </div>
 
-        {/* Bottom meta row */}
-        <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <p className="text-xs text-gray-600 dark:text-gray-400">
+        <div className="mt-4 flex flex-col gap-2 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+          <p>
             © {new Date().getFullYear()} {t('header.app_name')}. {t('footer.rights')}
           </p>
-          <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
-            <Link
-              href={`${base}/terms`}
-              className="hover:text-gray-900 dark:hover:text-white underline-offset-4 hover:underline"
-            >
+          <div className="flex items-center gap-3">
+            <Link href={`${base}/terms`} className="hover:text-foreground hover:underline underline-offset-4">
               {t('footer.terms')}
             </Link>
             <span aria-hidden="true">•</span>
-            <Link
-              href={`${base}/privacy`}
-              className="hover:text-gray-900 dark:hover:text-white underline-offset-4 hover:underline"
-            >
+            <Link href={`${base}/privacy`} className="hover:text-foreground hover:underline underline-offset-4">
               {t('footer.privacy')}
             </Link>
           </div>
