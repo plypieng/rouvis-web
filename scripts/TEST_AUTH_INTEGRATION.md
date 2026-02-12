@@ -59,6 +59,13 @@ This document provides comprehensive guidance for testing the ROuvis authenticat
 
 ## Running the Automated Tests
 
+### CI Gate Behavior
+
+- `test-auth-integration.ts` is a CI-gating command.
+- It exits with status code `1` when any CI-gating check fails.
+- CI-gating checks: `INT-001`, `INT-002`, `INT-003`, `INT-004`, `INT-005`, `INT-006`, `INT-007`, `INT-010`.
+- Manual-only checks: `INT-008` and `INT-009` are reported in `MANUAL-ONLY CHECKS (NON-GATING)` and do not change the exit code.
+
 ### Basic Execution
 
 ```bash
@@ -187,10 +194,12 @@ BACKEND_URL=http://localhost:3000 VERBOSE=true npx tsx scripts/test-auth-integra
 
 ---
 
-### INT-008: Mock Auth Flow
+### INT-008: Mock Auth Flow (Manual-only, Non-gating)
 **Purpose:** Placeholder for mock authentication in dev environment.
 
 **Current Status:** Not implemented (requires backend mock endpoint)
+
+**CI Impact:** This check is informational and does not fail CI.
 
 **Future Enhancement:**
 - Add mock auth endpoint for testing
@@ -198,10 +207,12 @@ BACKEND_URL=http://localhost:3000 VERBOSE=true npx tsx scripts/test-auth-integra
 
 ---
 
-### INT-009: Tenant Assignment
+### INT-009: Tenant Assignment (Manual-only, Non-gating)
 **Purpose:** Verify tenant is auto-created on first sign-in.
 
 **Testing Method:** Manual verification required
+
+**CI Impact:** This check is informational and does not fail CI.
 
 **Steps:**
 1. Sign in via Google OAuth (first time for test user)
@@ -699,16 +710,23 @@ Copy this template to document your test results:
 
 ## Automated Tests
 
-| Test ID | Test Name | Status | Notes |
-|---------|-----------|--------|-------|
-| INT-001 | Backend Health Check | ✅ PASS | |
-| INT-002 | NextAuth Providers | ✅ PASS | |
-| INT-003 | CSRF Token | ✅ PASS | |
-| INT-004 | Unauthenticated Session | ✅ PASS | |
-| INT-005 | OAuth Redirect | ✅ PASS | |
-| INT-006 | Protected Route Auth | ✅ PASS | |
-| INT-007 | Field Validation | ✅ PASS | |
-| INT-010 | Session Persistence | ✅ PASS | |
+| Test ID | Test Name | CI Gate | Status | Notes |
+|---------|-----------|---------|--------|-------|
+| INT-001 | Backend Health Check | Yes | ✅ PASS | |
+| INT-002 | NextAuth Providers | Yes | ✅ PASS | |
+| INT-003 | CSRF Token | Yes | ✅ PASS | |
+| INT-004 | Unauthenticated Session | Yes | ✅ PASS | |
+| INT-005 | OAuth Redirect | Yes | ✅ PASS | |
+| INT-006 | Protected Route Auth | Yes | ✅ PASS | |
+| INT-007 | Field Validation | Yes | ✅ PASS | |
+| INT-010 | Session Persistence | Yes | ✅ PASS | |
+
+## Manual-Only Checks (Non-gating)
+
+| Check ID | Check Name | Status | Notes |
+|----------|------------|--------|-------|
+| INT-008 | Mock Auth Flow | ℹ️ INFO | Requires backend mock auth endpoint implementation |
+| INT-009 | Tenant Assignment | ℹ️ INFO | Requires manual OAuth + database verification |
 
 **Total:** 8 tests
 **Passed:** 8
@@ -759,7 +777,8 @@ Copy this template to document your test results:
 
 ## Overall Assessment
 
-- **Automated Tests:** ✅ All Pass / ⚠️ Some Failures / ❌ Critical Failures
+- **CI-Gating Automated Tests:** ✅ All Pass / ❌ Failures (merge blocked)
+- **Manual-Only Checks:** ℹ️ Reported / ✅ Completed manually / ❌ Issues found manually
 - **Manual Tests:** ✅ All Pass / ⚠️ Some Failures / ❌ Critical Failures
 - **Recommendation:** READY FOR DEPLOYMENT / NEEDS FIXES / BLOCKED
 
@@ -809,9 +828,13 @@ VERBOSE=true npx tsx scripts/test-auth-integration.ts
 # ================================================================================
 # FULLSTACK INTEGRATION TEST REPORT
 # ================================================================================
-# Total Tests: 8
+# CI-GATING RESULTS
+# Total CI Tests: 8
 # Passed: 8
 # Failed: 0
+# MANUAL-ONLY CHECKS (NON-GATING)
+# ℹ️  INT-008: Mock Auth Flow
+# ℹ️  INT-009: Tenant Assignment
 # ✅ READY FOR DEPLOYMENT
 ```
 
@@ -826,4 +849,4 @@ For issues or questions:
 4. Review CLAUDE.md and PLAN.md for architecture details
 
 **Test Suite Maintainer:** Fullstack Integration Tester Agent
-**Last Updated:** 2025-10-25
+**Last Updated:** 2026-02-12

@@ -69,7 +69,6 @@ export default async function RootLayout(props: {
     isAuthenticated,
     isOnboardingIncomplete: isOnboardingIncompleteUser,
   };
-
   return (
     <NextIntlClientProvider locale={locale} messages={messages}>
       <Providers session={session}>

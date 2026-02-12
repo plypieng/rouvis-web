@@ -56,10 +56,6 @@ function logSuccess(message: string) {
   console.log(`\x1b[32m✅ ${message}\x1b[0m`);
 }
 
-function logWarning(message: string) {
-  console.log(`\x1b[33m⚠️  ${message}\x1b[0m`);
-}
-
 function logInfo(message: string) {
   console.log(`\x1b[36mℹ️  ${message}\x1b[0m`);
 }
@@ -175,26 +171,81 @@ async function fetchWithCookies(
 //   return false;
 // }
 
+interface TestResult {
+  id: string;
+  name: string;
+  passed: boolean;
+  duration: number;
+  ciGating: boolean;
+}
+
+interface ManualOnlyCheck {
+  id: string;
+  name: string;
+  notes: string[];
+}
+
 // Test cases
 class AuthIntegrationTests {
-  private testResults: { name: string; passed: boolean; duration: number }[] = [];
+  private testResults: TestResult[] = [];
+  private readonly ciGatingTestIds = new Set([
+    'INT-001',
+    'INT-002',
+    'INT-003',
+    'INT-004',
+    'INT-005',
+    'INT-006',
+    'INT-007',
+    'INT-010',
+  ]);
+  private readonly manualOnlyChecks: ManualOnlyCheck[] = [
+    {
+      id: 'INT-008',
+      name: 'Mock Auth Flow',
+      notes: [
+        'Non-gating: optional development flow.',
+        'Requires backend mock auth endpoint implementation.',
+      ],
+    },
+    {
+      id: 'INT-009',
+      name: 'Tenant Assignment',
+      notes: [
+        'Non-gating: requires manual OAuth sign-in and database verification.',
+        'Verify User.tenant_id, Tenant row creation, and TENANT_CREATED audit event.',
+      ],
+    },
+  ];
 
-  async runTest(name: string, testFn: () => Promise<void>): Promise<boolean> {
+  async runTest(id: string, name: string, testFn: () => Promise<void>): Promise<boolean> {
     const startTime = Date.now();
+    const fullName = `${id}: ${name}`;
     console.log(`\n${'='.repeat(80)}`);
-    console.log(`TEST: ${name}`);
+    console.log(`TEST: ${fullName}`);
     console.log('='.repeat(80));
 
     try {
       await testFn();
       const duration = Date.now() - startTime;
-      this.testResults.push({ name, passed: true, duration });
-      logSuccess(`PASS: ${name} (${duration}ms)`);
+      this.testResults.push({
+        id,
+        name,
+        passed: true,
+        duration,
+        ciGating: this.ciGatingTestIds.has(id),
+      });
+      logSuccess(`PASS: ${fullName} (${duration}ms)`);
       return true;
     } catch (error) {
       const duration = Date.now() - startTime;
-      this.testResults.push({ name, passed: false, duration });
-      logError(name, 'FAIL', error);
+      this.testResults.push({
+        id,
+        name,
+        passed: false,
+        duration,
+        ciGating: this.ciGatingTestIds.has(id),
+      });
+      logError(fullName, 'FAIL', error);
       return false;
     }
   }
@@ -364,52 +415,6 @@ class AuthIntegrationTests {
   }
 
   /**
-   * INT-008: Mock Authentication Flow (Development Only)
-   *
-   * This simulates a successful authentication for testing downstream flows.
-   * Only works if backend has mock auth enabled.
-   */
-  async testMockAuth(): Promise<void> {
-    if (!MOCK_AUTH) {
-      logInfo('Mock auth not enabled, skipping...');
-      return;
-    }
-
-    log('MockAuth', 'Testing mock authentication flow...');
-
-    // Create a mock user session
-    // const mockUser = {
-    //   email: 'test@example.com',
-    //   name: 'Test User',
-    //   id: 'test-user-id',
-    // };
-
-    // Note: This requires backend support for mock auth
-    // For now, we'll just log the intent
-    logWarning('Mock auth flow requires backend mock endpoint implementation');
-    logInfo('To test authenticated flows, sign in manually and copy session cookie');
-  }
-
-  /**
-   * INT-009: Test Tenant Assignment Logic (Requires DB Access)
-   *
-   * This verifies that tenant assignment happens correctly during sign-in.
-   */
-  async testTenantAssignment(): Promise<void> {
-    log('Tenant', 'Testing tenant assignment logic...');
-
-    // This test requires either:
-    // 1. Direct database access
-    // 2. Admin API endpoint to verify tenant creation
-    // 3. Manual verification after OAuth
-
-    logInfo('Tenant assignment test requires manual verification:');
-    logInfo('1. Sign in via Google OAuth');
-    logInfo('2. Check database for User.tenant_id and Tenant table entry');
-    logInfo('3. Verify AuditLog entry for TENANT_CREATED');
-  }
-
-  /**
    * INT-010: Test Session Persistence Across Requests
    */
   async testSessionPersistence(): Promise<void> {
@@ -437,7 +442,7 @@ class AuthIntegrationTests {
   /**
    * Print summary report
    */
-  printSummary(): void {
+  printSummary(): number {
     console.log('\n\n' + '='.repeat(80));
     console.log('FULLSTACK INTEGRATION TEST REPORT');
     console.log('='.repeat(80));
@@ -447,79 +452,59 @@ class AuthIntegrationTests {
     console.log(`Environment: ${APP_URL}`);
     console.log(`Mock Mode: ${MOCK_AUTH ? 'Enabled' : 'Disabled'}`);
 
-    const totalTests = this.testResults.length;
-    const passedTests = this.testResults.filter(t => t.passed).length;
-    const failedTests = totalTests - passedTests;
-    const totalDuration = this.testResults.reduce((sum, t) => sum + t.duration, 0);
+    const ciResults = this.testResults.filter(t => t.ciGating);
+    const totalCiTests = ciResults.length;
+    const passedCiTests = ciResults.filter(t => t.passed).length;
+    const failedCiTests = totalCiTests - passedCiTests;
+    const totalDuration = ciResults.reduce((sum, t) => sum + t.duration, 0);
 
     console.log('\n' + '-'.repeat(80));
-    console.log('SUMMARY');
+    console.log('CI-GATING RESULTS');
     console.log('-'.repeat(80));
-    console.log(`Total Tests: ${totalTests}`);
-    console.log(`Passed: \x1b[32m${passedTests}\x1b[0m`);
-    console.log(`Failed: \x1b[31m${failedTests}\x1b[0m`);
+    console.log(`Total CI Tests: ${totalCiTests}`);
+    console.log(`Passed: \x1b[32m${passedCiTests}\x1b[0m`);
+    console.log(`Failed: \x1b[31m${failedCiTests}\x1b[0m`);
     console.log(`Duration: ${totalDuration}ms`);
 
     console.log('\n' + '-'.repeat(80));
-    console.log('DETAILED RESULTS');
+    console.log('DETAILED CI RESULTS');
     console.log('-'.repeat(80));
 
-    this.testResults.forEach(result => {
+    ciResults.forEach(result => {
       const status = result.passed ? '\x1b[32m✅ PASS\x1b[0m' : '\x1b[31m❌ FAIL\x1b[0m';
-      console.log(`${status} ${result.name} (${result.duration}ms)`);
+      console.log(`${status} ${result.id}: ${result.name} (${result.duration}ms)`);
     });
 
     console.log('\n' + '-'.repeat(80));
-    console.log('CRITICAL ISSUES');
+    console.log('MANUAL-ONLY CHECKS (NON-GATING)');
     console.log('-'.repeat(80));
-
-    const criticalFailures = this.testResults.filter(t =>
-      !t.passed && (t.name.includes('Health') || t.name.includes('Providers'))
-    );
-
-    if (criticalFailures.length > 0) {
-      criticalFailures.forEach(failure => {
-        console.log(`\x1b[31m🚨 CRITICAL: ${failure.name}\x1b[0m`);
+    this.manualOnlyChecks.forEach(check => {
+      console.log(`ℹ️  ${check.id}: ${check.name}`);
+      check.notes.forEach(note => {
+        console.log(`   - ${note}`);
       });
-      console.log('\nBackend may not be running or misconfigured!');
-    } else {
-      console.log('No critical issues detected.');
-    }
-
-    console.log('\n' + '-'.repeat(80));
-    console.log('MANUAL TESTING REQUIRED');
-    console.log('-'.repeat(80));
-    console.log('The following flows require manual testing:');
-    console.log('1. Complete Google OAuth flow (visit redirect URL)');
-    console.log('2. Verify tenant creation in database after first sign-in');
-    console.log('3. Complete onboarding wizard (3 steps)');
-    console.log('4. Verify field creation persists in database');
-    console.log('5. Verify Google Calendar tokens stored in User table');
-    console.log('6. Test session persistence across browser tabs');
-    console.log('7. Test logout and re-authentication');
+    });
 
     console.log('\n' + '-'.repeat(80));
     console.log('OVERALL ASSESSMENT');
     console.log('-'.repeat(80));
 
-    if (failedTests === 0) {
+    if (failedCiTests === 0) {
       console.log('\x1b[32m✅ READY FOR DEPLOYMENT\x1b[0m');
-      console.log('All automated tests passed. Complete manual tests before production.');
-    } else if (criticalFailures.length > 0) {
-      console.log('\x1b[31m🚫 BLOCKED\x1b[0m');
-      console.log('Critical failures detected. Fix before proceeding.');
+      console.log('All CI-gating auth checks passed. Complete manual checks before production.');
     } else {
-      console.log('\x1b[33m⚠️  NEEDS FIXES\x1b[0m');
-      console.log('Some tests failed. Review and fix issues.');
+      console.log('\x1b[31m🚫 BLOCKED\x1b[0m');
+      console.log('One or more CI-gating auth checks failed. Fix before proceeding.');
     }
 
     console.log('\n' + '='.repeat(80) + '\n');
+    return failedCiTests;
   }
 
   /**
    * Run all tests
    */
-  async runAll(): Promise<void> {
+  async runAll(): Promise<number> {
     console.log('\x1b[36m');
     console.log('╔═══════════════════════════════════════════════════════════════════════════════╗');
     console.log('║                                                                               ║');
@@ -534,19 +519,17 @@ class AuthIntegrationTests {
     console.log('');
 
     // Run tests
-    await this.runTest('INT-001: Backend Health Check', () => this.testBackendHealth());
-    await this.runTest('INT-002: NextAuth Providers Endpoint', () => this.testAuthProviders());
-    await this.runTest('INT-003: CSRF Token Generation', () => this.testCsrfToken());
-    await this.runTest('INT-004: Unauthenticated Session', () => this.testUnauthenticatedSession());
-    await this.runTest('INT-005: Google OAuth Redirect', () => this.testOAuthRedirect());
-    await this.runTest('INT-006: Protected Route Without Auth', () => this.testProtectedRouteWithoutAuth());
-    await this.runTest('INT-007: Field Validation', () => this.testFieldValidation());
-    await this.runTest('INT-008: Mock Auth Flow', () => this.testMockAuth());
-    await this.runTest('INT-009: Tenant Assignment', () => this.testTenantAssignment());
-    await this.runTest('INT-010: Session Persistence', () => this.testSessionPersistence());
+    await this.runTest('INT-001', 'Backend Health Check', () => this.testBackendHealth());
+    await this.runTest('INT-002', 'NextAuth Providers Endpoint', () => this.testAuthProviders());
+    await this.runTest('INT-003', 'CSRF Token Generation', () => this.testCsrfToken());
+    await this.runTest('INT-004', 'Unauthenticated Session', () => this.testUnauthenticatedSession());
+    await this.runTest('INT-005', 'Google OAuth Redirect', () => this.testOAuthRedirect());
+    await this.runTest('INT-006', 'Protected Route Without Auth', () => this.testProtectedRouteWithoutAuth());
+    await this.runTest('INT-007', 'Field Validation', () => this.testFieldValidation());
+    await this.runTest('INT-010', 'Session Persistence', () => this.testSessionPersistence());
 
-    // Print summary
-    this.printSummary();
+    // Print summary and return CI-gating failure count
+    return this.printSummary();
   }
 }
 
@@ -555,7 +538,10 @@ async function main() {
   const tests = new AuthIntegrationTests();
 
   try {
-    await tests.runAll();
+    const failedCiChecks = await tests.runAll();
+    if (failedCiChecks > 0) {
+      process.exit(1);
+    }
   } catch (error) {
     console.error('\x1b[31m\nFatal error during test execution:\x1b[0m');
     console.error(error);
