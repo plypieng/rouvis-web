@@ -4,6 +4,10 @@ import * as Sentry from "@sentry/nextjs";
 import Head from "next/head";
 import { useEffect, useState } from "react";
 
+const isSentryExampleEnabled = ['1', 'true', 'yes', 'on'].includes(
+  (process.env.NEXT_PUBLIC_SENTRY_EXAMPLE_ENABLED || '').trim().toLowerCase()
+);
+
 class SentryExampleFrontendError extends Error {
   constructor(message: string | undefined) {
     super(message);
@@ -14,6 +18,14 @@ class SentryExampleFrontendError extends Error {
 export default function Page() {
   const [hasSentError, setHasSentError] = useState(false);
   const [isConnected, setIsConnected] = useState(true);
+
+  if (!isSentryExampleEnabled) {
+    return (
+      <main className="p-6">
+        <p>Sentry example is disabled.</p>
+      </main>
+    );
+  }
 
   useEffect(() => {
     Sentry.logger.info("Sentry example page loaded");
