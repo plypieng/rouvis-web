@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toastError, toastSuccess } from '@/lib/feedback';
+import { trackUXEvent } from '@/lib/analytics';
 
 interface Task {
     id: string;
@@ -20,12 +21,20 @@ interface Task {
 interface TodayFocusProps {
     tasks: Task[];
     locale: string;
+    highlightTaskId?: string | null;
+    hasCompletedTaskInitially?: boolean;
 }
 
-export default function TodayFocus({ tasks: initialTasks, locale }: TodayFocusProps) {
+export default function TodayFocus({
+    tasks: initialTasks,
+    locale,
+    highlightTaskId = null,
+    hasCompletedTaskInitially = false,
+}: TodayFocusProps) {
     const router = useRouter();
     const [tasks, setTasks] = useState<Task[]>(initialTasks);
     const [completingId, setCompletingId] = useState<string | null>(null);
+    const [hasCompletedTask, setHasCompletedTask] = useState(hasCompletedTaskInitially);
     const [notice, setNotice] = useState<{
         type: 'success' | 'error';
         message: string;
@@ -52,6 +61,17 @@ export default function TodayFocus({ tasks: initialTasks, locale }: TodayFocusPr
                 message: 'タスクを完了にしました。',
             });
             toastSuccess('タスクを完了にしました。');
+            void trackUXEvent('task_completed', {
+                surface: 'today_focus',
+                taskId,
+            });
+            if (!hasCompletedTask) {
+                setHasCompletedTask(true);
+                void trackUXEvent('first_task_completed', {
+                    surface: 'today_focus',
+                    taskId,
+                });
+            }
 
             // 3. Refresh Server Data
             router.refresh();
@@ -131,9 +151,10 @@ export default function TodayFocus({ tasks: initialTasks, locale }: TodayFocusPr
                     return (
                         <div
                             key={task.id}
+                            data-testid={task.id === highlightTaskId ? 'today-focus-highlight-task' : undefined}
                             className={`group bg-card rounded-xl border p-4 flex items-center gap-4 transition-colors ${
                                 isOverdue ? 'border-warning/30 bg-warning/5' : 'border-border hover:border-primary/30'
-                            }`}
+                            } ${task.id === highlightTaskId ? 'ring-2 ring-emerald-300 border-emerald-300 bg-emerald-50/40' : ''}`}
                         >
                             {/* Checkbox */}
                             <button

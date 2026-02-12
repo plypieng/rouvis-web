@@ -11,6 +11,7 @@ import PlantingHistoryInput from './PlantingHistoryInput';
 import AIProcessingOverlay from './AIProcessingOverlay';
 import { toastError, toastInfo, toastSuccess, toastWarning } from '@/lib/feedback';
 import { buildStarterTasks } from '@/lib/starter-tasks';
+import { trackUXEvent } from '@/lib/analytics';
 
 type WizardStep = 'project-type' | 'selection' | 'crop-analysis' | 'planting-history' | 'field-context';
 
@@ -48,6 +49,13 @@ type TaskPayload = {
     status: 'pending' | 'completed';
     isBackfilled?: boolean;
     isAssumed?: boolean;
+};
+
+type PersistedTask = {
+    id: string;
+    title: string;
+    dueDate?: string;
+    status: 'pending' | 'completed';
 };
 
 type NoticeState = {
@@ -250,7 +258,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
         );
     };
 
-    const persistGeneratedTasks = async (projectId: string, tasks: TaskPayload[]): Promise<void> => {
+    const persistGeneratedTasks = async (projectId: string, tasks: TaskPayload[]): Promise<PersistedTask[]> => {
         const selectedTemplatePreferences = preferenceTemplates.find(
             (template) => template.id === selectedTemplateId
         )?.preferences;
@@ -266,11 +274,25 @@ export default function ProjectWizard({ locale }: { locale: string }) {
         if (!saveResponse.ok) {
             throw new Error(await extractErrorMessage(saveResponse, '生成したタスクの保存に失敗しました'));
         }
+
+        const payload = await saveResponse.json().catch(() => ({}));
+        const persistedTasks = Array.isArray(payload?.project?.tasks)
+            ? (payload.project.tasks as Array<{ id?: string; title?: string; dueDate?: string; status?: string }>)
+            : [];
+
+        return persistedTasks
+            .filter((task): task is { id: string; title: string; dueDate?: string; status: string } => Boolean(task?.id && task?.title))
+            .map((task) => ({
+                id: task.id,
+                title: task.title,
+                dueDate: task.dueDate,
+                status: task.status === 'completed' ? 'completed' : 'pending',
+            }));
     };
 
     const generateAndPersistInitialSchedule = async (
         projectId: string
-    ): Promise<{ taskCount: number; usedFallback: boolean }> => {
+    ): Promise<{ taskCount: number; usedFallback: boolean; firstPendingTaskId: string | null }> => {
         if (!cropAnalysis) throw new Error('作物情報が見つかりません');
 
         const isBackfilled = projectType === 'existing' && !!plantingDate;
@@ -360,8 +382,20 @@ export default function ProjectWizard({ locale }: { locale: string }) {
             throw new Error('初回タスクの作成に失敗しました');
         }
 
-        await persistGeneratedTasks(projectId, tasks);
-        return { taskCount: tasks.length, usedFallback };
+        const persistedTasks = await persistGeneratedTasks(projectId, tasks);
+        const firstPendingTask = persistedTasks
+            .filter((task) => task.status === 'pending')
+            .sort((left, right) => {
+                const leftTime = left.dueDate ? new Date(left.dueDate).getTime() : Number.POSITIVE_INFINITY;
+                const rightTime = right.dueDate ? new Date(right.dueDate).getTime() : Number.POSITIVE_INFINITY;
+                return leftTime - rightTime;
+            })[0];
+
+        return {
+            taskCount: tasks.length,
+            usedFallback,
+            firstPendingTaskId: firstPendingTask?.id ?? null,
+        };
     };
 
     // Step 0: Project Type Selection (FIRST STEP)
@@ -556,15 +590,30 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                     throw new Error('プロジェクトIDを取得できませんでした');
                 }
                 setCreatedProjectId(projectId);
+                void trackUXEvent('project_created', {
+                    flow: 'wizard',
+                    projectType: projectType || 'new',
+                    hasField: Boolean(selectedField?.id),
+                });
             }
 
             setNotice({ type: 'info', message: 'AIが初回スケジュールを作成しています...' });
             toastInfo('AIが初回スケジュールを作成しています...');
-            const { taskCount, usedFallback } = await generateAndPersistInitialSchedule(projectId);
+            const { taskCount, usedFallback, firstPendingTaskId } = await generateAndPersistInitialSchedule(projectId);
+            void trackUXEvent('schedule_generated', {
+                flow: 'wizard',
+                taskCount,
+                usedFallback,
+                projectType: projectType || 'new',
+            });
             if (usedFallback) {
                 const fallbackMessage = `AI生成が不安定だったため、スタータータスクを作成しました（${taskCount}件）`;
                 setNotice({ type: 'info', message: fallbackMessage });
                 toastWarning(fallbackMessage);
+                void trackUXEvent('schedule_generation_fallback_used', {
+                    flow: 'wizard',
+                    taskCount,
+                });
             } else {
                 const successMessage = `初回スケジュールを作成しました（${taskCount}件）`;
                 setNotice({ type: 'success', message: successMessage });
@@ -578,7 +627,19 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                 console.warn('Session update failed after project creation:', error);
             }
             router.refresh(); // Ensure list is updated
-            router.push(`/${locale}/projects/${projectId}`);
+            const activationParams = new URLSearchParams({
+                activation: '1',
+                projectId,
+            });
+            if (firstPendingTaskId) {
+                activationParams.set('taskId', firstPendingTaskId);
+            }
+
+            void trackUXEvent('activation_flow_redirected', {
+                destination: 'dashboard',
+                hasFirstTask: Boolean(firstPendingTaskId),
+            });
+            router.push(`/${locale}?${activationParams.toString()}`);
         } catch (error) {
             console.error('Project creation error:', error);
             const message = error instanceof Error
@@ -587,6 +648,10 @@ export default function ProjectWizard({ locale }: { locale: string }) {
             setNotice({
                 type: 'error',
                 message,
+            });
+            void trackUXEvent('project_setup_failed', {
+                flow: 'wizard',
+                step: 'create_or_schedule',
             });
             toastError(message, {
                 label: '再試行',

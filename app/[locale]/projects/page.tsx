@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toastError, toastSuccess, toastWarning } from '@/lib/feedback';
 
 import { use } from 'react';
@@ -32,22 +32,29 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
     const [loading, setLoading] = useState(true);
     const [notice, setNotice] = useState<NoticeState>(null);
 
-    useEffect(() => {
-        fetchProjects();
-    }, []);
-
-    useEffect(() => {
-        if (!notice) return;
-        const timeout = setTimeout(() => setNotice(null), 4000);
-        return () => clearTimeout(timeout);
-    }, [notice]);
-
-    const fetchProjects = async () => {
+    const fetchProjects = useCallback(async () => {
+        setNotice(null);
         try {
             const res = await fetch('/api/v1/projects', { cache: 'no-store' });
             if (!res.ok) {
-                console.error('Failed to fetch projects:', res.status, res.statusText);
+                const payload = await res.json().catch(() => ({}));
+                const message = payload?.error || 'プロジェクト一覧の取得に失敗しました';
+                console.error('Failed to fetch projects:', res.status, res.statusText, message);
                 setProjects([]);
+                setNotice({
+                    type: 'error',
+                    message,
+                    actionLabel: '再試行',
+                    onAction: () => {
+                        void fetchProjects();
+                    },
+                });
+                toastError(message, {
+                    label: '再試行',
+                    onClick: () => {
+                        void fetchProjects();
+                    },
+                });
                 return;
             }
             const data = await res.json();
@@ -55,10 +62,35 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
         } catch (error) {
             console.error('Error fetching projects:', error);
             setProjects([]);
+            const message = 'プロジェクト一覧の取得に失敗しました';
+            setNotice({
+                type: 'error',
+                message,
+                actionLabel: '再試行',
+                onAction: () => {
+                    void fetchProjects();
+                },
+            });
+            toastError(message, {
+                label: '再試行',
+                onClick: () => {
+                    void fetchProjects();
+                },
+            });
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        void fetchProjects();
+    }, [fetchProjects]);
+
+    useEffect(() => {
+        if (!notice) return;
+        const timeout = setTimeout(() => setNotice(null), 4000);
+        return () => clearTimeout(timeout);
+    }, [notice]);
 
     const handleUnarchive = async (projectId: string, e: React.MouseEvent) => {
         e.preventDefault();

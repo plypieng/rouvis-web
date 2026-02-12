@@ -6,7 +6,12 @@ import { Suspense } from 'react';
 
 export default async function DashboardPage(props: {
   params: Promise<{ locale: string }>;
-  searchParams?: Promise<{ debugDataError?: string }>;
+  searchParams?: Promise<{
+    debugDataError?: string;
+    activation?: string;
+    projectId?: string;
+    taskId?: string;
+  }>;
 }) {
   const params = await props.params;
   const { locale } = params;
@@ -25,7 +30,16 @@ export default async function DashboardPage(props: {
 
   return (
     <main className="min-h-screen bg-gray-50">
-      <DashboardProjectList locale={locale} userId={userId} forceDataError={debugDataError} />
+      <DashboardProjectList
+        locale={locale}
+        userId={userId}
+        forceDataError={debugDataError}
+        activationContext={{
+          enabled: searchParams?.activation === '1',
+          projectId: searchParams?.projectId,
+          taskId: searchParams?.taskId,
+        }}
+      />
     </main>
   );
 }

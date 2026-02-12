@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toastError, toastInfo, toastSuccess, toastWarning } from '@/lib/feedback';
 import { buildStarterTasks } from '@/lib/starter-tasks';
+import { trackUXEvent } from '@/lib/analytics';
 
 type GeneratedTask = {
     title: string;
@@ -410,11 +411,20 @@ export default function ProjectAgentOnboarding({
             setProgressMessage(`💾 ${tasks.length}個のタスクを保存中...`);
 
             await persistGeneratedTasks(tasks);
+            void trackUXEvent('schedule_generated', {
+                flow: 'project_agent_onboarding',
+                taskCount: tasks.length,
+                usedFallback,
+                backfilled: Boolean(isBackfilled),
+            });
 
             if (usedFallback) {
                 const fallbackMessage = 'AI生成が不安定だったため、スタータータスクを作成しました。';
                 setProgressMessage(`⚠️ ${fallbackMessage}`);
                 toastWarning(fallbackMessage);
+                void trackUXEvent('schedule_generation_fallback_used', {
+                    flow: 'project_agent_onboarding',
+                });
             } else {
                 setProgressMessage('✅ スケジュール生成が完了しました！');
                 toastSuccess('初回ドラフトを生成しました。');
@@ -431,6 +441,10 @@ export default function ProjectAgentOnboarding({
             setProgressMessage('');
             const message = error instanceof Error ? error.message : 'スケジュールの生成に失敗しました';
             setErrorMessage(message);
+            void trackUXEvent('project_setup_failed', {
+                flow: 'project_agent_onboarding',
+                step: 'schedule_generation',
+            });
             toastError(message, {
                 label: '再試行',
                 onClick: () => {

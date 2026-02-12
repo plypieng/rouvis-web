@@ -10,6 +10,8 @@ import ProjectCalendar from '@/components/projects/ProjectCalendar';
 import ProjectAgentOnboarding from '@/components/projects/ProjectAgentOnboarding';
 import TaskCreateModal from './TaskCreateModal';
 import type { CockpitPanelMode, QuickApplyResult, QuickApplyState } from '@/types/project-cockpit';
+import { toastError, toastSuccess } from '@/lib/feedback';
+import { trackUXEvent } from '@/lib/analytics';
 
 type ProjectTask = {
     id: string;
@@ -50,6 +52,8 @@ interface ProjectDetailClientProps {
 type NoticeState = {
     type: 'success' | 'error';
     message: string;
+    actionLabel?: string;
+    onAction?: () => void;
 } | null;
 
 const COCKPIT_SPLIT_KEY = 'rouvis:project-cockpit-split';
@@ -75,6 +79,9 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
     const [splitRatio, setSplitRatio] = useState(DEFAULT_SPLIT);
     const [isResizing, setIsResizing] = useState(false);
     const [quickApplyState, setQuickApplyState] = useState<QuickApplyState>({ status: 'idle' });
+    const [hasCompletedTask, setHasCompletedTask] = useState(
+        () => (project.tasks || []).some((task) => task.status === 'completed')
+    );
     const chatRef = useRef<RouvisChatKitRef>(null);
     const splitContainerRef = useRef<HTMLDivElement>(null);
     const resizeStateRef = useRef<{ startX: number; startRatio: number } | null>(null);
@@ -190,15 +197,41 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
             if (!res.ok) throw new Error('Failed to update task');
 
             router.refresh();
+            if (status === 'completed') {
+                toastSuccess('タスクを完了にしました。');
+                void trackUXEvent('task_completed', {
+                    surface: 'project_detail',
+                    projectId: project.id,
+                    taskId,
+                });
+                if (!hasCompletedTask) {
+                    setHasCompletedTask(true);
+                    void trackUXEvent('first_task_completed', {
+                        surface: 'project_detail',
+                        projectId: project.id,
+                        taskId,
+                    });
+                }
+            }
             setNotice({
                 type: 'success',
                 message: status === 'completed' ? t('task_completed_notice') : t('task_updated_notice'),
             });
         } catch (error) {
             console.error('Failed to update task', error);
+            const retry = () => {
+                void handleTaskComplete(taskId, status);
+            };
+            const message = t('update_failed');
             setNotice({
                 type: 'error',
-                message: t('update_failed'),
+                message,
+                actionLabel: '再試行',
+                onAction: retry,
+            });
+            toastError(message, {
+                label: '再試行',
+                onClick: retry,
             });
         }
     };
@@ -312,7 +345,18 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
                                 : 'status-critical'
                         }`}
                     >
-                        {notice.message}
+                        <div className="flex items-center justify-between gap-3">
+                            <span>{notice.message}</span>
+                            {notice.actionLabel && notice.onAction && (
+                                <button
+                                    type="button"
+                                    onClick={notice.onAction}
+                                    className="rounded-md border border-current px-2 py-1 text-xs font-semibold hover:bg-white/40"
+                                >
+                                    {notice.actionLabel}
+                                </button>
+                            )}
+                        </div>
                     </div>
                 )}
 

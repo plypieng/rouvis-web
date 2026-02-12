@@ -7,6 +7,8 @@ import { z } from 'zod';
 import { Loader2, ChevronDown, Info, Check, ArrowRight } from 'lucide-react';
 import { PREFECTURES, EXPERIENCE_OPTIONS, FARMING_TYPES, COMMON_CROPS } from '../../../lib/prefectures';
 import FieldMapEditor from '@/components/fields/FieldMapEditor';
+import { toastError } from '@/lib/feedback';
+import { trackUXEvent } from '@/lib/analytics';
 
 // Validation schemas
 const profileSchema = z.object({
@@ -217,6 +219,10 @@ export default function OnboardingPage() {
       } catch (error) {
         console.warn('Session update failed after profile save:', error);
       }
+      void trackUXEvent('onboarding_profile_saved', {
+        experience: profileData.experience || 'unknown',
+        farmingType: profileData.farmingType || 'unknown',
+      });
       setStep(3);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -228,9 +234,16 @@ export default function OnboardingPage() {
         });
         setErrors(newErrors);
       } else {
+        const message = getErrorMessage(err, 'プロフィールの保存に失敗しました。時間をおいて再試行してください。');
         setNotice({
           type: 'error',
-          message: getErrorMessage(err, 'プロフィールの保存に失敗しました。時間をおいて再試行してください。'),
+          message,
+        });
+        toastError(message, {
+          label: '再試行',
+          onClick: () => {
+            void handleProfileNext();
+          },
         });
       }
     } finally {
@@ -271,6 +284,11 @@ export default function OnboardingPage() {
       } catch (error) {
         console.warn('Session update failed after field save:', error);
       }
+      void trackUXEvent('onboarding_field_saved', {
+        mode: fieldEntryMode,
+        hasPolygon: Boolean(fieldData.polygon && fieldData.polygon.length > 2),
+        hasLocation: Boolean(fieldData.location),
+      });
       router.push(`/${locale}/projects/create`);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -283,9 +301,16 @@ export default function OnboardingPage() {
         setErrors(newErrors);
       } else {
         console.error('Field creation error:', err);
+        const message = getErrorMessage(err, '圃場の登録に失敗しました。入力内容を確認して再試行してください。');
         setNotice({
           type: 'error',
-          message: getErrorMessage(err, '圃場の登録に失敗しました。入力内容を確認して再試行してください。'),
+          message,
+        });
+        toastError(message, {
+          label: '再試行',
+          onClick: () => {
+            void handleFieldSubmit();
+          },
         });
       }
     } finally {
@@ -300,7 +325,15 @@ export default function OnboardingPage() {
     } catch (error) {
       console.warn('Session update failed before project creation redirect:', error);
     }
-    router.push(`/${locale}/projects/create`);
+    const destination = `/${locale}/projects/create`;
+    void trackUXEvent('onboarding_field_skipped', {
+      mode: fieldEntryMode,
+    });
+    void trackUXEvent('onboarding_completed', {
+      skippedField: true,
+      destination,
+    });
+    router.push(destination);
   };
 
   const setTodayDate = () => {

@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 
 import FieldSelector from './FieldSelector';
 import { toastError, toastSuccess } from '@/lib/feedback';
+import { trackUXEvent } from '@/lib/analytics';
 
 interface InitialProjectData {
     name?: string;
@@ -107,6 +108,10 @@ export default function CreateProjectForm({ locale, initialData }: { locale: str
             const successMessage = t('success');
             setNotice({ type: 'success', message: successMessage });
             toastSuccess(successMessage);
+            void trackUXEvent('project_created', {
+                flow: 'manual_form',
+                hasField: Boolean(formData.fieldId),
+            });
             router.push(`/${locale}/projects/${data.project.id}`);
             router.refresh();
         } catch (error) {

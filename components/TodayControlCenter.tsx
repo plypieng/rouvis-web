@@ -1,9 +1,10 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toastError, toastSuccess } from '@/lib/feedback';
+import { trackUXEvent } from '@/lib/analytics';
+import TrackedEventLink from './TrackedEventLink';
 
 type QuickTask = {
   id: string;
@@ -23,15 +24,24 @@ function buildTodayChatHref(locale: string): string {
 export default function TodayControlCenter({
   locale,
   quickTask,
+  hasCompletedTaskInitially = false,
 }: {
   locale: string;
   quickTask?: QuickTask | null;
+  hasCompletedTaskInitially?: boolean;
 }) {
   const router = useRouter();
   const [completing, setCompleting] = useState(false);
+  const [hasCompletedTask, setHasCompletedTask] = useState(hasCompletedTaskInitially);
+  const [notice, setNotice] = useState<{
+    type: 'success' | 'error';
+    message: string;
+    canRetry?: boolean;
+  } | null>(null);
 
   const handleQuickComplete = async () => {
     if (!quickTask?.id || completing) return;
+    setNotice(null);
     setCompleting(true);
 
     try {
@@ -47,9 +57,29 @@ export default function TodayControlCenter({
       }
 
       toastSuccess(`「${quickTask.title}」を完了にしました。`);
+      setNotice({
+        type: 'success',
+        message: `「${quickTask.title}」を完了にしました。`,
+      });
+      void trackUXEvent('task_completed', {
+        surface: 'today_control_center',
+        taskId: quickTask.id,
+      });
+      if (!hasCompletedTask) {
+        setHasCompletedTask(true);
+        void trackUXEvent('first_task_completed', {
+          surface: 'today_control_center',
+          taskId: quickTask.id,
+        });
+      }
       router.refresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'タスク更新に失敗しました';
+      setNotice({
+        type: 'error',
+        message,
+        canRetry: true,
+      });
       toastError(message, {
         label: '再試行',
         onClick: () => {
@@ -69,12 +99,14 @@ export default function TodayControlCenter({
       </div>
 
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-        <Link
+        <TrackedEventLink
           href={`/${locale}/records?action=log`}
+          eventName="today_control_log_clicked"
+          eventProperties={{ surface: 'today_control_center' }}
           className="flex min-h-[52px] items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100"
         >
           活動を記録
-        </Link>
+        </TrackedEventLink>
 
         <button
           type="button"
@@ -91,14 +123,41 @@ export default function TodayControlCenter({
               : '完了対象なし'}
         </button>
 
-        <Link
+        <TrackedEventLink
           href={buildTodayChatHref(locale)}
+          eventName="today_control_ai_clicked"
+          eventProperties={{ surface: 'today_control_center' }}
           data-testid="today-control-chat-link"
           className="flex min-h-[52px] items-center justify-center rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100"
         >
           AIに相談
-        </Link>
+        </TrackedEventLink>
       </div>
+
+      {notice && (
+        <div
+          className={`mt-3 rounded-lg border px-3 py-2 text-sm ${
+            notice.type === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : 'border-red-200 bg-red-50 text-red-700'
+          }`}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <span>{notice.message}</span>
+            {notice.canRetry && (
+              <button
+                type="button"
+                onClick={() => {
+                  void handleQuickComplete();
+                }}
+                className="rounded-md border border-current px-2 py-1 text-xs font-semibold hover:bg-white/40"
+              >
+                再試行
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {quickTask && (
         <p className="mt-3 text-xs text-gray-600">
