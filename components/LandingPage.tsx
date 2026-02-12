@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
@@ -13,16 +13,14 @@ import {
     Leaf,
     MapPinned,
     MessageSquareQuote,
-    PlayCircle,
     ShieldCheck,
     Sprout,
     Tractor,
 } from 'lucide-react';
-import { signIn } from 'next-auth/react';
-import { useSearchParams } from 'next/navigation';
 import { Noto_Sans_JP, Noto_Serif_JP } from 'next/font/google';
 import { Logo } from './Logo';
 import { useTranslations } from 'next-intl';
+import { DemoAutoStart } from './DemoAutoStart';
 
 interface LandingPageProps {
     locale: string;
@@ -42,41 +40,8 @@ const notoSerifJp = Noto_Serif_JP({
 
 export default function LandingPage({ locale }: LandingPageProps) {
     const t = useTranslations('landing');
-    const searchParams = useSearchParams();
-    const [isDemoLoading, setIsDemoLoading] = useState(false);
     const demoModeEnabled = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
     const isClosedBeta = true;
-
-    const handleStartDemo = useCallback(async () => {
-        setIsDemoLoading(true);
-        try {
-            let deviceId = localStorage.getItem('rouvis_demo_device_id');
-            if (!deviceId) {
-                deviceId = crypto.randomUUID();
-                localStorage.setItem('rouvis_demo_device_id', deviceId);
-            }
-
-            const result = await signIn('demo-device', {
-                deviceId,
-                callbackUrl: `/${locale}/onboarding`,
-                redirect: true,
-            });
-
-            if (result?.error) {
-                console.error('Demo login failed:', result.error);
-                setIsDemoLoading(false);
-            }
-        } catch (error) {
-            console.error('Demo error:', error);
-            setIsDemoLoading(false);
-        }
-    }, [locale]);
-
-    useEffect(() => {
-        if (searchParams.get('demo') === 'true' && demoModeEnabled) {
-            void handleStartDemo();
-        }
-    }, [searchParams, demoModeEnabled, handleStartDemo]);
 
     const painPoints = [
         {
@@ -207,22 +172,16 @@ export default function LandingPage({ locale }: LandingPageProps) {
                             </Link>
 
                             {demoModeEnabled ? (
-                                <button
-                                    onClick={() => {
-                                        void handleStartDemo();
-                                    }}
-                                    disabled={isDemoLoading}
-                                    className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-full border border-[#cfd8e4] bg-white px-7 py-3 text-base font-semibold text-slate-700 transition hover:border-[#9ebbe0] hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
-                                >
-                                    {isDemoLoading ? (
+                                <Suspense fallback={
+                                    <button
+                                        disabled
+                                        className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-full border border-[#cfd8e4] bg-white px-7 py-3 text-base font-semibold text-slate-700 opacity-60"
+                                    >
                                         <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
-                                    ) : (
-                                        <>
-                                            <PlayCircle className="h-5 w-5" />
-                                            <span>{t('hero.cta_demo')}</span>
-                                        </>
-                                    )}
-                                </button>
+                                    </button>
+                                }>
+                                    <DemoAutoStart locale={locale} />
+                                </Suspense>
                             ) : (
                                 <Link
                                     href={`/${locale}/login`}
