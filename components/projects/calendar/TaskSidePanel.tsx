@@ -20,7 +20,8 @@ interface Task {
 interface TaskSidePanelProps {
     selectedDate: Date;
     tasks: Task[];
-    onAddTask?: (date: Date) => void;
+    affectedTasks?: Array<{ id: string; title: string; dueDate: string }>;
+    onAddTask?: (date: Date, initialData?: { title: string; description?: string }) => void;
     onTaskComplete?: (taskId: string, status: string) => void;
 }
 
@@ -31,7 +32,7 @@ type ForecastDay = {
     icon?: string;
 };
 
-export default function TaskSidePanel({ selectedDate, tasks, onAddTask, onTaskComplete }: TaskSidePanelProps) {
+export default function TaskSidePanel({ selectedDate, tasks, affectedTasks = [], onAddTask, onTaskComplete }: TaskSidePanelProps) {
     const t = useTranslations('projects.calendar');
     const tProject = useTranslations('projects');
 
@@ -102,6 +103,17 @@ export default function TaskSidePanel({ selectedDate, tasks, onAddTask, onTaskCo
 
                 {/* Task List */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                    {affectedTasks.length > 0 && (
+                        <div className="rounded-lg border border-blue-100 bg-blue-50/70 p-3 text-xs text-blue-900">
+                            <p className="mb-1 font-semibold">{t('affected_tasks_title')}</p>
+                            <ul className="space-y-1">
+                                {affectedTasks.slice(0, 3).map((task) => (
+                                    <li key={task.id} className="truncate">• {task.title}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
                     {selectedTasks.length === 0 ? (
                         <div className="text-center py-8 text-gray-400">
                             <span className="material-symbols-outlined text-4xl mb-2 opacity-20">event_available</span>
