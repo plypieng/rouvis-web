@@ -21,10 +21,10 @@ type StageConfigItem = {
 type StageConfig = StageConfigItem[];
 
 const DEFAULT_STAGES: StageConfig = [
-  { key: 'seedling', label: 'Seedling', threshold: 20 },
-  { key: 'vegetative', label: 'Vegetative', threshold: 50 },
-  { key: 'flowering', label: 'Flowering', threshold: 80 },
-  { key: 'harvest', label: 'Harvest', threshold: 100 },
+  { key: 'seedling', threshold: 20 },
+  { key: 'vegetative', threshold: 50 },
+  { key: 'flowering', threshold: 80 },
+  { key: 'harvest', threshold: 100 },
 ];
 
 type KnowledgeStage = {
@@ -62,7 +62,12 @@ function getCurrentStage(progress: number, config: StageConfig): string {
   return config[config.length - 1].key;
 }
 
-function stageMilestones(stages: StageConfig, progress: number) {
+function stageMilestones(
+  stages: StageConfig,
+  progress: number,
+  fallbackLabel: (stageKey: string) => string,
+  personalizedLabel: string
+) {
   const currentStageKey = getCurrentStage(progress, stages);
   return stages.slice(0, 4).map((stage) => {
     let state: 'done' | 'current' | 'upcoming' = 'upcoming';
@@ -74,10 +79,10 @@ function stageMilestones(stages: StageConfig, progress: number) {
 
     return {
       id: stage.key,
-      label: stage.label || stage.key,
+      label: stage.label || fallbackLabel(stage.key),
       stage: normalizeCropStage(stage.key) as CropStage,
       state,
-      note: stage.personalized ? 'Personalized' : undefined,
+      note: stage.personalized ? personalizedLabel : undefined,
     };
   });
 }
@@ -91,6 +96,7 @@ function riskFromTimeline(progress: number, dayCount: number, totalDays: number)
 
 export default function ProjectHeader({ project, compact }: ProjectHeaderProps) {
   const t = useTranslations('projects');
+  const tw = useTranslations('workflow');
   const router = useRouter();
   const params = useParams<{ locale: string }>();
   const locale = (params?.locale as string) || 'ja';
@@ -214,6 +220,14 @@ export default function ProjectHeader({ project, compact }: ProjectHeaderProps) 
 
   const currentStage = getCurrentStage(progress, stages);
   const risk = riskFromTimeline(progress, dayCount, totalDays);
+  const dayLabel = totalDays > 0
+    ? tw('day_progress_with_total', { current: dayCount, total: totalDays })
+    : tw('day_progress_simple', { current: dayCount });
+
+  const localizedStageLabel = (stageKey: string) => {
+    const normalizedStage = normalizeCropStage(stageKey);
+    return tw(`stages.${normalizedStage}`);
+  };
 
   const seasonState = {
     ...buildSeasonRailState({
@@ -221,22 +235,23 @@ export default function ProjectHeader({ project, compact }: ProjectHeaderProps) 
       progress,
       dayCount,
       totalDays,
+      dayLabel,
+      milestoneLabels: {
+        seedling: tw('milestones.seedling'),
+        vegetative: tw('milestones.vegetative'),
+        flowering: tw('milestones.flowering'),
+        harvest: tw('milestones.harvest'),
+      },
       risk,
       windowLabel: project.targetHarvestDate
-        ? `${locale === 'ja' ? '収穫予定' : 'Target harvest'}: ${new Date(project.targetHarvestDate).toLocaleDateString(locale)}`
-        : locale === 'ja'
-          ? '収穫予定日が未設定です'
-          : 'Harvest date not set yet',
+        ? t('target_harvest_window', { date: new Date(project.targetHarvestDate).toLocaleDateString(locale) })
+        : t('target_harvest_missing'),
       note:
         risk === 'warning'
-          ? locale === 'ja'
-            ? '進行に遅れが出る前に今週の作業を再確認してください。'
-            : 'Review this week plan to avoid timeline slippage.'
-          : locale === 'ja'
-            ? '現在の進行は計画範囲内です。'
-            : 'Current progress is within planned range.',
+          ? t('timeline_warning_note')
+          : t('timeline_on_track_note'),
     }),
-    milestones: stageMilestones(stages, progress),
+    milestones: stageMilestones(stages, progress, localizedStageLabel, t('personalized')),
   };
 
   const actionMenu = (
@@ -280,7 +295,7 @@ export default function ProjectHeader({ project, compact }: ProjectHeaderProps) 
                 onClick={() => setIsExpanded((prev) => !prev)}
                 className="touch-target rounded-md p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
                 aria-expanded={isExpanded}
-                aria-label={isExpanded ? 'Collapse project details' : 'Expand project details'}
+                aria-label={isExpanded ? t('collapse_details') : t('expand_details')}
               >
                 <span className="material-symbols-outlined text-[20px]">{isExpanded ? 'expand_less' : 'expand_more'}</span>
               </button>
@@ -292,7 +307,7 @@ export default function ProjectHeader({ project, compact }: ProjectHeaderProps) 
                     setShowMenu((prev) => !prev);
                   }}
                   className="touch-target rounded-md p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
-                  aria-label="Project menu"
+                  aria-label={t('project_menu')}
                 >
                   <span className="material-symbols-outlined text-[20px]">more_vert</span>
                 </button>
@@ -302,12 +317,9 @@ export default function ProjectHeader({ project, compact }: ProjectHeaderProps) 
           </div>
 
           <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-            <span>
-              {locale === 'ja' ? `${dayCount}日目` : `Day ${dayCount}`}
-              {totalDays > 0 ? ` / ${totalDays}` : ''}
-            </span>
+            <span>{dayLabel}</span>
             <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${risk === 'safe' ? 'status-safe' : risk === 'watch' ? 'status-watch' : risk === 'warning' ? 'status-warning' : 'status-critical'}`}>
-              {currentStage}
+              {localizedStageLabel(currentStage)}
             </span>
           </div>
 
@@ -349,7 +361,7 @@ export default function ProjectHeader({ project, compact }: ProjectHeaderProps) 
             <button
               onClick={() => setShowMenu((prev) => !prev)}
               className="touch-target rounded-md p-2 text-muted-foreground hover:bg-secondary hover:text-foreground"
-              aria-label="Project menu"
+              aria-label={t('project_menu')}
             >
               <span className="material-symbols-outlined text-[20px]">more_vert</span>
             </button>

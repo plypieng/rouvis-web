@@ -1,6 +1,15 @@
 import type { CropStage, RiskTone, SeasonRailMilestone, SeasonRailState } from '@/types/ui-shell';
 
 const stageOrder: CropStage[] = ['seedling', 'vegetative', 'flowering', 'ripening', 'harvest'];
+type MilestoneStage = Extract<CropStage, 'seedling' | 'vegetative' | 'flowering' | 'harvest'>;
+
+export type SeasonMilestoneLabels = Record<MilestoneStage, string>;
+const defaultMilestoneLabels: SeasonMilestoneLabels = {
+  seedling: 'Seed prep',
+  vegetative: 'Canopy build',
+  flowering: 'Critical care',
+  harvest: 'Harvest prep',
+};
 
 const stageAliases: Array<{ stage: CropStage; matches: string[] }> = [
   { stage: 'dormant', matches: ['dormant', 'rest'] },
@@ -29,12 +38,17 @@ function milestoneState(targetStage: CropStage, currentStage: CropStage): Season
   return 'upcoming';
 }
 
-export function defaultMilestones(currentStage: CropStage): SeasonRailMilestone[] {
+export function defaultMilestones(
+  currentStage: CropStage,
+  labels?: Partial<SeasonMilestoneLabels>
+): SeasonRailMilestone[] {
+  const milestoneLabels = { ...defaultMilestoneLabels, ...labels };
+
   return [
-    { id: 'seedling', label: 'Seed prep', stage: 'seedling', state: milestoneState('seedling', currentStage) },
-    { id: 'vegetative', label: 'Canopy build', stage: 'vegetative', state: milestoneState('vegetative', currentStage) },
-    { id: 'flowering', label: 'Critical care', stage: 'flowering', state: milestoneState('flowering', currentStage) },
-    { id: 'harvest', label: 'Harvest prep', stage: 'harvest', state: milestoneState('harvest', currentStage) },
+    { id: 'seedling', label: milestoneLabels.seedling, stage: 'seedling', state: milestoneState('seedling', currentStage) },
+    { id: 'vegetative', label: milestoneLabels.vegetative, stage: 'vegetative', state: milestoneState('vegetative', currentStage) },
+    { id: 'flowering', label: milestoneLabels.flowering, stage: 'flowering', state: milestoneState('flowering', currentStage) },
+    { id: 'harvest', label: milestoneLabels.harvest, stage: 'harvest', state: milestoneState('harvest', currentStage) },
   ];
 }
 
@@ -50,20 +64,23 @@ export function buildSeasonRailState(params: {
   progress: number;
   dayCount: number;
   totalDays?: number;
+  dayLabel?: string;
   windowLabel?: string;
   risk?: RiskTone;
   note?: string;
+  milestoneLabels?: Partial<SeasonMilestoneLabels>;
 }): SeasonRailState {
   const normalizedStage = normalizeCropStage(params.stage);
   const totalDaysLabel = params.totalDays ? ` / ${Math.max(params.totalDays, 0)}d` : '';
+  const fallbackDayLabel = `Day ${Math.max(params.dayCount, 0)}${totalDaysLabel}`;
 
   return {
     stage: normalizedStage,
     completion: Math.max(0, Math.min(100, Number.isFinite(params.progress) ? params.progress : 0)),
-    dayLabel: `Day ${Math.max(params.dayCount, 0)}${totalDaysLabel}`,
+    dayLabel: params.dayLabel || fallbackDayLabel,
     windowLabel: params.windowLabel,
     risk: params.risk || riskFromProgress(params.progress),
     note: params.note,
-    milestones: defaultMilestones(normalizedStage),
+    milestones: defaultMilestones(normalizedStage, params.milestoneLabels),
   };
 }

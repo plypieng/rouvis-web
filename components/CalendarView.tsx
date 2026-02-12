@@ -51,6 +51,7 @@ function weekdayPalette(index: number): string {
 
 export function CalendarView({ tasks = [], locale }: CalendarViewProps) {
   const t = useTranslations();
+  const tw = useTranslations('workflow');
   const router = useRouter();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -112,7 +113,7 @@ export function CalendarView({ tasks = [], locale }: CalendarViewProps) {
     });
 
     if (!res.ok) {
-      alert('タスク更新に失敗しました');
+      alert(tw('calendar.task_update_failed'));
       return;
     }
 
@@ -133,16 +134,19 @@ export function CalendarView({ tasks = [], locale }: CalendarViewProps) {
     progress: Math.round((selectedDate.getDate() / Math.max(monthDayCount, 1)) * 100),
     dayCount: selectedDate.getDate(),
     totalDays: monthDayCount,
+    dayLabel: tw('day_progress_with_total', { current: selectedDate.getDate(), total: monthDayCount }),
+    milestoneLabels: {
+      seedling: tw('milestones.seedling'),
+      vegetative: tw('milestones.vegetative'),
+      flowering: tw('milestones.flowering'),
+      harvest: tw('milestones.harvest'),
+    },
     windowLabel: format(currentDate, locale === 'ja' ? 'yyyy年M月' : 'MMMM yyyy'),
     risk: selectedDayTasks.length > 4 ? 'warning' : selectedDayTasks.length > 1 ? 'watch' : 'safe',
     note:
       selectedDayTasks.length > 0
-        ? locale === 'ja'
-          ? `${selectedDayTasks.length}件の作業が選択日にあります。`
-          : `${selectedDayTasks.length} items scheduled for the selected day.`
-        : locale === 'ja'
-          ? '選択日に予定はありません。'
-          : 'No tasks on the selected day.',
+        ? tw('calendar.tasks_selected_note', { count: selectedDayTasks.length })
+        : tw('calendar.no_tasks_selected_note'),
   });
 
   return (
@@ -156,7 +160,7 @@ export function CalendarView({ tasks = [], locale }: CalendarViewProps) {
             onClick={previousMonth}
             className="touch-target rounded-lg border border-border bg-secondary px-3 py-2 text-sm font-semibold text-secondary-foreground hover:bg-secondary/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            {locale === 'ja' ? '前月' : 'Prev'}
+            {tw('calendar.prev_month')}
           </button>
 
           <div className="text-center">
@@ -169,7 +173,7 @@ export function CalendarView({ tasks = [], locale }: CalendarViewProps) {
               onClick={goToCurrentMonth}
               className="mt-2 rounded-full border border-border bg-background px-3 py-1 text-xs font-semibold text-foreground hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              {locale === 'ja' ? '今月に戻る' : 'Back to current month'}
+              {tw('calendar.back_to_current_month')}
             </button>
           </div>
 
@@ -178,7 +182,7 @@ export function CalendarView({ tasks = [], locale }: CalendarViewProps) {
             onClick={nextMonth}
             className="touch-target rounded-lg border border-border bg-secondary px-3 py-2 text-sm font-semibold text-secondary-foreground hover:bg-secondary/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            {locale === 'ja' ? '翌月' : 'Next'}
+            {tw('calendar.next_month')}
           </button>
         </div>
 
@@ -258,15 +262,15 @@ export function CalendarView({ tasks = [], locale }: CalendarViewProps) {
             href={`/${locale}/projects`}
             className="text-sm font-semibold text-brand-seedling hover:text-brand-seedling/80"
           >
-            {locale === 'ja' ? 'プロジェクト一覧' : 'Projects'}
+            {tw('calendar.projects')}
           </Link>
         </div>
 
         {selectedDayTasks.length === 0 ? (
           <div className="mt-3">
             <ModuleBlueprint
-              title={locale === 'ja' ? 'この日の予定はありません' : 'No tasks on this day'}
-              description={locale === 'ja' ? '別の日付を選ぶか、新しい作業を追加してください。' : 'Pick another date or add a task.'}
+              title={tw('calendar.no_tasks_for_day_title')}
+              description={tw('calendar.no_tasks_for_day_description')}
               tone="watch"
             />
           </div>
@@ -283,7 +287,7 @@ export function CalendarView({ tasks = [], locale }: CalendarViewProps) {
                         href={`/${locale}/projects/${task.projectId}`}
                         className="mt-1 inline-block text-xs font-semibold text-brand-seedling hover:text-brand-seedling/80"
                       >
-                        {locale === 'ja' ? 'プロジェクトを開く' : 'Open project'}
+                        {tw('calendar.open_project')}
                       </Link>
                     ) : null}
                   </div>
@@ -293,7 +297,7 @@ export function CalendarView({ tasks = [], locale }: CalendarViewProps) {
                     onClick={() => handleCompleteTask(task.id)}
                     className="touch-target rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    {locale === 'ja' ? '完了' : 'Done'}
+                    {tw('calendar.done')}
                   </button>
                 </div>
               </li>

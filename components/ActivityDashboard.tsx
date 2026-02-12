@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Activity, Calendar, Clock, MapPin, Plus, TrendingUp } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { ActivityFeedCard } from './ActivityFeedCard';
 import { TaskSchedulerCard } from './TaskSchedulerCard';
 import { FieldCard } from './FieldCard';
@@ -65,6 +66,7 @@ interface ActivityDashboardProps {
 }
 
 export function ActivityDashboard({ onLogActivity, onScheduleTask, onViewCalendar }: ActivityDashboardProps) {
+  const tw = useTranslations('workflow');
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [fields, setFields] = useState<Field[]>([]);
@@ -122,7 +124,7 @@ export function ActivityDashboard({ onLogActivity, onScheduleTask, onViewCalenda
       }
     } catch (err) {
       console.error('Failed to fetch dashboard data:', err);
-      setError('データの読み込みに失敗しました');
+      setError(tw('activity_dashboard.error_load_failed'));
     } finally {
       setLoading(false);
     }
@@ -141,7 +143,7 @@ export function ActivityDashboard({ onLogActivity, onScheduleTask, onViewCalenda
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        alert(data.error || 'タスク更新に失敗しました');
+        alert(data.error || tw('activity_dashboard.task_update_failed'));
         return;
       }
 
@@ -154,14 +156,14 @@ export function ActivityDashboard({ onLogActivity, onScheduleTask, onViewCalenda
   const deleteField = async (fieldId: string, fieldName: string) => {
     if (!fieldId || deletingFieldId === fieldId) return;
 
-    if (!confirm(`「${fieldName}」を削除しますか？\nこの操作は元に戻せません。`)) return;
+    if (!confirm(tw('activity_dashboard.delete_field_confirm', { name: fieldName }))) return;
 
     setDeletingFieldId(fieldId);
     try {
       const res = await fetch(`/api/v1/fields/${fieldId}`, { method: 'DELETE' });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        alert(data.error || '圃場の削除に失敗しました');
+        alert(data.error || tw('activity_dashboard.delete_field_failed'));
         return;
       }
 
@@ -224,7 +226,7 @@ export function ActivityDashboard({ onLogActivity, onScheduleTask, onViewCalenda
             }}
             className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
           >
-            再試行
+            {tw('activity_dashboard.retry')}
           </button>
         </div>
       </div>
@@ -240,12 +242,19 @@ export function ActivityDashboard({ onLogActivity, onScheduleTask, onViewCalenda
     progress: Math.min(100, Math.round((todayActivities.length / Math.max(todayActivities.length + upcomingTasks.length, 1)) * 100)),
     dayCount: todayActivities.length,
     totalDays: Math.max(upcomingTasks.length, 1),
-    windowLabel: 'Daily operations ledger',
+    dayLabel: tw('day_progress_with_total', { current: todayActivities.length, total: Math.max(upcomingTasks.length, 1) }),
+    milestoneLabels: {
+      seedling: tw('milestones.seedling'),
+      vegetative: tw('milestones.vegetative'),
+      flowering: tw('milestones.flowering'),
+      harvest: tw('milestones.harvest'),
+    },
+    windowLabel: tw('activity_dashboard.ledger_window'),
     risk: upcomingTasks.length > 4 ? 'warning' : upcomingTasks.length > 1 ? 'watch' : 'safe',
     note:
       upcomingTasks.length > 0
-        ? `今週 ${upcomingTasks.length} 件の保留タスクがあります。`
-        : '今週の保留タスクはありません。',
+        ? tw('activity_dashboard.pending_tasks_note', { count: upcomingTasks.length })
+        : tw('activity_dashboard.no_pending_tasks_note'),
   });
 
   return (
@@ -255,8 +264,8 @@ export function ActivityDashboard({ onLogActivity, onScheduleTask, onViewCalenda
       <div className="surface-base p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-xl font-semibold text-foreground">農業活動ダッシュボード</h2>
-            <p className="text-sm text-muted-foreground">今日の活動状況と今後の予定を確認</p>
+            <h2 className="text-xl font-semibold text-foreground">{tw('activity_dashboard.title')}</h2>
+            <p className="text-sm text-muted-foreground">{tw('activity_dashboard.subtitle')}</p>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -265,14 +274,14 @@ export function ActivityDashboard({ onLogActivity, onScheduleTask, onViewCalenda
               className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
             >
               <Plus className="h-4 w-4" />
-              活動を記録
+              {tw('activity_dashboard.log_activity')}
             </button>
             <button
               onClick={onScheduleTask}
               className="inline-flex items-center gap-2 rounded-lg border border-border bg-secondary px-4 py-2 text-sm font-semibold text-secondary-foreground hover:bg-secondary/75"
             >
               <Calendar className="h-4 w-4" />
-              タスクを予定
+              {tw('activity_dashboard.schedule_task')}
             </button>
           </div>
         </div>
@@ -286,7 +295,7 @@ export function ActivityDashboard({ onLogActivity, onScheduleTask, onViewCalenda
             </div>
             <div>
               <p className="text-2xl font-semibold text-foreground">{todayActivities.length}</p>
-              <p className="text-sm text-muted-foreground">今日の活動</p>
+              <p className="text-sm text-muted-foreground">{tw('activity_dashboard.stats.today_activities')}</p>
             </div>
           </div>
         </div>
@@ -298,7 +307,7 @@ export function ActivityDashboard({ onLogActivity, onScheduleTask, onViewCalenda
             </div>
             <div>
               <p className="text-2xl font-semibold text-foreground">{upcomingTasks.length}</p>
-              <p className="text-sm text-muted-foreground">今週のタスク</p>
+              <p className="text-sm text-muted-foreground">{tw('activity_dashboard.stats.this_week_tasks')}</p>
             </div>
           </div>
         </div>
@@ -310,7 +319,7 @@ export function ActivityDashboard({ onLogActivity, onScheduleTask, onViewCalenda
             </div>
             <div>
               <p className="text-2xl font-semibold text-foreground">{fields.length}</p>
-              <p className="text-sm text-muted-foreground">管理圃場</p>
+              <p className="text-sm text-muted-foreground">{tw('activity_dashboard.stats.managed_fields')}</p>
             </div>
           </div>
         </div>
@@ -322,7 +331,7 @@ export function ActivityDashboard({ onLogActivity, onScheduleTask, onViewCalenda
             </div>
             <div>
               <p className="text-2xl font-semibold text-foreground">{activities.filter((activity) => activity.status === 'completed').length}</p>
-              <p className="text-sm text-muted-foreground">完了活動</p>
+              <p className="text-sm text-muted-foreground">{tw('activity_dashboard.stats.completed_activities')}</p>
             </div>
           </div>
         </div>
@@ -331,9 +340,9 @@ export function ActivityDashboard({ onLogActivity, onScheduleTask, onViewCalenda
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <section className="space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-foreground">最近の活動</h3>
+            <h3 className="text-lg font-semibold text-foreground">{tw('activity_dashboard.sections.recent_activity')}</h3>
             <button onClick={onViewCalendar} className="text-sm font-semibold text-brand-seedling hover:text-brand-seedling/80">
-              カレンダーを見る
+              {tw('activity_dashboard.sections.view_calendar')}
             </button>
           </div>
           <div className="surface-base p-3">
@@ -343,17 +352,17 @@ export function ActivityDashboard({ onLogActivity, onScheduleTask, onViewCalenda
 
         <section className="space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-foreground">今後のタスク</h3>
+            <h3 className="text-lg font-semibold text-foreground">{tw('activity_dashboard.sections.upcoming_tasks')}</h3>
             <button onClick={onScheduleTask} className="text-sm font-semibold text-brand-seedling hover:text-brand-seedling/80">
-              新規予定
+              {tw('activity_dashboard.sections.new_schedule')}
             </button>
           </div>
 
           <div className="space-y-3">
             {upcomingTasks.length === 0 ? (
               <ModuleBlueprint
-                title="今週の予定されたタスクはありません"
-                description="新しい作業を登録すると、ここに優先順で表示されます。"
+                title={tw('activity_dashboard.blueprint.title')}
+                description={tw('activity_dashboard.blueprint.description')}
                 tone="safe"
               />
             ) : (
@@ -377,7 +386,7 @@ export function ActivityDashboard({ onLogActivity, onScheduleTask, onViewCalenda
       </div>
 
       <section className="space-y-3">
-        <h3 className="text-lg font-semibold text-foreground">圃場状況</h3>
+        <h3 className="text-lg font-semibold text-foreground">{tw('activity_dashboard.sections.field_status')}</h3>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {fieldStatus.map((field) => {
             const areaSqm = field.area_sqm ?? field.area;
@@ -430,7 +439,7 @@ export function ActivityDashboard({ onLogActivity, onScheduleTask, onViewCalenda
 
             if (!res.ok) {
               const payload = await res.json().catch(() => ({}));
-              throw new Error(payload.error || 'Failed to update field');
+              throw new Error(payload.error || tw('activity_dashboard.update_field_failed'));
             }
 
             setEditingField(null);

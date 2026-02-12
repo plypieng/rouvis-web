@@ -275,11 +275,17 @@
   },
   "fields": {
     "title": "Field Management",
+    "add_new": "Add New Field",
     "add_field": "Add Field",
     "create_field": "Create Field",
     "edit_field": "Edit Field",
     "update_field": "Update Field",
     "delete_field": "Delete Field",
+    "name_label": "Field Name",
+    "name_placeholder": "e.g. North Rice Field",
+    "crop_label": "Crop Type",
+    "area_label": "Area",
+    "color_label": "Color",
     "field_name": "Field Name",
     "field_name_placeholder": "e.g. North Rice Field",
     "crop": "Crop",
@@ -308,7 +314,13 @@
     "last_updated": "Last Updated",
     "current_crop": "Current Crop",
     "legend": "Legend",
-    "delete_confirm": "Are you sure you want to delete this field? This action cannot be undone."
+    "delete_confirm": "Are you sure you want to delete this field? This action cannot be undone.",
+    "save_error": "Failed to save field",
+    "map_draw_first_note": "Draw your first field to start map operations.",
+    "map_boundaries_note": "{mapped}/{total} fields include mapped boundaries.",
+    "no_fields_mapped": "No fields mapped yet.",
+    "recenter_map": "Recenter Map",
+    "auto_calculated": "Auto-calculated"
   },
   "rotation": {
     "title": "Crop Rotation Planning",
@@ -648,9 +660,87 @@
   },
   "workflow": {
     "season_rail": "Season Rail",
+    "season_rail_aria": "Season rail",
     "field_operations": "Field Operations",
     "module_blueprint_title": "Module setup required",
-    "module_blueprint_description": "Finish initial setup to activate this workflow module."
+    "module_blueprint_description": "Finish initial setup to activate this workflow module.",
+    "risk": {
+      "safe": "Stable",
+      "watch": "Watch",
+      "warning": "Warning",
+      "critical": "Critical"
+    },
+    "stages": {
+      "dormant": "Dormant",
+      "seedling": "Seedling",
+      "vegetative": "Vegetative",
+      "flowering": "Flowering",
+      "ripening": "Ripening",
+      "harvest": "Harvest"
+    },
+    "milestones": {
+      "seedling": "Seed prep",
+      "vegetative": "Canopy build",
+      "flowering": "Critical care",
+      "harvest": "Harvest prep"
+    },
+    "day_progress_simple": "Day {current}",
+    "day_progress_with_total": "Day {current} / {total}d",
+    "weather": {
+      "high": "High",
+      "low": "Low"
+    },
+    "dashboard": {
+      "window_weather": "{location} · {highLabel} {high}° / {lowLabel} {low}°",
+      "overdue_note": "{count} overdue tasks need recovery",
+      "on_track_note": "Clear priority items early to keep this week on track.",
+      "alerts": "{count} alerts"
+    },
+    "calendar": {
+      "prev_month": "Prev",
+      "next_month": "Next",
+      "back_to_current_month": "Back to current month",
+      "projects": "Projects",
+      "no_tasks_for_day_title": "No tasks on this day",
+      "no_tasks_for_day_description": "Pick another date or add a task.",
+      "open_project": "Open project",
+      "done": "Done",
+      "task_update_failed": "Failed to update task",
+      "tasks_selected_note": "{count} items scheduled for the selected day.",
+      "no_tasks_selected_note": "No tasks on the selected day."
+    },
+    "activity_dashboard": {
+      "error_load_failed": "Failed to load dashboard data.",
+      "task_update_failed": "Failed to update task",
+      "delete_field_confirm": "Delete \"{name}\"? This action cannot be undone.",
+      "delete_field_failed": "Failed to delete field",
+      "update_field_failed": "Failed to update field",
+      "retry": "Retry",
+      "ledger_window": "Daily operations ledger",
+      "pending_tasks_note": "{count} pending tasks this week.",
+      "no_pending_tasks_note": "No pending tasks this week.",
+      "title": "Farm Activity Dashboard",
+      "subtitle": "Review today's operations and upcoming plans",
+      "log_activity": "Log Activity",
+      "schedule_task": "Schedule Task",
+      "stats": {
+        "today_activities": "Today's Activities",
+        "this_week_tasks": "This Week's Tasks",
+        "managed_fields": "Managed Fields",
+        "completed_activities": "Completed Activities"
+      },
+      "sections": {
+        "recent_activity": "Recent Activity",
+        "view_calendar": "View Calendar",
+        "upcoming_tasks": "Upcoming Tasks",
+        "new_schedule": "New Schedule",
+        "field_status": "Field Status"
+      },
+      "blueprint": {
+        "title": "No tasks are scheduled for this week",
+        "description": "When you add new work, it appears here in priority order."
+      }
+    }
   },
   "privacy_policy": {
     "title": "Privacy Policy",

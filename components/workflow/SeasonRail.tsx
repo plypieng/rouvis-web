@@ -1,13 +1,7 @@
-import type { CropStage, RiskTone, SeasonRailProps } from '@/types/ui-shell';
+'use client';
 
-const stageLabels: Record<CropStage, string> = {
-  dormant: 'Dormant',
-  seedling: 'Seedling',
-  vegetative: 'Vegetative',
-  flowering: 'Flowering',
-  ripening: 'Ripening',
-  harvest: 'Harvest',
-};
+import { useTranslations } from 'next-intl';
+import type { CropStage, RiskTone, SeasonRailProps } from '@/types/ui-shell';
 
 const riskToneClass: Record<RiskTone, string> = {
   safe: 'status-safe',
@@ -29,18 +23,21 @@ function milestoneClass(state: 'upcoming' | 'current' | 'done'): string {
 }
 
 export function SeasonRail({ state, orientation = 'horizontal', className }: SeasonRailProps) {
+  const t = useTranslations('workflow');
   const completion = Math.max(0, Math.min(100, state.completion));
+  const stageLabel = (stage: CropStage) => t(`stages.${stage}`);
+  const riskLabel = (risk: RiskTone) => t(`risk.${risk}`);
 
   if (orientation === 'vertical') {
     return (
-      <aside className={`surface-base p-4 ${className || ''}`} aria-label="Season rail">
+      <aside className={`surface-base p-4 ${className || ''}`} aria-label={t('season_rail_aria')}>
         <div className="mb-4 flex items-center justify-between gap-2">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">Season Rail</p>
-            <h3 className="text-base font-semibold text-foreground">{stageLabels[state.stage]}</h3>
+            <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">{t('season_rail')}</p>
+            <h3 className="text-base font-semibold text-foreground">{stageLabel(state.stage)}</h3>
           </div>
           <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${riskToneClass[state.risk]}`}>
-            {state.risk}
+            {riskLabel(state.risk)}
           </span>
         </div>
 
@@ -56,7 +53,7 @@ export function SeasonRail({ state, orientation = 'horizontal', className }: Sea
           {state.milestones.map((milestone) => (
             <li key={milestone.id} className={`rounded-lg border px-3 py-2 text-xs ${milestoneClass(milestone.state)}`}>
               <p className="font-semibold">{milestone.label}</p>
-              <p className="mt-0.5 uppercase tracking-[0.08em] opacity-80">{stageLabels[milestone.stage]}</p>
+              <p className="mt-0.5 uppercase tracking-[0.08em] opacity-80">{stageLabel(milestone.stage)}</p>
               {milestone.note ? <p className="mt-1 opacity-90">{milestone.note}</p> : null}
             </li>
           ))}
@@ -68,14 +65,14 @@ export function SeasonRail({ state, orientation = 'horizontal', className }: Sea
   }
 
   return (
-    <section className={`surface-base p-4 ${className || ''}`} aria-label="Season rail">
+    <section className={`surface-base p-4 ${className || ''}`} aria-label={t('season_rail_aria')}>
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">Season Rail</p>
-          <p className="text-sm font-semibold text-foreground">{stageLabels[state.stage]} · {state.dayLabel}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">{t('season_rail')}</p>
+          <p className="text-sm font-semibold text-foreground">{stageLabel(state.stage)} · {state.dayLabel}</p>
           {state.windowLabel ? <p className="text-xs text-muted-foreground">{state.windowLabel}</p> : null}
         </div>
-        <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${riskToneClass[state.risk]}`}>{state.risk}</span>
+        <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${riskToneClass[state.risk]}`}>{riskLabel(state.risk)}</span>
       </div>
 
       <div className="mb-3 h-2 overflow-hidden rounded-full bg-secondary">
@@ -86,7 +83,7 @@ export function SeasonRail({ state, orientation = 'horizontal', className }: Sea
         {state.milestones.map((milestone) => (
           <li key={milestone.id} className={`rounded-lg border px-2.5 py-2 ${milestoneClass(milestone.state)}`}>
             <p className="font-semibold">{milestone.label}</p>
-            <p className="mt-0.5 uppercase tracking-[0.08em] opacity-80">{stageLabels[milestone.stage]}</p>
+            <p className="mt-0.5 uppercase tracking-[0.08em] opacity-80">{stageLabel(milestone.stage)}</p>
           </li>
         ))}
       </ol>

@@ -30,6 +30,7 @@ interface FieldFormData {
 
 export default function MapTab() {
     const t = useTranslations('fields');
+    const tw = useTranslations('workflow');
     const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
     const mapRef = useRef<HTMLDivElement>(null);
     const polygonsRef = useRef<{ [key: string]: google.maps.Polygon }>({});
@@ -98,13 +99,13 @@ export default function MapTab() {
                 body: JSON.stringify(payload),
             });
 
-            if (!res.ok) throw new Error('Failed to save field');
+            if (!res.ok) throw new Error(t('save_error'));
 
             await refreshFields();
             setIsModalOpen(false);
         } catch (error) {
             console.error('Error saving field:', error);
-            alert('Failed to save field');
+            alert(t('save_error'));
         } finally {
             setIsSubmitting(false);
         }
@@ -289,11 +290,18 @@ export default function MapTab() {
         progress: Math.round((mappedFields / Math.max(fields.length, 1)) * 100),
         dayCount: mappedFields,
         totalDays: Math.max(fields.length, 1),
+        dayLabel: tw('day_progress_with_total', { current: mappedFields, total: Math.max(fields.length, 1) }),
+        milestoneLabels: {
+            seedling: tw('milestones.seedling'),
+            vegetative: tw('milestones.vegetative'),
+            flowering: tw('milestones.flowering'),
+            harvest: tw('milestones.harvest'),
+        },
         windowLabel: t('title'),
         risk: fields.length === 0 ? 'watch' : mappedFields < fields.length ? 'warning' : 'safe',
         note: fields.length === 0
-            ? 'Draw your first field to start map operations.'
-            : `${mappedFields}/${fields.length} fields include mapped boundaries.`,
+            ? t('map_draw_first_note')
+            : t('map_boundaries_note', { mapped: mappedFields, total: fields.length }),
     });
 
     return (
@@ -307,7 +315,7 @@ export default function MapTab() {
                 {/* Empty State / Instructions if no fields */}
                 {fields.length === 0 && (
                     <div className="absolute left-4 right-4 top-4 rounded-lg border border-border bg-card/90 p-3 text-center shadow-lift1 backdrop-blur">
-                        <p className="text-sm text-muted-foreground">No fields mapped yet.</p>
+                        <p className="text-sm text-muted-foreground">{t('no_fields_mapped')}</p>
                     </div>
                 )}
 
@@ -315,7 +323,7 @@ export default function MapTab() {
                 <button
                     onClick={handleRecenter}
                     className="touch-target absolute right-4 top-4 rounded-full border border-border bg-card p-2 text-foreground shadow-lift1 hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    title="Recenter Map"
+                    title={t('recenter_map')}
                 >
                     <span className="material-symbols-outlined">my_location</span>
                 </button>
@@ -437,7 +445,7 @@ export default function MapTab() {
                                         className="control-inset w-full bg-secondary px-3 py-2"
                                         value={formData.area}
                                         readOnly
-                                        placeholder="Auto-calculated"
+                                        placeholder={t('auto_calculated')}
                                     />
                                 </div>
                                 <div>

@@ -1,6 +1,7 @@
 import { AdvisorStrip } from './AdvisorStrip';
 import PriorityTaskBubble from './PriorityTaskBubble';
 import DashboardCalendar from './DashboardCalendar';
+import { getTranslations } from 'next-intl/server';
 import { SeasonRail } from '@/components/workflow/SeasonRail';
 import { buildSeasonRailState } from '@/lib/workflow-ui';
 import type { RiskTone } from '@/types/ui-shell';
@@ -23,8 +24,9 @@ interface Task {
 }
 
 export default async function DashboardHeader({ locale, weather, tasks }: { locale: string; weather: WeatherData; tasks: Task[] }) {
-  const lowLabel = locale === 'ja' ? '最低' : 'Low';
-  const highLabel = locale === 'ja' ? '最高' : 'High';
+  const tw = await getTranslations({ locale, namespace: 'workflow' });
+  const lowLabel = tw('weather.low');
+  const highLabel = tw('weather.high');
 
   // Find today's priority task
   const today = new Date();
@@ -63,13 +65,24 @@ export default async function DashboardHeader({ locale, weather, tasks }: { loca
     progress: completedTodayRatio,
     dayCount: dayOfYear,
     totalDays: 365,
-    windowLabel: `${weather.location} · ${highLabel} ${Math.round(weather.temperature.max)}° / ${lowLabel} ${Math.round(weather.temperature.min)}°`,
+    dayLabel: tw('day_progress_with_total', { current: dayOfYear, total: 365 }),
+    milestoneLabels: {
+      seedling: tw('milestones.seedling'),
+      vegetative: tw('milestones.vegetative'),
+      flowering: tw('milestones.flowering'),
+      harvest: tw('milestones.harvest'),
+    },
+    windowLabel: tw('dashboard.window_weather', {
+      location: weather.location,
+      highLabel,
+      high: Math.round(weather.temperature.max),
+      lowLabel,
+      low: Math.round(weather.temperature.min),
+    }),
     risk: riskTone,
     note: overdueCount > 0
-      ? `${overdueCount} ${locale === 'ja' ? '件の期限超過タスクがあります' : 'overdue tasks need recovery'}`
-      : locale === 'ja'
-        ? '今日の重点タスクを先に完了させると遅延を防げます'
-        : 'Clear priority items early to keep this week on track.',
+      ? tw('dashboard.overdue_note', { count: overdueCount })
+      : tw('dashboard.on_track_note'),
   });
 
   return (
@@ -78,7 +91,7 @@ export default async function DashboardHeader({ locale, weather, tasks }: { loca
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              {locale === 'ja' ? '圃場オペレーション' : 'Field Operations'}
+              {tw('field_operations')}
             </p>
             <h2 className="text-xl font-semibold text-foreground">
               {weather.location}
@@ -93,7 +106,7 @@ export default async function DashboardHeader({ locale, weather, tasks }: { loca
             </span>
             {(weather.alerts?.length || 0) > 0 && (
               <span className="status-warning rounded-full px-3 py-1 text-xs font-semibold">
-                {locale === 'ja' ? `警戒 ${weather.alerts?.length} 件` : `${weather.alerts?.length} alerts`}
+                {tw('dashboard.alerts', { count: weather.alerts?.length || 0 })}
               </span>
             )}
           </div>
