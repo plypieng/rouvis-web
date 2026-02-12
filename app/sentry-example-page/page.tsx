@@ -19,15 +19,9 @@ export default function Page() {
   const [hasSentError, setHasSentError] = useState(false);
   const [isConnected, setIsConnected] = useState(true);
 
-  if (!isSentryExampleEnabled) {
-    return (
-      <main className="p-6">
-        <p>Sentry example is disabled.</p>
-      </main>
-    );
-  }
-
   useEffect(() => {
+    if (!isSentryExampleEnabled) return;
+
     Sentry.logger.info("Sentry example page loaded");
     async function checkConnectivity() {
       const result = await Sentry.diagnoseSdkConnectivity();
@@ -35,6 +29,14 @@ export default function Page() {
     }
     checkConnectivity();
   }, []);
+
+  if (!isSentryExampleEnabled) {
+    return (
+      <main className="p-6">
+        <p>Sentry example is disabled.</p>
+      </main>
+    );
+  }
 
   return (
     <div>
