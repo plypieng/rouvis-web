@@ -89,7 +89,7 @@
       "activity": "活動記録を1件残す"
     },
     "command_center": {
-      "title": "Today Command Center",
+      "title": "本日のダンドリ",
       "log_activity": "活動を記録",
       "ask_ai": "AIに相談",
       "open_project": "プロジェクトを開く",
@@ -102,9 +102,9 @@
         "update_failed": "タスク更新に失敗しました。"
       },
       "new": {
-        "badge": "新規モード",
+        "badge": "ガイドモード",
         "helper": "まずは1件だけ終わらせましょう。迷ったら下の2つから選べます。",
-        "recommended_label": "最初にやる1件",
+        "recommended_label": "現在の推奨作業",
         "complete_action": "この作業を完了にする",
         "empty_title": "今日の緊急作業はありません。",
         "empty_body": "余裕があるうちに記録を残すか、AIと次の段取りを確認しましょう。",
@@ -116,8 +116,8 @@
         "remaining": "残タスク",
         "overdue": "期限超過",
         "done": "完了",
-        "queue_title": "優先キュー",
-        "empty": "本日の優先キューは空です。",
+        "queue_title": "着手リスト",
+        "empty": "本日の着手リストは空です。",
         "actions": {
           "open_calendar": "残り{count}件を進める",
           "log_activity": "今日の活動を記録する",
