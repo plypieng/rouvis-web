@@ -273,6 +273,8 @@ test.describe('Farmer UI mode flows', () => {
 
     await page.goto('/ja');
     await expect(page.getByTestId('dashboard-mode-new')).toBeVisible();
+    await expect(page.getByTestId('today-command-center')).toBeVisible();
+    await expect(page.getByTestId('today-command-center-new')).toBeVisible();
     await expect(page.getByTestId('season-rail-disclosure')).toBeVisible();
     await expect(page.getByTestId('season-rail-expanded')).not.toBeVisible();
     await expect(page.getByText('Invalid Date')).toHaveCount(0);
@@ -295,6 +297,8 @@ test.describe('Farmer UI mode flows', () => {
 
     await page.goto('/ja');
     await expect(page.getByTestId('dashboard-mode-veteran')).toBeVisible();
+    await expect(page.getByTestId('today-command-center')).toBeVisible();
+    await expect(page.getByTestId('today-command-center-veteran')).toBeVisible();
     await expect(page.getByTestId('season-rail-expanded')).toBeVisible();
     await expect(page.getByTestId('season-rail-disclosure')).toHaveCount(0);
     await expect(page.getByText('Invalid Date')).toHaveCount(0);

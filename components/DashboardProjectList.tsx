@@ -3,8 +3,7 @@ import { getTranslations } from 'next-intl/server';
 import { cookies } from 'next/headers';
 
 import DashboardHeader from './DashboardHeader';
-import TodayFocus from './TodayFocus';
-import TodayControlCenter from './TodayControlCenter';
+import TodayCommandCenter, { type TodayCommandTask } from './TodayCommandCenter';
 import FirstWeekChecklist, { type ChecklistItem } from './FirstWeekChecklist';
 import TrackedEventLink from './TrackedEventLink';
 import { resolveFarmerUiMode } from '@/lib/farmerUiMode';
@@ -440,30 +439,23 @@ export default async function DashboardProjectList({
     const activationProjectId = activationTask?.projectId || activationContext?.projectId || null;
     const activationProjectHref = activationProjectId ? `/${locale}/projects/${activationProjectId}` : `/${locale}/projects`;
 
-    const focusTaskId = activationTask && dueTodayOrOverduePendingTasks.some((task) => task.id === activationTask.id)
-        ? activationTask.id
-        : null;
-    const quickTaskSource = activationTask || dueTodayOrOverduePendingTasks[0] || null;
-
-    const todayFocusTasks = dueTodayOrOverduePendingTasks.map((task) => ({
+    const recommendedTaskSource = activationTask || dueTodayOrOverduePendingTasks[0] || null;
+    const todayCommandTasks: TodayCommandTask[] = dueTodayOrOverduePendingTasks.map((task) => ({
         id: task.id,
         title: task.title,
-        dueDate: task.dueAt,
-        status: task.status,
-        priority: 'medium',
+        dueAt: task.dueAt,
         projectId: task.projectId,
-        project: task.projectName ? { name: task.projectName } : undefined,
+        projectName: task.projectName,
     }));
-
-    const quickTask = quickTaskSource
+    const recommendedTask: TodayCommandTask | null = recommendedTaskSource
         ? {
-            id: quickTaskSource.id,
-            title: quickTaskSource.title,
-            projectName: quickTaskSource.projectName,
+            id: recommendedTaskSource.id,
+            title: recommendedTaskSource.title,
+            dueAt: recommendedTaskSource.dueAt,
+            projectId: recommendedTaskSource.projectId,
+            projectName: recommendedTaskSource.projectName,
         }
         : null;
-
-    const simplifiedFocusTasks = todayFocusTasks.slice(0, 3);
 
     const completedTaskExists = completedTasks.length > 0;
     const activitiesCount = activities.length;
@@ -514,33 +506,6 @@ export default async function DashboardProjectList({
 
     const todayProgressTotal = todayTasks.length;
     const todayProgressDone = todayCompletedTasks.length;
-    const todayProgressPercent = todayProgressTotal === 0
-        ? 0
-        : Math.round((todayProgressDone / todayProgressTotal) * 100);
-
-    const dailyLoopAction = dueTodayOrOverduePendingTasks.length > 0
-        ? {
-            label: t('daily_loop.action_pending', { count: dueTodayOrOverduePendingTasks.length }),
-            href: `/${locale}/calendar`,
-            eventName: 'daily_loop_focus_clicked',
-            className: 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100',
-            helper: t('daily_loop.helper_pending'),
-        }
-        : todayProgressDone > 0
-            ? {
-                label: t('daily_loop.action_log'),
-                href: `/${locale}/records?action=log`,
-                eventName: 'daily_loop_log_clicked',
-                className: 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
-                helper: t('daily_loop.helper_log'),
-            }
-            : {
-                label: t('daily_loop.action_ai'),
-                href: buildTodayChatHref(locale, t('chat_prompts.today_priority')),
-                eventName: 'daily_loop_ai_clicked',
-                className: 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100',
-                helper: t('daily_loop.helper_ai'),
-            };
 
     const weatherAlertCount = weather.alerts?.length || 0;
     const dashboardRiskTone = buildRiskTone({
@@ -646,39 +611,18 @@ export default async function DashboardProjectList({
         </>
     );
 
-    const dailyLoopSection = (
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="mb-3 flex items-center justify-between gap-3">
-                <h2 className="text-base font-bold text-slate-900">{t('daily_loop.title')}</h2>
-                <span className="text-xs text-slate-500">
-                    {t('daily_loop.progress', { done: todayProgressDone, total: todayProgressTotal || 0 })}
-                </span>
-            </div>
-            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                <div
-                    className="h-full rounded-full bg-emerald-500 transition-all"
-                    style={{ width: `${todayProgressPercent}%` }}
-                />
-            </div>
-            <p className="mt-3 text-sm text-slate-700">{dailyLoopAction.helper}</p>
-            <TrackedEventLink
-                href={dailyLoopAction.href}
-                eventName={dailyLoopAction.eventName}
-                className={`mt-3 inline-flex min-h-[44px] items-center justify-center rounded-xl border px-3 py-2 text-sm font-semibold transition ${dailyLoopAction.className}`}
-            >
-                {dailyLoopAction.label}
-            </TrackedEventLink>
-        </section>
-    );
-
     return (
         <div className="min-h-screen bg-background font-sans">
             <DashboardHeader locale={locale} weather={weather} tasks={pendingTasks} mode={resolvedUiMode} />
 
             <main className="container mx-auto max-w-7xl space-y-8 px-4 py-8" data-testid={dashboardModeTestId}>
-                <TodayControlCenter
+                <TodayCommandCenter
                     locale={locale}
-                    quickTask={quickTask}
+                    mode={resolvedUiMode}
+                    todayTasks={todayCommandTasks}
+                    recommendedTask={recommendedTask}
+                    todayProgressDone={todayProgressDone}
+                    todayProgressTotal={todayProgressTotal}
                     hasCompletedTaskInitially={completedTaskExists}
                 />
 
@@ -700,8 +644,6 @@ export default async function DashboardProjectList({
                 )}
 
                 {isVeteranMode && contextualBannerSections}
-
-                {isVeteranMode && dailyLoopSection}
 
                 <section data-testid="dashboard-ops-window" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                     <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
@@ -769,46 +711,6 @@ export default async function DashboardProjectList({
                 </section>
 
                 {isVeteranMode && <FirstWeekChecklist items={checklistItems} show={showFirstWeekChecklist} />}
-
-                {isVeteranMode && todayFocusTasks.length > 0 && (
-                    <TodayFocus
-                        tasks={todayFocusTasks}
-                        locale={locale}
-                        highlightTaskId={focusTaskId}
-                        hasCompletedTaskInitially={completedTaskExists}
-                    />
-                )}
-
-                {!isVeteranMode && (
-                    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <div className="mb-3 flex items-center justify-between gap-3">
-                            <h2 className="text-base font-bold text-slate-900">{t('modes.new_focus_title')}</h2>
-                            <span className="text-xs text-slate-500">{t('modes.new_focus_count', { count: simplifiedFocusTasks.length })}</span>
-                        </div>
-                        <p className="text-sm text-slate-600">{t('modes.new_focus_helper')}</p>
-                        {simplifiedFocusTasks.length > 0 ? (
-                            <div className="mt-3 space-y-2">
-                                {simplifiedFocusTasks.map((task) => (
-                                    <div key={task.id} className="rounded-lg border border-slate-200 px-3 py-2">
-                                        <p className="text-sm font-semibold text-slate-900">{task.title}</p>
-                                        <p className="mt-1 text-xs text-slate-600">
-                                            {task.project?.name || t('ops_window.unassigned_project')} · {toDateLabel(task.dueDate, locale, t('ops_window.unscheduled'))}
-                                        </p>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <p className="mt-3 text-sm text-emerald-700">{t('modes.new_focus_empty')}</p>
-                        )}
-                        <TrackedEventLink
-                            href={`/${locale}/calendar`}
-                            eventName="dashboard_new_focus_open_calendar"
-                            className="mt-3 inline-flex min-h-[44px] items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-100"
-                        >
-                            {t('modes.new_focus_action')}
-                        </TrackedEventLink>
-                    </section>
-                )}
 
                 {!isVeteranMode && <FirstWeekChecklist items={checklistItems} show={showFirstWeekChecklist} />}
 
@@ -952,7 +854,6 @@ export default async function DashboardProjectList({
                         <p className="mt-1 text-sm text-slate-600">{t('modes.new_advanced_helper')}</p>
                         <div className="mt-4 space-y-4">
                             {contextualBannerSections}
-                            {dailyLoopSection}
                         </div>
                     </details>
                 )}

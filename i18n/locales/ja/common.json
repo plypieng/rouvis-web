@@ -88,15 +88,47 @@
       "task_complete": "タスクを1件完了",
       "activity": "活動記録を1件残す"
     },
-    "daily_loop": {
-      "title": "Daily Loop",
-      "progress": "今日の進捗 {done}/{total}",
-      "action_pending": "残り{count}件を進める",
-      "helper_pending": "期限が近い作業から順に片付けるのが最短です。",
-      "action_log": "今日の活動を記録して締める",
-      "helper_log": "終わった作業を記録すると次回の提案精度が上がります。",
-      "action_ai": "AIに今日の段取りを相談",
-      "helper_ai": "まだ着手前なら、最初の3手をAIに整理してもらいましょう。"
+    "command_center": {
+      "title": "Today Command Center",
+      "log_activity": "活動を記録",
+      "ask_ai": "AIに相談",
+      "open_project": "プロジェクトを開く",
+      "open_project_short": "開く",
+      "complete_short": "完了",
+      "retry": "再試行",
+      "completing": "更新中...",
+      "notice": {
+        "completed": "「{task}」を完了にしました。",
+        "update_failed": "タスク更新に失敗しました。"
+      },
+      "new": {
+        "badge": "新規モード",
+        "helper": "まずは1件だけ終わらせましょう。迷ったら下の2つから選べます。",
+        "recommended_label": "最初にやる1件",
+        "complete_action": "この作業を完了にする",
+        "empty_title": "今日の緊急作業はありません。",
+        "empty_body": "余裕があるうちに記録を残すか、AIと次の段取りを確認しましょう。",
+        "why_disclosure": "なぜこの順番かを見る",
+        "why_helper": "表示している順番は期限と未完了状況をもとにしています。"
+      },
+      "veteran": {
+        "progress": "進捗 {done}/{total}",
+        "remaining": "残タスク",
+        "overdue": "期限超過",
+        "done": "完了",
+        "queue_title": "優先キュー",
+        "empty": "本日の優先キューは空です。",
+        "actions": {
+          "open_calendar": "残り{count}件を進める",
+          "log_activity": "今日の活動を記録する",
+          "ask_ai": "AIに段取りを相談する"
+        },
+        "helpers": {
+          "open_calendar": "まず期限に近いタスクから回収しましょう。",
+          "log_activity": "完了内容を記録して明日の提案精度を高めましょう。",
+          "ask_ai": "まだ着手前なら、最初の3手をAIに作ってもらいましょう。"
+        }
+      }
     },
     "banners": {
       "activation_title": "初回セットアップが完了しました。",

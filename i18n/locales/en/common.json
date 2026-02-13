@@ -76,15 +76,47 @@
       "task_complete": "Complete one task",
       "activity": "Log one activity"
     },
-    "daily_loop": {
-      "title": "Daily Loop",
-      "progress": "Today's progress {done}/{total}",
-      "action_pending": "Work remaining: {count}",
-      "helper_pending": "Clearing near-deadline work first is the fastest recovery path.",
-      "action_log": "Close day by logging activity",
-      "helper_log": "Logging completed work improves the next recommendations.",
-      "action_ai": "Ask AI for today's sequence",
-      "helper_ai": "If you have not started yet, ask AI to map the first three moves."
+    "command_center": {
+      "title": "Today Command Center",
+      "log_activity": "Log activity",
+      "ask_ai": "Ask AI",
+      "open_project": "Open project",
+      "open_project_short": "Open",
+      "complete_short": "Done",
+      "retry": "Retry",
+      "completing": "Updating...",
+      "notice": {
+        "completed": "Completed \"{task}\".",
+        "update_failed": "Failed to update task."
+      },
+      "new": {
+        "badge": "New Farmer",
+        "helper": "Finish one thing first. If you are unsure, use one of the two actions below.",
+        "recommended_label": "Start here",
+        "complete_action": "Mark this task complete",
+        "empty_title": "No urgent task for today.",
+        "empty_body": "Use this time to log activity or ask AI to plan the next step.",
+        "why_disclosure": "Why this order",
+        "why_helper": "The order is based on due pressure and unfinished work."
+      },
+      "veteran": {
+        "progress": "Progress {done}/{total}",
+        "remaining": "Remaining",
+        "overdue": "Overdue",
+        "done": "Done",
+        "queue_title": "Priority Queue",
+        "empty": "No priority queue items for today.",
+        "actions": {
+          "open_calendar": "Work remaining: {count}",
+          "log_activity": "Log today's activity",
+          "ask_ai": "Ask AI for sequence"
+        },
+        "helpers": {
+          "open_calendar": "Clear deadline pressure first to recover control.",
+          "log_activity": "Logging outcomes improves tomorrow's recommendations.",
+          "ask_ai": "If you have not started yet, ask AI for the first three moves."
+        }
+      }
     },
     "banners": {
       "activation_title": "Initial setup is complete.",
