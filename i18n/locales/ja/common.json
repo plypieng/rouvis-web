@@ -71,6 +71,60 @@
       "date_unknown": "日付未設定",
       "due_label": "期限: {date}",
       "risk_counts": "期限超過 {overdue}件 / 48h {dueIn48h}件 / 未設定 {unscheduled}件"
+    },
+    "weather_defaults": {
+      "location": "長岡市",
+      "unknown_condition": "不明",
+      "fetch_failed_condition": "取得失敗"
+    },
+    "chat_prompts": {
+      "today_priority": "今日やるべき作業を優先順位つきで3つに整理して",
+      "first_project": "まだプロジェクトがありません。最初のプロジェクト候補と今日やることを提案して"
+    },
+    "checklist": {
+      "onboarding": "初期設定を完了",
+      "project": "最初のプロジェクトを作成",
+      "schedule": "初回タスクを生成",
+      "task_complete": "タスクを1件完了",
+      "activity": "活動記録を1件残す"
+    },
+    "daily_loop": {
+      "title": "Daily Loop",
+      "progress": "今日の進捗 {done}/{total}",
+      "action_pending": "残り{count}件を進める",
+      "helper_pending": "期限が近い作業から順に片付けるのが最短です。",
+      "action_log": "今日の活動を記録して締める",
+      "helper_log": "終わった作業を記録すると次回の提案精度が上がります。",
+      "action_ai": "AIに今日の段取りを相談",
+      "helper_ai": "まだ着手前なら、最初の3手をAIに整理してもらいましょう。"
+    },
+    "banners": {
+      "activation_title": "初回セットアップが完了しました。",
+      "activation_next_task_with_project": "次の1件: 「{task}」（{project}）",
+      "activation_next_task": "次の1件: 「{task}」",
+      "activation_next_project": "「{project}」の最初の作業に進みましょう。",
+      "activation_next_generic": "最初の作業に進みましょう。",
+      "activation_action": "最初のタスクを開く",
+      "resume_title": "セットアップが未完了です。",
+      "resume_body": "次は「{step}」を進めると利用が安定します。",
+      "resume_action": "続きから再開"
+    },
+    "data_warning": {
+      "title": "一部データを取得できませんでした。",
+      "body": "表示が最新でない可能性があります。再試行してください。",
+      "retry": "再試行"
+    },
+    "empty_cta_ai": "AIに相談",
+    "modes": {
+      "new_focus_title": "Today Focus",
+      "new_focus_count": "{count}件を優先",
+      "new_focus_helper": "まずは今日の重要な作業だけに集中しましょう。",
+      "new_focus_empty": "今日の優先作業はありません。",
+      "new_focus_action": "カレンダーで全体を見る",
+      "new_project_helper": "必要な情報だけを先に表示しています。",
+      "new_project_next": "次の作業: {task}",
+      "new_advanced_disclosure": "詳細コンテキストを表示",
+      "new_advanced_helper": "慣れてきたら、日次ループやセットアップ状況も確認できます。"
     }
   },
   "planner": {
@@ -777,6 +831,13 @@
         "regionPlaceholder": "例：新潟県",
         "farmSizeLabel": "農地面積（ha）",
         "farmSizePlaceholder": "例：2.5",
+        "farmer_mode_label": "表示モード",
+        "farmer_mode_help": "作業経験に合わせてダッシュボードの情報量を調整します。",
+        "farmer_mode_required": "利用モードを選択してください。",
+        "farmer_mode_new_title": "New Farmer",
+        "farmer_mode_new_desc": "今日の判断に必要な情報だけを表示します。",
+        "farmer_mode_veteran_title": "Veteran Farmer",
+        "farmer_mode_veteran_desc": "季節文脈と運用詳細をまとめて表示します。",
         "backButton": "戻る",
         "nextButton": "次へ"
       },
@@ -842,13 +903,25 @@
     },
     "settings": {
       "title": "設定",
-      "desc": "言語とテーマを管理します",
+      "desc": "言語、テーマ、表示モードを管理します",
       "language_section": "言語設定",
       "select_language": "表示言語を選択",
       "theme_section": "テーマ設定",
       "theme_light": "ライト",
       "theme_dark": "ダーク",
       "theme_system": "システム",
+      "farmer_mode_section": "Farmer Mode",
+      "farmer_mode_desc": "あなたの作業スタイルに合わせて、ダッシュボードの情報量を切り替えます。",
+      "farmer_mode_new_title": "New Farmer",
+      "farmer_mode_new_desc": "迷わず進めるために、必要な情報を絞って表示します。",
+      "farmer_mode_veteran_title": "Veteran Farmer",
+      "farmer_mode_veteran_desc": "季節文脈と運用指標をまとめて確認できます。",
+      "farmer_mode_loading": "現在のモードを読み込み中...",
+      "farmer_mode_saving": "モードを保存中...",
+      "farmer_mode_saved": "モード設定を保存しました。",
+      "farmer_mode_load_error": "モード設定の読み込みに失敗しました。",
+      "farmer_mode_save_error": "モード設定の保存に失敗しました。",
+      "retry": "再試行",
       "notifications_section": "通知設定",
       "email_alerts": "メールアラート",
       "email_alerts_desc": "重要なアラートをメールで受け取る",
@@ -1055,7 +1128,9 @@
       "window_weather": "{location} · {highLabel} {high}° / {lowLabel} {low}°",
       "overdue_note": "{count}件の期限超過タスクがあります",
       "on_track_note": "今日の重点タスクを先に完了させると遅延を防げます",
-      "alerts": "警戒 {count} 件"
+      "alerts": "警戒 {count} 件",
+      "season_context_toggle": "なぜ今この作業か（季節コンテキスト）",
+      "season_context_helper": "必要なときだけ、季節進行とマイルストーンを確認できます。"
     },
     "calendar": {
       "prev_month": "前月",

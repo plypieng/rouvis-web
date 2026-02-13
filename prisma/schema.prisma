@@ -75,6 +75,7 @@ model UserProfile {
   // Farming Context
   farmingType       String   @default("conventional") // organic, conventional, etc.
   experienceLevel   String   @default("intermediate") // beginner, intermediate, expert
+  uiMode            String?  // new_farmer | veteran_farmer
   
   // AI Preferences
   communicationStyle String  @default("friendly") // professional, friendly, mentor

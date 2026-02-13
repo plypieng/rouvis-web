@@ -2,21 +2,87 @@
 
 import { useTranslations } from 'next-intl';
 import LanguageSwitcher from '../../../components/LanguageSwitcher';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, use } from 'react';
+import type { FarmerUiMode } from '@/types/farmer-ui-mode';
+import { resolveFarmerUiMode } from '@/lib/farmerUiMode';
 
 type ThemeMode = 'light' | 'dark' | 'system';
 
-export default function SettingsPage({ params }: { params: { locale: string } }) {
-    const { locale } = params;
+export default function SettingsPage({ params }: { params: Promise<{ locale: string }> }) {
+    const { locale } = use(params);
     const t = useTranslations('pages.settings');
     const [theme, setTheme] = useState<ThemeMode>('system');
     const [emailNotif, setEmailNotif] = useState(true);
     const [weeklyReport, setWeeklyReport] = useState(false);
+    const [farmerMode, setFarmerMode] = useState<FarmerUiMode>('new_farmer');
+    const [farmerModeLoading, setFarmerModeLoading] = useState(true);
+    const [farmerModeSaving, setFarmerModeSaving] = useState(false);
+    const [farmerModeError, setFarmerModeError] = useState<string | null>(null);
+
+    const fetchFarmerMode = useCallback(async () => {
+        setFarmerModeLoading(true);
+        setFarmerModeError(null);
+        try {
+            const res = await fetch('/api/v1/profile', { cache: 'no-store' });
+            if (res.status === 404) {
+                setFarmerMode('new_farmer');
+                return;
+            }
+            if (!res.ok) {
+                throw new Error(t('farmer_mode_load_error'));
+            }
+
+            const payload = await res.json();
+            const profile = payload?.profile;
+            const resolvedMode = payload?.resolvedUiMode
+                || resolveFarmerUiMode(profile?.uiMode, profile?.experienceLevel);
+            setFarmerMode(resolvedMode);
+        } catch (error) {
+            console.error('Failed to fetch farmer mode', error);
+            setFarmerModeError(t('farmer_mode_load_error'));
+        } finally {
+            setFarmerModeLoading(false);
+        }
+    }, [t]);
 
     useEffect(() => {
         const saved = (localStorage.getItem('theme') as ThemeMode) || 'system';
         setTheme(saved);
-    }, []);
+        void fetchFarmerMode();
+    }, [fetchFarmerMode]);
+
+    const saveFarmerMode = useCallback(async (nextMode: FarmerUiMode) => {
+        if (farmerModeSaving || farmerMode === nextMode) return;
+
+        const previousMode = farmerMode;
+        setFarmerMode(nextMode);
+        setFarmerModeSaving(true);
+        setFarmerModeError(null);
+
+        try {
+            const res = await fetch('/api/v1/profile', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ uiMode: nextMode }),
+            });
+
+            if (!res.ok) {
+                throw new Error(t('farmer_mode_save_error'));
+            }
+
+            const payload = await res.json();
+            const profile = payload?.profile;
+            const resolvedMode = payload?.resolvedUiMode
+                || resolveFarmerUiMode(profile?.uiMode, profile?.experienceLevel);
+            setFarmerMode(resolvedMode);
+        } catch (error) {
+            console.error('Failed to save farmer mode', error);
+            setFarmerMode(previousMode);
+            setFarmerModeError(t('farmer_mode_save_error'));
+        } finally {
+            setFarmerModeSaving(false);
+        }
+    }, [farmerMode, farmerModeSaving, t]);
 
     const handleThemeChange = (mode: ThemeMode) => {
         setTheme(mode);
@@ -69,6 +135,71 @@ export default function SettingsPage({ params }: { params: { locale: string } })
                                 </span>
                             </button>
                         ))}
+                    </div>
+                </div>
+
+                {/* Farmer Mode Section */}
+                <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+                    <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white flex items-center gap-2">
+                        <span className="material-symbols-outlined">tune</span>
+                        {t('farmer_mode_section')}
+                    </h2>
+                    <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">{t('farmer_mode_desc')}</p>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <button
+                            type="button"
+                            data-testid="settings-farmer-mode-new"
+                            onClick={() => {
+                                void saveFarmerMode('new_farmer');
+                            }}
+                            disabled={farmerModeSaving || farmerModeLoading}
+                            className={`rounded-xl border px-4 py-3 text-left transition ${
+                                farmerMode === 'new_farmer'
+                                    ? 'border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-500 dark:bg-emerald-900/20 dark:text-emerald-100'
+                                    : 'border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600'
+                            } disabled:opacity-60`}
+                        >
+                            <p className="text-sm font-semibold">{t('farmer_mode_new_title')}</p>
+                            <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">{t('farmer_mode_new_desc')}</p>
+                        </button>
+                        <button
+                            type="button"
+                            data-testid="settings-farmer-mode-veteran"
+                            onClick={() => {
+                                void saveFarmerMode('veteran_farmer');
+                            }}
+                            disabled={farmerModeSaving || farmerModeLoading}
+                            className={`rounded-xl border px-4 py-3 text-left transition ${
+                                farmerMode === 'veteran_farmer'
+                                    ? 'border-sky-300 bg-sky-50 text-sky-900 dark:border-sky-500 dark:bg-sky-900/20 dark:text-sky-100'
+                                    : 'border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600'
+                            } disabled:opacity-60`}
+                        >
+                            <p className="text-sm font-semibold">{t('farmer_mode_veteran_title')}</p>
+                            <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">{t('farmer_mode_veteran_desc')}</p>
+                        </button>
+                    </div>
+                    <div className="mt-3 min-h-[20px] text-xs text-gray-500 dark:text-gray-400">
+                        {farmerModeLoading
+                            ? t('farmer_mode_loading')
+                            : farmerModeSaving
+                                ? t('farmer_mode_saving')
+                                : farmerModeError
+                                    ? (
+                                        <span className="inline-flex items-center gap-2 text-red-600 dark:text-red-300">
+                                            <span>{farmerModeError}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    void fetchFarmerMode();
+                                                }}
+                                                className="underline"
+                                            >
+                                                {t('retry')}
+                                            </button>
+                                        </span>
+                                    )
+                                    : t('farmer_mode_saved')}
                     </div>
                 </div>
 

@@ -5,13 +5,21 @@ import { getTranslations } from 'next-intl/server';
 import { SeasonRail } from '@/components/workflow/SeasonRail';
 import { buildSeasonRailState } from '@/lib/workflow-ui';
 import type { RiskTone } from '@/types/ui-shell';
+import type { FarmerUiMode } from '@/types/farmer-ui-mode';
+
+interface ForecastDay {
+  date: string;
+  temperature: { max: number; min: number };
+  condition: string;
+  icon: string;
+}
 
 interface WeatherData {
   location: string;
   temperature: { max: number; min: number };
   condition: string;
   alerts?: string[];
-  forecast?: any[];
+  forecast?: ForecastDay[];
 }
 
 interface Task {
@@ -23,7 +31,17 @@ interface Task {
   priority?: string;
 }
 
-export default async function DashboardHeader({ locale, weather, tasks }: { locale: string; weather: WeatherData; tasks: Task[] }) {
+export default async function DashboardHeader({
+  locale,
+  weather,
+  tasks,
+  mode,
+}: {
+  locale: string;
+  weather: WeatherData;
+  tasks: Task[];
+  mode: FarmerUiMode;
+}) {
   const tw = await getTranslations({ locale, namespace: 'workflow' });
   const lowLabel = tw('weather.low');
   const highLabel = tw('weather.high');
@@ -99,7 +117,26 @@ export default async function DashboardHeader({ locale, weather, tasks }: { loca
           </div>
         </div>
 
-        <SeasonRail state={seasonState} className="mb-4" />
+        {mode === 'veteran_farmer' ? (
+          <div data-testid="season-rail-expanded">
+            <SeasonRail state={seasonState} className="mb-4" />
+          </div>
+        ) : (
+          <details className="mb-4 rounded-xl border border-border/80 bg-background/70 p-3">
+            <summary
+              data-testid="season-rail-disclosure"
+              className="cursor-pointer list-none text-sm font-semibold text-foreground"
+            >
+              {tw('dashboard.season_context_toggle')}
+            </summary>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {tw('dashboard.season_context_helper')}
+            </p>
+            <div data-testid="season-rail-expanded" className="mt-3">
+              <SeasonRail state={seasonState} />
+            </div>
+          </details>
+        )}
 
         <div className="mb-4 grid gap-4 lg:grid-cols-[320px,1fr]">
           <PriorityTaskBubble task={priorityTask} />

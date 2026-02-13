@@ -7,6 +7,8 @@ import TodayFocus from './TodayFocus';
 import TodayControlCenter from './TodayControlCenter';
 import FirstWeekChecklist, { type ChecklistItem } from './FirstWeekChecklist';
 import TrackedEventLink from './TrackedEventLink';
+import { resolveFarmerUiMode } from '@/lib/farmerUiMode';
+import type { FarmerUiMode } from '@/types/farmer-ui-mode';
 
 interface Project {
     id: string;
@@ -33,6 +35,13 @@ type DashboardActivity = {
 
 type UserProfile = {
     createdAt?: string;
+    experienceLevel?: string | null;
+    uiMode?: string | null;
+};
+
+type ProfilePayload = {
+    profile: UserProfile | null;
+    resolvedUiMode?: FarmerUiMode;
 };
 
 type WeatherData = {
@@ -40,7 +49,18 @@ type WeatherData = {
     temperature: { max: number; min: number };
     condition: string;
     alerts: string[];
-    forecast: unknown[];
+    forecast: Array<{
+        date: string;
+        temperature: { min: number; max: number };
+        condition: string;
+        icon: string;
+    }>;
+};
+
+type WeatherCopy = {
+    fallbackLocation: string;
+    unknownCondition: string;
+    fetchFailedCondition: string;
 };
 
 type ActivationContext = {
@@ -98,10 +118,10 @@ function riskBadgeClass(tone: RiskTone): string {
     return 'border-emerald-200 bg-emerald-50 text-emerald-700';
 }
 
-function buildTodayChatHref(locale: string): string {
+function buildTodayChatHref(locale: string, prompt: string): string {
     const query = new URLSearchParams({
         intent: 'today',
-        prompt: '今日やるべき作業を優先順位つきで3つに整理して',
+        prompt,
         fresh: '1',
     });
     return `/${locale}/chat?${query.toString()}`;
@@ -112,12 +132,20 @@ function withCookieHeaders(cookieHeader: string): HeadersInit | undefined {
     return { Cookie: cookieHeader };
 }
 
+function requestTimeoutSignal(ms = 4500): AbortSignal | undefined {
+    if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+        return AbortSignal.timeout(ms);
+    }
+    return undefined;
+}
+
 async function getProjects(cookieHeader: string): Promise<LoadResult<Project[]>> {
     try {
         const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
         const res = await fetch(`${baseUrl}/api/v1/projects`, {
             cache: 'no-store',
             headers: withCookieHeaders(cookieHeader),
+            signal: requestTimeoutSignal(),
         });
 
         if (!res.ok) throw new Error(`Failed to fetch projects (${res.status})`);
@@ -135,36 +163,47 @@ async function getProjects(cookieHeader: string): Promise<LoadResult<Project[]>>
     }
 }
 
-async function getWeather(cookieHeader: string): Promise<LoadResult<WeatherData>> {
+async function getWeather(cookieHeader: string, copy: WeatherCopy): Promise<LoadResult<WeatherData>> {
     try {
         const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
         const res = await fetch(`${baseUrl}/api/v1/weather/overview`, {
             next: { revalidate: 3600 },
             headers: withCookieHeaders(cookieHeader),
+            signal: requestTimeoutSignal(),
         });
 
         if (!res.ok) throw new Error(`Failed to fetch weather (${res.status})`);
         const data = await res.json();
 
         const daily = Array.isArray(data.daily) ? data.daily : [];
+        const fallbackForecast = Array.isArray(data.forecast) ? data.forecast : [];
         const today = daily[0];
-        const mappedForecast = daily.map((day: any) => ({
-            date: day.date,
-            temperature: day.temperature,
-            condition: day?.condition?.label || day.condition || '不明',
-            icon: day?.condition?.icon || day.icon || '03d',
-            precipitation: day?.precipitationMm ?? day.precipitation ?? 0,
-        }));
+        const mappedForecast = daily.length > 0
+            ? daily.map((day: any) => ({
+                date: day.date,
+                temperature: day.temperature,
+                condition: day?.condition?.label || day.condition || copy.unknownCondition,
+                icon: day?.condition?.icon || day.icon || '03d',
+                precipitation: day?.precipitationMm ?? day.precipitation ?? 0,
+            }))
+            : fallbackForecast.map((day: any) => ({
+                date: day.date,
+                temperature: day.temperature,
+                condition: day?.condition?.label || day.condition || copy.unknownCondition,
+                icon: day?.condition?.icon || day.icon || '03d',
+            }));
 
         return {
             data: {
-                location: data?.location?.label || data.location || '長岡市',
+                location: data?.location?.label || data.location || copy.fallbackLocation,
                 temperature: {
                     max: today?.temperature?.max ?? 0,
                     min: today?.temperature?.min ?? 0,
                 },
-                condition: data?.current?.condition?.label || data.condition || '不明',
-                alerts: Array.isArray(data.alerts) ? data.alerts.map((alert: any) => alert.title) : [],
+                condition: data?.current?.condition?.label || data.condition || copy.unknownCondition,
+                alerts: Array.isArray(data.alerts)
+                    ? data.alerts.map((alert: any) => alert?.title || alert?.message || String(alert))
+                    : [],
                 forecast: mappedForecast,
             },
             hasError: false,
@@ -173,9 +212,9 @@ async function getWeather(cookieHeader: string): Promise<LoadResult<WeatherData>
         console.error('Failed to fetch weather:', error);
         return {
             data: {
-                location: '長岡市',
+                location: copy.fallbackLocation,
                 temperature: { max: 0, min: 0 },
-                condition: '取得失敗',
+                condition: copy.fetchFailedCondition,
                 alerts: [],
                 forecast: [],
             },
@@ -190,6 +229,7 @@ async function getTasks(cookieHeader: string): Promise<LoadResult<DashboardTask[
         const res = await fetch(`${baseUrl}/api/v1/tasks`, {
             cache: 'no-store',
             headers: withCookieHeaders(cookieHeader),
+            signal: requestTimeoutSignal(),
         });
 
         if (!res.ok) throw new Error(`Failed to fetch tasks (${res.status})`);
@@ -213,6 +253,7 @@ async function getActivities(cookieHeader: string): Promise<LoadResult<Dashboard
         const res = await fetch(`${baseUrl}/api/v1/activities`, {
             cache: 'no-store',
             headers: withCookieHeaders(cookieHeader),
+            signal: requestTimeoutSignal(),
         });
 
         if (!res.ok) throw new Error(`Failed to fetch activities (${res.status})`);
@@ -230,17 +271,18 @@ async function getActivities(cookieHeader: string): Promise<LoadResult<Dashboard
     }
 }
 
-async function getProfile(cookieHeader: string): Promise<LoadResult<UserProfile | null>> {
+async function getProfile(cookieHeader: string): Promise<LoadResult<ProfilePayload>> {
     try {
         const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
         const res = await fetch(`${baseUrl}/api/v1/profile`, {
             cache: 'no-store',
             headers: withCookieHeaders(cookieHeader),
+            signal: requestTimeoutSignal(),
         });
 
         if (res.status === 404) {
             return {
-                data: null,
+                data: { profile: null },
                 hasError: false,
             };
         }
@@ -251,15 +293,35 @@ async function getProfile(cookieHeader: string): Promise<LoadResult<UserProfile 
 
         const data = await res.json();
         return {
-            data: (data?.profile || null) as UserProfile | null,
+            data: {
+                profile: (data?.profile || null) as UserProfile | null,
+                resolvedUiMode: data?.resolvedUiMode as FarmerUiMode | undefined,
+            },
             hasError: false,
         };
     } catch (error) {
         console.error('Failed to fetch profile:', error);
         return {
-            data: null,
+            data: { profile: null },
             hasError: true,
         };
+    }
+}
+
+async function persistInferredUiMode(cookieHeader: string, uiMode: FarmerUiMode): Promise<void> {
+    try {
+        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+        await fetch(`${baseUrl}/api/v1/profile`, {
+            method: 'POST',
+            cache: 'no-store',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(withCookieHeaders(cookieHeader) || {}),
+            },
+            body: JSON.stringify({ uiMode }),
+        });
+    } catch (error) {
+        console.warn('Failed to persist inferred farmer UI mode:', error);
     }
 }
 
@@ -267,10 +329,12 @@ export default async function DashboardProjectList({
     locale,
     forceDataError = false,
     activationContext,
+    sessionUiMode,
 }: {
     locale: string;
     forceDataError?: boolean;
     activationContext?: ActivationContext;
+    sessionUiMode?: FarmerUiMode;
 }) {
     const [t, tw] = await Promise.all([
         getTranslations({ locale, namespace: 'dashboard' }),
@@ -281,7 +345,11 @@ export default async function DashboardProjectList({
 
     const [projectsResult, weatherResult, tasksResult, activitiesResult, profileResult] = await Promise.all([
         getProjects(cookieHeader),
-        getWeather(cookieHeader),
+        getWeather(cookieHeader, {
+            fallbackLocation: t('weather_defaults.location'),
+            unknownCondition: t('weather_defaults.unknown_condition'),
+            fetchFailedCondition: t('weather_defaults.fetch_failed_condition'),
+        }),
         getTasks(cookieHeader),
         getActivities(cookieHeader),
         getProfile(cookieHeader),
@@ -291,7 +359,21 @@ export default async function DashboardProjectList({
     const weather = weatherResult.data;
     const allTasks = tasksResult.data;
     const activities = activitiesResult.data;
-    const profile = profileResult.data;
+    const profilePayload = profileResult.data;
+    const profile = profilePayload.profile;
+    const inferredProfileMode = profile
+        ? resolveFarmerUiMode(profile.uiMode, profile.experienceLevel)
+        : undefined;
+    const resolvedUiMode = profilePayload.resolvedUiMode
+        || inferredProfileMode
+        || (sessionUiMode === 'veteran_farmer' ? 'veteran_farmer' : 'new_farmer');
+    const isVeteranMode = resolvedUiMode === 'veteran_farmer';
+    const dashboardModeTestId = isVeteranMode ? 'dashboard-mode-veteran' : 'dashboard-mode-new';
+
+    if (profile && !profile.uiMode) {
+        await persistInferredUiMode(cookieHeader, resolvedUiMode);
+    }
+
     const hasDataFetchError = forceDataError
         || projectsResult.hasError
         || weatherResult.hasError
@@ -302,7 +384,7 @@ export default async function DashboardProjectList({
     const retryHref = `/${locale}?retry=${Date.now().toString()}`;
     const emptyProjectsChatHref = `/${locale}/chat?${new URLSearchParams({
         intent: 'project',
-        prompt: 'まだプロジェクトがありません。最初のプロジェクト候補と今日やることを提案して',
+        prompt: t('chat_prompts.first_project'),
         fresh: '1',
     }).toString()}`;
 
@@ -381,6 +463,8 @@ export default async function DashboardProjectList({
         }
         : null;
 
+    const simplifiedFocusTasks = todayFocusTasks.slice(0, 3);
+
     const completedTaskExists = completedTasks.length > 0;
     const activitiesCount = activities.length;
     const hasGeneratedSchedule = allTasks.length > 0;
@@ -394,31 +478,31 @@ export default async function DashboardProjectList({
     const checklistItems: ChecklistItem[] = [
         {
             id: 'onboarding',
-            label: '初期設定を完了',
+            label: t('checklist.onboarding'),
             done: Boolean(profile),
             href: `/${locale}/onboarding`,
         },
         {
             id: 'project',
-            label: '最初のプロジェクトを作成',
+            label: t('checklist.project'),
             done: projects.length > 0,
             href: `/${locale}/projects/create`,
         },
         {
             id: 'schedule',
-            label: '初回タスクを生成',
+            label: t('checklist.schedule'),
             done: hasGeneratedSchedule,
             href: `/${locale}/projects/create`,
         },
         {
             id: 'task_complete',
-            label: 'タスクを1件完了',
+            label: t('checklist.task_complete'),
             done: completedTaskExists,
             href: `/${locale}/calendar`,
         },
         {
             id: 'activity',
-            label: '活動記録を1件残す',
+            label: t('checklist.activity'),
             done: activitiesCount > 0,
             href: `/${locale}/records?action=log`,
         },
@@ -436,26 +520,26 @@ export default async function DashboardProjectList({
 
     const dailyLoopAction = dueTodayOrOverduePendingTasks.length > 0
         ? {
-            label: `残り${dueTodayOrOverduePendingTasks.length}件を進める`,
+            label: t('daily_loop.action_pending', { count: dueTodayOrOverduePendingTasks.length }),
             href: `/${locale}/calendar`,
             eventName: 'daily_loop_focus_clicked',
             className: 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100',
-            helper: '期限が近い作業から順に片付けるのが最短です。',
+            helper: t('daily_loop.helper_pending'),
         }
         : todayProgressDone > 0
             ? {
-                label: '今日の活動を記録して締める',
+                label: t('daily_loop.action_log'),
                 href: `/${locale}/records?action=log`,
                 eventName: 'daily_loop_log_clicked',
                 className: 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
-                helper: '終わった作業を記録すると次回の提案精度が上がります。',
+                helper: t('daily_loop.helper_log'),
             }
             : {
-                label: 'AIに今日の段取りを相談',
-                href: buildTodayChatHref(locale),
+                label: t('daily_loop.action_ai'),
+                href: buildTodayChatHref(locale, t('chat_prompts.today_priority')),
                 eventName: 'daily_loop_ai_clicked',
                 className: 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100',
-                helper: 'まだ着手前なら、最初の3手をAIに整理してもらいましょう。',
+                helper: t('daily_loop.helper_ai'),
             };
 
     const weatherAlertCount = weather.alerts?.length || 0;
@@ -476,7 +560,7 @@ export default async function DashboardProjectList({
                 label: t('ops_window.action_prepare'),
             }
             : {
-                href: buildTodayChatHref(locale),
+                href: buildTodayChatHref(locale, t('chat_prompts.today_priority')),
                 label: t('ops_window.action_plan'),
             };
 
@@ -509,55 +593,89 @@ export default async function DashboardProjectList({
         });
     }
 
+    const contextualBannerSections = (
+        <>
+            {activationContext?.enabled && (
+                <section
+                    data-testid="dashboard-activation-banner"
+                    className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-emerald-900"
+                >
+                    <p className="text-sm font-semibold">{t('banners.activation_title')}</p>
+                    <p className="mt-1 text-sm">
+                        {activationTask
+                            ? activationTask.projectName
+                                ? t('banners.activation_next_task_with_project', {
+                                    task: activationTask.title,
+                                    project: activationTask.projectName,
+                                })
+                                : t('banners.activation_next_task', { task: activationTask.title })
+                            : activationProject
+                                ? t('banners.activation_next_project', { project: activationProject.name })
+                                : t('banners.activation_next_generic')}
+                    </p>
+                    <TrackedEventLink
+                        href={activationProjectHref}
+                        eventName="activation_task_opened"
+                        eventProperties={{
+                            hasTask: Boolean(activationTask),
+                            projectId: activationProjectId || '',
+                        }}
+                        className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-emerald-800 hover:text-emerald-950 hover:underline"
+                    >
+                        {t('banners.activation_action')}
+                        <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                    </TrackedEventLink>
+                </section>
+            )}
+
+            {showResumeSetupBanner && firstIncompleteChecklist && (
+                <section className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-4 text-blue-900">
+                    <p className="text-sm font-semibold">{t('banners.resume_title')}</p>
+                    <p className="mt-1 text-sm">{t('banners.resume_body', { step: firstIncompleteChecklist.label })}</p>
+                    <TrackedEventLink
+                        href={firstIncompleteChecklist.href}
+                        eventName="resume_setup_clicked"
+                        eventProperties={{ step: firstIncompleteChecklist.id }}
+                        className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-blue-800 hover:text-blue-950 hover:underline"
+                    >
+                        {t('banners.resume_action')}
+                        <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                    </TrackedEventLink>
+                </section>
+            )}
+        </>
+    );
+
+    const dailyLoopSection = (
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-3 flex items-center justify-between gap-3">
+                <h2 className="text-base font-bold text-slate-900">{t('daily_loop.title')}</h2>
+                <span className="text-xs text-slate-500">
+                    {t('daily_loop.progress', { done: todayProgressDone, total: todayProgressTotal || 0 })}
+                </span>
+            </div>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                <div
+                    className="h-full rounded-full bg-emerald-500 transition-all"
+                    style={{ width: `${todayProgressPercent}%` }}
+                />
+            </div>
+            <p className="mt-3 text-sm text-slate-700">{dailyLoopAction.helper}</p>
+            <TrackedEventLink
+                href={dailyLoopAction.href}
+                eventName={dailyLoopAction.eventName}
+                className={`mt-3 inline-flex min-h-[44px] items-center justify-center rounded-xl border px-3 py-2 text-sm font-semibold transition ${dailyLoopAction.className}`}
+            >
+                {dailyLoopAction.label}
+            </TrackedEventLink>
+        </section>
+    );
+
     return (
         <div className="min-h-screen bg-background font-sans">
-            <DashboardHeader locale={locale} weather={weather} tasks={pendingTasks} />
+            <DashboardHeader locale={locale} weather={weather} tasks={pendingTasks} mode={resolvedUiMode} />
 
-            <main className="container mx-auto px-4 py-8 max-w-7xl space-y-8">
-                {activationContext?.enabled && (
-                    <section
-                        data-testid="dashboard-activation-banner"
-                        className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-emerald-900"
-                    >
-                        <p className="text-sm font-semibold">初回セットアップが完了しました。</p>
-                        <p className="mt-1 text-sm">
-                            {activationTask
-                                ? `次の1件: 「${activationTask.title}」${activationTask.projectName ? `（${activationTask.projectName}）` : ''}`
-                                : activationProject
-                                    ? `「${activationProject.name}」の最初の作業に進みましょう。`
-                                    : '最初の作業に進みましょう。'}
-                        </p>
-                        <TrackedEventLink
-                            href={activationProjectHref}
-                            eventName="activation_task_opened"
-                            eventProperties={{
-                                hasTask: Boolean(activationTask),
-                                projectId: activationProjectId || '',
-                            }}
-                            className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-emerald-800 hover:text-emerald-950 hover:underline"
-                        >
-                            最初のタスクを開く
-                            <span className="material-symbols-outlined text-sm">arrow_forward</span>
-                        </TrackedEventLink>
-                    </section>
-                )}
-
-                {showResumeSetupBanner && firstIncompleteChecklist && (
-                    <section className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-4 text-blue-900">
-                        <p className="text-sm font-semibold">セットアップが未完了です。</p>
-                        <p className="mt-1 text-sm">次は「{firstIncompleteChecklist.label}」を進めると利用が安定します。</p>
-                        <TrackedEventLink
-                            href={firstIncompleteChecklist.href}
-                            eventName="resume_setup_clicked"
-                            eventProperties={{ step: firstIncompleteChecklist.id }}
-                            className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-blue-800 hover:text-blue-950 hover:underline"
-                        >
-                            続きから再開
-                            <span className="material-symbols-outlined text-sm">arrow_forward</span>
-                        </TrackedEventLink>
-                    </section>
-                )}
-
+            <main className="container mx-auto max-w-7xl space-y-8 px-4 py-8" data-testid={dashboardModeTestId}>
                 <TodayControlCenter
                     locale={locale}
                     quickTask={quickTask}
@@ -566,8 +684,8 @@ export default async function DashboardProjectList({
 
                 {hasDataFetchError && (
                     <div data-testid="dashboard-data-warning" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                        <p className="font-semibold">一部データを取得できませんでした。</p>
-                        <p className="mt-1">表示が最新でない可能性があります。再試行してください。</p>
+                        <p className="font-semibold">{t('data_warning.title')}</p>
+                        <p className="mt-1">{t('data_warning.body')}</p>
                         <TrackedEventLink
                             href={retryHref}
                             eventName="dashboard_retry_clicked"
@@ -575,34 +693,15 @@ export default async function DashboardProjectList({
                             data-testid="dashboard-retry-link"
                             className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-amber-800 hover:text-amber-950 hover:underline"
                         >
-                            再試行
+                            {t('data_warning.retry')}
                             <span className="material-symbols-outlined text-sm">refresh</span>
                         </TrackedEventLink>
                     </div>
                 )}
 
-                <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                        <h2 className="text-base font-bold text-slate-900">Daily Loop</h2>
-                        <span className="text-xs text-slate-500">
-                            今日の進捗 {todayProgressDone}/{todayProgressTotal || 0}
-                        </span>
-                    </div>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                        <div
-                            className="h-full rounded-full bg-emerald-500 transition-all"
-                            style={{ width: `${todayProgressPercent}%` }}
-                        />
-                    </div>
-                    <p className="mt-3 text-sm text-slate-700">{dailyLoopAction.helper}</p>
-                    <TrackedEventLink
-                        href={dailyLoopAction.href}
-                        eventName={dailyLoopAction.eventName}
-                        className={`mt-3 inline-flex min-h-[44px] items-center justify-center rounded-xl border px-3 py-2 text-sm font-semibold transition ${dailyLoopAction.className}`}
-                    >
-                        {dailyLoopAction.label}
-                    </TrackedEventLink>
-                </section>
+                {isVeteranMode && contextualBannerSections}
+
+                {isVeteranMode && dailyLoopSection}
 
                 <section data-testid="dashboard-ops-window" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                     <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
@@ -669,9 +768,9 @@ export default async function DashboardProjectList({
                     </TrackedEventLink>
                 </section>
 
-                <FirstWeekChecklist items={checklistItems} show={showFirstWeekChecklist} />
+                {isVeteranMode && <FirstWeekChecklist items={checklistItems} show={showFirstWeekChecklist} />}
 
-                {todayFocusTasks.length > 0 && (
+                {isVeteranMode && todayFocusTasks.length > 0 && (
                     <TodayFocus
                         tasks={todayFocusTasks}
                         locale={locale}
@@ -680,12 +779,50 @@ export default async function DashboardProjectList({
                     />
                 )}
 
+                {!isVeteranMode && (
+                    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                            <h2 className="text-base font-bold text-slate-900">{t('modes.new_focus_title')}</h2>
+                            <span className="text-xs text-slate-500">{t('modes.new_focus_count', { count: simplifiedFocusTasks.length })}</span>
+                        </div>
+                        <p className="text-sm text-slate-600">{t('modes.new_focus_helper')}</p>
+                        {simplifiedFocusTasks.length > 0 ? (
+                            <div className="mt-3 space-y-2">
+                                {simplifiedFocusTasks.map((task) => (
+                                    <div key={task.id} className="rounded-lg border border-slate-200 px-3 py-2">
+                                        <p className="text-sm font-semibold text-slate-900">{task.title}</p>
+                                        <p className="mt-1 text-xs text-slate-600">
+                                            {task.project?.name || t('ops_window.unassigned_project')} · {toDateLabel(task.dueDate, locale, t('ops_window.unscheduled'))}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="mt-3 text-sm text-emerald-700">{t('modes.new_focus_empty')}</p>
+                        )}
+                        <TrackedEventLink
+                            href={`/${locale}/calendar`}
+                            eventName="dashboard_new_focus_open_calendar"
+                            className="mt-3 inline-flex min-h-[44px] items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-100"
+                        >
+                            {t('modes.new_focus_action')}
+                        </TrackedEventLink>
+                    </section>
+                )}
+
+                {!isVeteranMode && <FirstWeekChecklist items={checklistItems} show={showFirstWeekChecklist} />}
+
                 <div>
-                    <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-xl font-bold text-gray-900">{t('active_projects')}</h2>
+                    <div className="mb-4 flex items-center justify-between">
+                        <div>
+                            <h2 className="text-xl font-bold text-gray-900">{t('active_projects')}</h2>
+                            {!isVeteranMode && (
+                                <p className="mt-1 text-sm text-gray-500">{t('modes.new_project_helper')}</p>
+                            )}
+                        </div>
                         <Link
                             href={`/${locale}/projects`}
-                            className="text-sm font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                            className="flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800"
                         >
                             {t('view_all')}
                             <span className="material-symbols-outlined text-sm">arrow_forward</span>
@@ -693,8 +830,8 @@ export default async function DashboardProjectList({
                     </div>
 
                     {projects.length === 0 ? (
-                        <div className="text-center py-12 bg-white rounded-lg border border-dashed border-gray-300">
-                            <p className="text-gray-500 mb-4">{t('no_projects')}</p>
+                        <div className="rounded-lg border border-dashed border-gray-300 bg-white py-12 text-center">
+                            <p className="mb-4 text-gray-500">{t('no_projects')}</p>
                             <div className="flex flex-wrap items-center justify-center gap-3">
                                 <Link
                                     href={`/${locale}/projects/create`}
@@ -707,12 +844,12 @@ export default async function DashboardProjectList({
                                     data-testid="dashboard-empty-projects-ai-link"
                                     className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100"
                                 >
-                                    AIに相談
+                                    {t('empty_cta_ai')}
                                 </Link>
                             </div>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                             {projects.slice(0, 6).map((project) => {
                                 const opsSummary = projectOpsById.get(project.id);
                                 const nextTaskDueLabel = opsSummary?.nextTask
@@ -720,27 +857,58 @@ export default async function DashboardProjectList({
                                     : t('project_ops.no_due_tasks');
                                 const projectRiskTone: RiskTone = opsSummary?.risk || 'safe';
 
+                                if (!isVeteranMode) {
+                                    return (
+                                        <Link key={project.id} href={`/${locale}/projects/${project.id}`} className="block h-full">
+                                            <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5 transition hover:border-green-200 hover:shadow-md">
+                                                <div className="mb-3 flex items-start justify-between gap-2">
+                                                    <h3 className="line-clamp-1 text-lg font-semibold text-gray-900">{project.name}</h3>
+                                                    <span className={`rounded-full px-2 py-1 text-xs font-medium ${project.status === 'active' ? 'bg-green-100 text-green-800'
+                                                        : project.status === 'completed'
+                                                            ? 'bg-blue-100 text-blue-800'
+                                                            : 'bg-yellow-100 text-yellow-800'
+                                                        }`}>
+                                                        {project.status}
+                                                    </span>
+                                                </div>
+                                                <p className="text-sm text-gray-600">
+                                                    {project.crop} {project.variety ? `(${project.variety})` : ''}
+                                                </p>
+                                                <p className="mt-1 text-xs text-gray-500">
+                                                    {t('project_ops.due_label', { date: nextTaskDueLabel })}
+                                                </p>
+                                                <p className="mt-3 text-sm font-medium text-slate-700">
+                                                    {t('modes.new_project_next', {
+                                                        task: opsSummary?.nextTask?.title || t('project_ops.no_pending_tasks'),
+                                                    })}
+                                                </p>
+                                            </div>
+                                        </Link>
+                                    );
+                                }
+
                                 return (
                                     <Link key={project.id} href={`/${locale}/projects/${project.id}`} className="block group h-full">
-                                        <div className="border rounded-xl p-5 hover:shadow-md transition bg-white h-full flex flex-col border-gray-200 group-hover:border-green-200">
-                                            <div className="flex justify-between items-start mb-3">
-                                                <h3 className="text-lg font-semibold text-gray-900 group-hover:text-green-700 transition line-clamp-1">
+                                        <div className="flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5 transition hover:shadow-md group-hover:border-green-200">
+                                            <div className="mb-3 flex items-start justify-between">
+                                                <h3 className="line-clamp-1 text-lg font-semibold text-gray-900 transition group-hover:text-green-700">
                                                     {project.name}
                                                 </h3>
-                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${project.status === 'active' ? 'bg-green-100 text-green-800' :
-                                                    project.status === 'completed' ? 'bg-blue-100 text-blue-800' :
-                                                        'bg-yellow-100 text-yellow-800'
+                                                <span className={`rounded-full px-2 py-1 text-xs font-medium ${project.status === 'active' ? 'bg-green-100 text-green-800'
+                                                    : project.status === 'completed'
+                                                        ? 'bg-blue-100 text-blue-800'
+                                                        : 'bg-yellow-100 text-yellow-800'
                                                     }`}>
                                                     {project.status}
                                                 </span>
                                             </div>
                                             <div className="space-y-2 text-sm text-gray-600">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="material-symbols-outlined text-gray-400 text-base">grass</span>
-                                                    <span>{project.crop} {project.variety && `(${project.variety})`}</span>
+                                                    <span className="material-symbols-outlined text-base text-gray-400">grass</span>
+                                                    <span>{project.crop} {project.variety ? `(${project.variety})` : ''}</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <span className="material-symbols-outlined text-gray-400 text-base">calendar_today</span>
+                                                    <span className="material-symbols-outlined text-base text-gray-400">calendar_today</span>
                                                     <span>{toDateLabel(project.startDate, locale, t('project_ops.date_unknown'))}</span>
                                                 </div>
                                             </div>
@@ -775,6 +943,19 @@ export default async function DashboardProjectList({
                         </div>
                     )}
                 </div>
+
+                {!isVeteranMode && (
+                    <details className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <summary className="cursor-pointer list-none text-sm font-semibold text-slate-900">
+                            {t('modes.new_advanced_disclosure')}
+                        </summary>
+                        <p className="mt-1 text-sm text-slate-600">{t('modes.new_advanced_helper')}</p>
+                        <div className="mt-4 space-y-4">
+                            {contextualBannerSections}
+                            {dailyLoopSection}
+                        </div>
+                    </details>
+                )}
             </main>
         </div>
     );

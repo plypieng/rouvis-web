@@ -59,6 +59,60 @@
       "date_unknown": "Date not set",
       "due_label": "Due: {date}",
       "risk_counts": "Overdue {overdue} / 48h {dueIn48h} / Unscheduled {unscheduled}"
+    },
+    "weather_defaults": {
+      "location": "Nagaoka",
+      "unknown_condition": "Unknown",
+      "fetch_failed_condition": "Unavailable"
+    },
+    "chat_prompts": {
+      "today_priority": "Organize the top 3 tasks for today with priorities.",
+      "first_project": "There are no projects yet. Suggest the first project and today's work."
+    },
+    "checklist": {
+      "onboarding": "Complete initial setup",
+      "project": "Create first project",
+      "schedule": "Generate first tasks",
+      "task_complete": "Complete one task",
+      "activity": "Log one activity"
+    },
+    "daily_loop": {
+      "title": "Daily Loop",
+      "progress": "Today's progress {done}/{total}",
+      "action_pending": "Work remaining: {count}",
+      "helper_pending": "Clearing near-deadline work first is the fastest recovery path.",
+      "action_log": "Close day by logging activity",
+      "helper_log": "Logging completed work improves the next recommendations.",
+      "action_ai": "Ask AI for today's sequence",
+      "helper_ai": "If you have not started yet, ask AI to map the first three moves."
+    },
+    "banners": {
+      "activation_title": "Initial setup is complete.",
+      "activation_next_task_with_project": "Next: \"{task}\" ({project})",
+      "activation_next_task": "Next: \"{task}\"",
+      "activation_next_project": "Start the first operation for \"{project}\".",
+      "activation_next_generic": "Move to your first operation.",
+      "activation_action": "Open first task",
+      "resume_title": "Setup is not finished.",
+      "resume_body": "Continue with \"{step}\" to stabilize guidance quality.",
+      "resume_action": "Resume setup"
+    },
+    "data_warning": {
+      "title": "Some data could not be loaded.",
+      "body": "Displayed information may be stale. Please retry.",
+      "retry": "Retry"
+    },
+    "empty_cta_ai": "Ask AI",
+    "modes": {
+      "new_focus_title": "Today Focus",
+      "new_focus_count": "{count} priorities",
+      "new_focus_helper": "Stay focused on only the most important work for today.",
+      "new_focus_empty": "No priority tasks for today.",
+      "new_focus_action": "Open full schedule",
+      "new_project_helper": "Showing only the essentials for faster decisions.",
+      "new_project_next": "Next task: {task}",
+      "new_advanced_disclosure": "Show advanced context",
+      "new_advanced_helper": "Reveal daily loop and setup context when you need deeper operations detail."
     }
   },
   "planner": {
@@ -526,6 +580,13 @@
         "regionPlaceholder": "e.g., Niigata Prefecture",
         "farmSizeLabel": "Farm Size (ha)",
         "farmSizePlaceholder": "e.g., 2.5",
+        "farmer_mode_label": "Farmer Mode",
+        "farmer_mode_help": "Select how much detail to show on your dashboard.",
+        "farmer_mode_required": "Please select a farmer mode.",
+        "farmer_mode_new_title": "New Farmer",
+        "farmer_mode_new_desc": "Simplified guidance focused on today's actions.",
+        "farmer_mode_veteran_title": "Veteran Farmer",
+        "farmer_mode_veteran_desc": "Dense operational context with season and risk detail.",
         "backButton": "Back",
         "nextButton": "Next"
       },
@@ -549,6 +610,35 @@
         "subtitle": "You're ready to start using ROuvis",
         "dashboardButton": "Go to Dashboard"
       }
+    }
+  },
+  "pages": {
+    "settings": {
+      "title": "Settings",
+      "desc": "Manage language, theme, and farmer mode.",
+      "language_section": "Language",
+      "select_language": "Choose display language",
+      "theme_section": "Theme",
+      "theme_light": "Light",
+      "theme_dark": "Dark",
+      "theme_system": "System",
+      "farmer_mode_section": "Farmer Mode",
+      "farmer_mode_desc": "Switch dashboard information density based on your workflow.",
+      "farmer_mode_new_title": "New Farmer",
+      "farmer_mode_new_desc": "Simplified dashboard with only essential decisions.",
+      "farmer_mode_veteran_title": "Veteran Farmer",
+      "farmer_mode_veteran_desc": "Detailed dashboard with seasonal and operational context.",
+      "farmer_mode_loading": "Loading current mode...",
+      "farmer_mode_saving": "Saving mode...",
+      "farmer_mode_saved": "Farmer mode saved.",
+      "farmer_mode_load_error": "Failed to load farmer mode.",
+      "farmer_mode_save_error": "Failed to save farmer mode.",
+      "retry": "Retry",
+      "notifications_section": "Notifications",
+      "email_alerts": "Email alerts",
+      "email_alerts_desc": "Receive important alerts by email",
+      "weekly_report": "Weekly report",
+      "weekly_report_desc": "Receive a weekly summary of activity"
     }
   },
   "alerts": {
@@ -720,7 +810,9 @@
       "window_weather": "{location} · {highLabel} {high}° / {lowLabel} {low}°",
       "overdue_note": "{count} overdue tasks need recovery",
       "on_track_note": "Clear priority items early to keep this week on track.",
-      "alerts": "{count} alerts"
+      "alerts": "{count} alerts",
+      "season_context_toggle": "Why now / seasonal context",
+      "season_context_helper": "Open only when needed to inspect seasonal progress and milestones."
     },
     "calendar": {
       "prev_month": "Prev",

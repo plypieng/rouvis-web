@@ -43,6 +43,7 @@ export async function getServerSessionFromToken(token?: string) {
         id: (decoded.id as string | undefined) ?? decoded.sub ?? '',
         profileComplete: Boolean(decoded.profileComplete),
         onboardingComplete: Boolean(decoded.onboardingComplete),
+        uiMode: decoded.uiMode as 'new_farmer' | 'veteran_farmer' | undefined,
       },
       expires: decoded.exp ? new Date((decoded.exp as number) * 1000).toISOString() : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     };

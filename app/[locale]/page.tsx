@@ -33,6 +33,7 @@ export default async function DashboardPage(props: {
       <DashboardProjectList
         locale={locale}
         forceDataError={debugDataError}
+        sessionUiMode={session?.user?.uiMode}
         activationContext={{
           enabled: searchParams?.activation === '1',
           projectId: searchParams?.projectId,

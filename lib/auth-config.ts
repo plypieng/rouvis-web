@@ -10,6 +10,7 @@ import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { prisma, authPrisma } from "./prisma";
+import { resolveFarmerUiMode } from "./farmerUiMode";
 
 const normalizeEnvValue = (value?: string) => value?.replace(/\\[rn]/g, '').trim();
 const googleClientId = normalizeEnvValue(process.env.GOOGLE_CLIENT_ID);
@@ -80,6 +81,7 @@ export const authOptions: NextAuthOptions = {
                   userId: user.id,
                   farmingType: 'conventional',
                   experienceLevel: 'beginner',
+                  uiMode: 'new_farmer',
                   region: 'Demo Region',
                 }
               });
@@ -166,7 +168,7 @@ export const authOptions: NextAuthOptions = {
         const [userProfile, firstField, firstProject] = await Promise.all([
           prisma.userProfile.findUnique({
             where: { userId },
-            select: { id: true },
+            select: { id: true, uiMode: true, experienceLevel: true },
           }),
           prisma.field.findFirst({
             where: { userId },
@@ -181,6 +183,7 @@ export const authOptions: NextAuthOptions = {
         const profileComplete = Boolean(userProfile);
         token.profileComplete = profileComplete;
         token.onboardingComplete = Boolean(profileComplete && (firstField || firstProject));
+        token.uiMode = resolveFarmerUiMode(userProfile?.uiMode, userProfile?.experienceLevel);
       }
 
       return token;
@@ -196,6 +199,7 @@ export const authOptions: NextAuthOptions = {
         session.user.name = token.name as string;
         session.user.profileComplete = Boolean(token.profileComplete);
         session.user.onboardingComplete = Boolean(token.onboardingComplete);
+        session.user.uiMode = token.uiMode as 'new_farmer' | 'veteran_farmer' | undefined;
       }
       return session;
     },

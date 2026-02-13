@@ -4,11 +4,13 @@ import { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { z } from 'zod';
-import { Loader2, ChevronDown, Info, Check, ArrowRight } from 'lucide-react';
+import { Loader2, ChevronDown, Info, ArrowRight } from 'lucide-react';
 import { PREFECTURES, EXPERIENCE_OPTIONS, FARMING_TYPES, COMMON_CROPS } from '../../../lib/prefectures';
 import FieldMapEditor from '@/components/fields/FieldMapEditor';
 import { toastError } from '@/lib/feedback';
 import { trackUXEvent } from '@/lib/analytics';
+import { useTranslations } from 'next-intl';
+import type { FarmerUiMode } from '@/types/farmer-ui-mode';
 
 // Validation schemas
 const profileSchema = z.object({
@@ -16,6 +18,7 @@ const profileSchema = z.object({
   prefecture: z.string().min(1, '都道府県を選択してください'),
   experience: z.string().min(1, '経験年数を選択してください'),
   farmingType: z.string().min(1, '栽培方法を選択してください'),
+  uiMode: z.string().min(1, 'ui_mode_required'),
 });
 
 const fieldSchema = z.object({
@@ -73,6 +76,7 @@ export default function OnboardingPage() {
   const searchParams = useSearchParams();
   const locale = (params?.locale as string) || 'ja';
   const router = useRouter();
+  const tonboarding = useTranslations('auth.onboarding');
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fieldEntryMode, setFieldEntryMode] = useState<'quick' | 'detailed'>('quick');
@@ -206,6 +210,7 @@ export default function OnboardingPage() {
           region: selectedPrefecture?.name || '新潟県',
           experienceLevel: profileData.experience,
           farmingType: profileData.farmingType,
+          uiMode: profileData.uiMode,
         }),
       });
       if (!response.ok) {
@@ -222,6 +227,7 @@ export default function OnboardingPage() {
       void trackUXEvent('onboarding_profile_saved', {
         experience: profileData.experience || 'unknown',
         farmingType: profileData.farmingType || 'unknown',
+        uiMode: profileData.uiMode || 'unknown',
       });
       setStep(3);
     } catch (err) {
@@ -229,7 +235,12 @@ export default function OnboardingPage() {
         const newErrors: Record<string, string> = {};
         err.issues.forEach((issue) => {
           if (issue.path[0]) {
-            newErrors[issue.path[0].toString()] = issue.message;
+            const key = issue.path[0].toString();
+            if (key === 'uiMode') {
+              newErrors[key] = tonboarding('profile.farmer_mode_required');
+              return;
+            }
+            newErrors[key] = issue.message;
           }
         });
         setErrors(newErrors);
@@ -341,6 +352,20 @@ export default function OnboardingPage() {
     setFieldData({ ...fieldData, plantingDate: today });
   };
 
+  const handleModeSelect = (uiMode: FarmerUiMode) => {
+    setProfileData((prev) => ({ ...prev, uiMode }));
+    setErrors((prev) => {
+      if (!prev.uiMode) return prev;
+      const next = { ...prev };
+      delete next.uiMode;
+      return next;
+    });
+    void trackUXEvent('onboarding_farmer_mode_selected', {
+      uiMode,
+      experience: profileData.experience || 'unknown',
+    });
+  };
+
   // Step 1: Welcome
   if (step === 1) {
     return (
@@ -448,12 +473,52 @@ export default function OnboardingPage() {
                 error={errors.farmingType}
               />
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                {tonboarding('profile.farmer_mode_label')}
+              </label>
+              <p className="mb-2 text-xs text-gray-500">{tonboarding('profile.farmer_mode_help')}</p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  data-testid="onboarding-farmer-mode-new"
+                  onClick={() => {
+                    handleModeSelect('new_farmer');
+                  }}
+                  className={`rounded-xl border px-3 py-3 text-left transition ${
+                    profileData.uiMode === 'new_farmer'
+                      ? 'border-emerald-300 bg-emerald-50 text-emerald-900'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <p className="text-sm font-semibold">{tonboarding('profile.farmer_mode_new_title')}</p>
+                  <p className="mt-1 text-xs text-gray-600">{tonboarding('profile.farmer_mode_new_desc')}</p>
+                </button>
+                <button
+                  type="button"
+                  data-testid="onboarding-farmer-mode-veteran"
+                  onClick={() => {
+                    handleModeSelect('veteran_farmer');
+                  }}
+                  className={`rounded-xl border px-3 py-3 text-left transition ${
+                    profileData.uiMode === 'veteran_farmer'
+                      ? 'border-sky-300 bg-sky-50 text-sky-900'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <p className="text-sm font-semibold">{tonboarding('profile.farmer_mode_veteran_title')}</p>
+                  <p className="mt-1 text-xs text-gray-600">{tonboarding('profile.farmer_mode_veteran_desc')}</p>
+                </button>
+              </div>
+              {errors.uiMode && <p className="mt-1 text-sm text-red-600">{errors.uiMode}</p>}
+            </div>
           </div>
 
           <div className="pt-4 space-y-3">
             <button
               onClick={handleProfileNext}
-              disabled={isSubmitting}
+              disabled={isSubmitting || !profileData.uiMode}
               className="w-full px-6 py-4 bg-emerald-600 text-white rounded-xl hover:bg-emerald-500 transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {isSubmitting ? (
@@ -717,18 +782,6 @@ function FeatureRow({ icon, text }: { icon: string; text: string }) {
     <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
       <span className="text-xl">{icon}</span>
       <span className="text-sm text-gray-700">{text}</span>
-    </div>
-  );
-}
-
-// Next step item for completion
-function NextStepItem({ number, text }: { number: number; text: string }) {
-  return (
-    <div className="flex items-center gap-3">
-      <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 text-xs font-bold flex items-center justify-center">
-        {number}
-      </div>
-      <span className="text-sm text-gray-600">{text}</span>
     </div>
   );
 }

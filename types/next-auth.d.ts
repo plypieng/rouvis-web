@@ -1,4 +1,5 @@
 import "next-auth";
+import type { FarmerUiMode } from './farmer-ui-mode';
 
 declare module "next-auth" {
   /**
@@ -12,6 +13,7 @@ declare module "next-auth" {
       image?: string | null;
       profileComplete?: boolean;
       onboardingComplete?: boolean;
+      uiMode?: FarmerUiMode;
     };
   }
 
@@ -25,6 +27,7 @@ declare module "next-auth" {
     image?: string | null;
     profileComplete?: boolean;
     onboardingComplete?: boolean;
+    uiMode?: FarmerUiMode;
   }
 }
 
@@ -38,5 +41,6 @@ declare module "next-auth/jwt" {
     email?: string | null;
     profileComplete?: boolean;
     onboardingComplete?: boolean;
+    uiMode?: FarmerUiMode;
   }
 }
