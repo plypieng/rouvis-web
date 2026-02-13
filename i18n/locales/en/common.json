@@ -33,7 +33,33 @@
     "empty_step_1": "Take a photo or type your crop name",
     "empty_step_2": "AI auto-creates your schedule",
     "empty_step_3": "Check and log daily tasks",
-    "create_first_project": "Create Project"
+    "create_first_project": "Create Project",
+    "create_new": "Create New",
+    "ops_window": {
+      "title": "48h Operations Window",
+      "subtitle": "Review due pressure, weather alerts, and near-term workload",
+      "risk_prefix": "Risk",
+      "overdue": "Overdue",
+      "due_today": "Due Today",
+      "due_48h": "Next 48h",
+      "weather_alerts": "Weather Alerts",
+      "priority_list": "Priority Queue",
+      "unassigned_project": "No project",
+      "unscheduled": "Date not set",
+      "clear_note": "No pending deadlines within the next 48 hours.",
+      "unscheduled_note": "{count} task(s) have no due date. Add dates to improve plan quality.",
+      "action_recover": "Recover overdue tasks",
+      "action_prepare": "Review the 48h plan",
+      "action_plan": "Ask AI for next actions"
+    },
+    "project_ops": {
+      "next_operation": "Next operation",
+      "no_pending_tasks": "No pending tasks",
+      "no_due_tasks": "No due date",
+      "date_unknown": "Date not set",
+      "due_label": "Due: {date}",
+      "risk_counts": "Overdue {overdue} / 48h {dueIn48h} / Unscheduled {unscheduled}"
+    }
   },
   "planner": {
     "title": "Crop Layout Planner",

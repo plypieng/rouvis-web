@@ -32,7 +32,6 @@ export default async function DashboardPage(props: {
     <main className="min-h-screen bg-gray-50">
       <DashboardProjectList
         locale={locale}
-        userId={userId}
         forceDataError={debugDataError}
         activationContext={{
           enabled: searchParams?.activation === '1',

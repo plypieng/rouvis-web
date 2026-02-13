@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import { toastError, toastSuccess } from '@/lib/feedback';
 import { trackUXEvent } from '@/lib/analytics';
 
@@ -32,6 +33,7 @@ export default function TodayFocus({
     hasCompletedTaskInitially = false,
 }: TodayFocusProps) {
     const router = useRouter();
+    const t = useTranslations('dashboard');
     const [tasks, setTasks] = useState<Task[]>(initialTasks);
     const [completingId, setCompletingId] = useState<string | null>(null);
     const [hasCompletedTask, setHasCompletedTask] = useState(hasCompletedTaskInitially);
@@ -146,7 +148,13 @@ export default function TodayFocus({
 
             <div className="grid gap-3">
                 {tasks.map(task => {
-                    const isOverdue = new Date(task.dueDate) < new Date(new Date().setHours(0, 0, 0, 0));
+                    const todayStartEpoch = new Date(new Date().setHours(0, 0, 0, 0)).getTime();
+                    const dueEpoch = new Date(task.dueDate).getTime();
+                    const hasValidDueDate = Number.isFinite(dueEpoch);
+                    const isOverdue = hasValidDueDate && dueEpoch < todayStartEpoch;
+                    const dueLabel = hasValidDueDate
+                        ? new Date(dueEpoch).toLocaleDateString(locale)
+                        : t('project_ops.date_unknown');
 
                     return (
                         <div
@@ -187,7 +195,7 @@ export default function TodayFocus({
                                         </>
                                     )}
                                     <span className={isOverdue ? 'text-warning font-medium' : ''}>
-                                        {isOverdue ? '期限切れ' : new Date(task.dueDate).toLocaleDateString(locale)}
+                                        {isOverdue ? '期限切れ' : dueLabel}
                                     </span>
                                 </div>
                             </div>

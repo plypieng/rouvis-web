@@ -46,7 +46,32 @@
     "empty_step_1": "写真を撮るか、作物名を入力",
     "empty_step_2": "AIがスケジュールを自動作成",
     "empty_step_3": "毎日のタスクをチェックして記録",
-    "create_first_project": "プロジェクトを作成する"
+    "create_first_project": "プロジェクトを作成する",
+    "ops_window": {
+      "title": "48時間オペレーション",
+      "subtitle": "期限・警報・作業密度をまとめて確認",
+      "risk_prefix": "リスク",
+      "overdue": "期限超過",
+      "due_today": "本日締切",
+      "due_48h": "次の48時間",
+      "weather_alerts": "気象アラート",
+      "priority_list": "優先作業",
+      "unassigned_project": "プロジェクト未設定",
+      "unscheduled": "日付未設定",
+      "clear_note": "直近48時間の期限タスクはありません。",
+      "unscheduled_note": "日付未設定タスクが{count}件あります。予定日を入れると提案精度が上がります。",
+      "action_recover": "期限超過タスクを回復する",
+      "action_prepare": "48時間の段取りを確認する",
+      "action_plan": "AIに次の作業を相談する"
+    },
+    "project_ops": {
+      "next_operation": "次の作業",
+      "no_pending_tasks": "未完了タスクなし",
+      "no_due_tasks": "締切なし",
+      "date_unknown": "日付未設定",
+      "due_label": "期限: {date}",
+      "risk_counts": "期限超過 {overdue}件 / 48h {dueIn48h}件 / 未設定 {unscheduled}件"
+    }
   },
   "planner": {
     "title": "作付けレイアウト",

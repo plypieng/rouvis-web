@@ -31,23 +31,10 @@ export default async function DashboardHeader({ locale, weather, tasks }: { loca
   // Find today's priority task
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
-  let priorityTask = tasks.find(t => {
+  const priorityTask = tasks.find(t => {
     const taskDate = new Date(t.dueAt).toISOString().split('T')[0];
     return taskDate === todayStr && t.status !== 'completed';
   });
-
-  // TODO: Remove this mock when real priority logic is fully connected
-  // For UI verification as requested by user
-  if (!priorityTask) {
-    priorityTask = {
-      id: 'mock-1',
-      title: '冬期荒起し',
-      dueAt: new Date().toISOString(),
-      status: 'pending',
-      projectName: 'メイン圃場',
-      priority: 'high'
-    };
-  }
 
   const todayIso = new Date().toISOString().split('T')[0];
   const overdueCount = tasks.filter((task) => task.status !== 'completed' && task.dueAt.split('T')[0] < todayIso).length;

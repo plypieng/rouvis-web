@@ -2,8 +2,6 @@ import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { cookies } from 'next/headers';
 
-import { authPrisma } from '@/lib/prisma';
-
 import DashboardHeader from './DashboardHeader';
 import TodayFocus from './TodayFocus';
 import TodayControlCenter from './TodayControlCenter';
@@ -51,11 +49,14 @@ type ActivationContext = {
     taskId?: string;
 };
 
-type FunnelMetrics = {
-    onboardingCompleted: number;
-    projectCreated: number;
-    scheduleGenerated: number;
-    firstTaskCompleted: number;
+type RiskTone = 'safe' | 'watch' | 'warning' | 'critical';
+
+type ProjectOpsSummary = {
+    nextTask: DashboardTask | null;
+    overdueCount: number;
+    dueIn48hCount: number;
+    unscheduledCount: number;
+    risk: RiskTone;
 };
 
 type LoadResult<T> = {
@@ -63,12 +64,38 @@ type LoadResult<T> = {
     hasError: boolean;
 };
 
-const RECENT_FUNNEL_DAYS = 14;
-
 function toEpoch(raw: string | undefined): number {
     if (!raw) return Number.POSITIVE_INFINITY;
     const parsed = new Date(raw).getTime();
     return Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
+}
+
+function toDateLabel(raw: string | undefined, locale: string, fallback: string): string {
+    const epoch = toEpoch(raw);
+    if (!Number.isFinite(epoch)) return fallback;
+    return new Date(epoch).toLocaleDateString(locale, { month: 'numeric', day: 'numeric' });
+}
+
+function buildRiskTone({
+    overdueCount,
+    dueIn48hCount,
+    weatherAlertCount,
+}: {
+    overdueCount: number;
+    dueIn48hCount: number;
+    weatherAlertCount: number;
+}): RiskTone {
+    if (overdueCount >= 2 || (weatherAlertCount >= 2 && dueIn48hCount > 0)) return 'critical';
+    if (overdueCount >= 1 || weatherAlertCount >= 1 || dueIn48hCount >= 4) return 'warning';
+    if (dueIn48hCount > 0) return 'watch';
+    return 'safe';
+}
+
+function riskBadgeClass(tone: RiskTone): string {
+    if (tone === 'critical') return 'border-red-200 bg-red-50 text-red-700';
+    if (tone === 'warning') return 'border-amber-200 bg-amber-50 text-amber-700';
+    if (tone === 'watch') return 'border-blue-200 bg-blue-50 text-blue-700';
+    return 'border-emerald-200 bg-emerald-50 text-emerald-700';
 }
 
 function buildTodayChatHref(locale: string): string {
@@ -236,97 +263,28 @@ async function getProfile(cookieHeader: string): Promise<LoadResult<UserProfile 
     }
 }
 
-async function getFunnelMetrics(userId: string): Promise<LoadResult<FunnelMetrics>> {
-    if (!process.env.DATABASE_URL) {
-        return {
-            data: {
-                onboardingCompleted: 0,
-                projectCreated: 0,
-                scheduleGenerated: 0,
-                firstTaskCompleted: 0,
-            },
-            hasError: true,
-        };
-    }
-
-    try {
-        const since = new Date(Date.now() - RECENT_FUNNEL_DAYS * 24 * 60 * 60 * 1000);
-        const events = await authPrisma.auditEvent.findMany({
-            where: {
-                userId,
-                status: 'SUCCESS',
-                createdAt: {
-                    gte: since,
-                },
-                action: {
-                    in: [
-                        'ux.onboarding_completed',
-                        'ux.project_created',
-                        'ux.schedule_generated',
-                        'ux.first_task_completed',
-                        'PROJECT_CREATE',
-                    ],
-                },
-            },
-            select: {
-                action: true,
-            },
-        });
-
-        const metrics: FunnelMetrics = {
-            onboardingCompleted: 0,
-            projectCreated: 0,
-            scheduleGenerated: 0,
-            firstTaskCompleted: 0,
-        };
-
-        for (const event of events) {
-            if (event.action === 'ux.onboarding_completed') metrics.onboardingCompleted += 1;
-            if (event.action === 'ux.project_created' || event.action === 'PROJECT_CREATE') metrics.projectCreated += 1;
-            if (event.action === 'ux.schedule_generated') metrics.scheduleGenerated += 1;
-            if (event.action === 'ux.first_task_completed') metrics.firstTaskCompleted += 1;
-        }
-
-        return {
-            data: metrics,
-            hasError: false,
-        };
-    } catch (error) {
-        console.error('Failed to fetch funnel metrics:', error);
-        return {
-            data: {
-                onboardingCompleted: 0,
-                projectCreated: 0,
-                scheduleGenerated: 0,
-                firstTaskCompleted: 0,
-            },
-            hasError: true,
-        };
-    }
-}
-
 export default async function DashboardProjectList({
     locale,
-    userId,
     forceDataError = false,
     activationContext,
 }: {
     locale: string;
-    userId: string;
     forceDataError?: boolean;
     activationContext?: ActivationContext;
 }) {
-    const t = await getTranslations({ locale, namespace: 'dashboard' });
+    const [t, tw] = await Promise.all([
+        getTranslations({ locale, namespace: 'dashboard' }),
+        getTranslations({ locale, namespace: 'workflow' }),
+    ]);
     const cookieStore = await cookies();
     const cookieHeader = cookieStore.getAll().map((cookie) => `${cookie.name}=${cookie.value}`).join('; ');
 
-    const [projectsResult, weatherResult, tasksResult, activitiesResult, profileResult, funnelMetricsResult] = await Promise.all([
+    const [projectsResult, weatherResult, tasksResult, activitiesResult, profileResult] = await Promise.all([
         getProjects(cookieHeader),
         getWeather(cookieHeader),
         getTasks(cookieHeader),
         getActivities(cookieHeader),
         getProfile(cookieHeader),
-        getFunnelMetrics(userId),
     ]);
 
     const projects = projectsResult.data;
@@ -353,14 +311,37 @@ export default async function DashboardProjectList({
     todayStart.setHours(0, 0, 0, 0);
     const todayEnd = new Date(now);
     todayEnd.setHours(23, 59, 59, 999);
+    const nowEpoch = now.getTime();
     const todayStartEpoch = todayStart.getTime();
     const todayEndEpoch = todayEnd.getTime();
+    const window48hEndEpoch = nowEpoch + (48 * 60 * 60 * 1000);
 
     const pendingTasks = allTasks
         .filter((task) => task.status !== 'completed')
         .sort((left, right) => toEpoch(left.dueAt) - toEpoch(right.dueAt));
     const completedTasks = allTasks.filter((task) => task.status === 'completed');
     const dueTodayOrOverduePendingTasks = pendingTasks.filter((task) => toEpoch(task.dueAt) <= todayEndEpoch);
+    const overduePendingTasks = pendingTasks.filter((task) => {
+        const dueEpoch = toEpoch(task.dueAt);
+        return Number.isFinite(dueEpoch) && dueEpoch < todayStartEpoch;
+    });
+    const dueTodayPendingTasks = pendingTasks.filter((task) => {
+        const dueEpoch = toEpoch(task.dueAt);
+        return Number.isFinite(dueEpoch) && dueEpoch >= todayStartEpoch && dueEpoch <= todayEndEpoch;
+    });
+    const dueNext48hPendingTasks = pendingTasks.filter((task) => {
+        const dueEpoch = toEpoch(task.dueAt);
+        return Number.isFinite(dueEpoch) && dueEpoch > todayEndEpoch && dueEpoch <= window48hEndEpoch;
+    });
+    const dueIn48hPendingTasks = pendingTasks.filter((task) => {
+        const dueEpoch = toEpoch(task.dueAt);
+        return Number.isFinite(dueEpoch) && dueEpoch >= todayStartEpoch && dueEpoch <= window48hEndEpoch;
+    });
+    const windowPressureTasks = pendingTasks.filter((task) => {
+        const dueEpoch = toEpoch(task.dueAt);
+        return Number.isFinite(dueEpoch) && dueEpoch <= window48hEndEpoch;
+    });
+    const unscheduledPendingTasks = pendingTasks.filter((task) => !Number.isFinite(toEpoch(task.dueAt)));
 
     const todayTasks = allTasks.filter((task) => {
         const dueEpoch = toEpoch(task.dueAt);
@@ -477,18 +458,56 @@ export default async function DashboardProjectList({
                 helper: 'まだ着手前なら、最初の3手をAIに整理してもらいましょう。',
             };
 
-    const fallbackFunnel = {
-        onboardingCompleted: profile ? 1 : 0,
-        projectCreated: projects.length,
-        scheduleGenerated: hasGeneratedSchedule ? 1 : 0,
-        firstTaskCompleted: completedTaskExists ? 1 : 0,
-    };
-    const funnelMetrics = {
-        onboardingCompleted: Math.max(funnelMetricsResult.data.onboardingCompleted, fallbackFunnel.onboardingCompleted),
-        projectCreated: Math.max(funnelMetricsResult.data.projectCreated, fallbackFunnel.projectCreated),
-        scheduleGenerated: Math.max(funnelMetricsResult.data.scheduleGenerated, fallbackFunnel.scheduleGenerated),
-        firstTaskCompleted: Math.max(funnelMetricsResult.data.firstTaskCompleted, fallbackFunnel.firstTaskCompleted),
-    };
+    const weatherAlertCount = weather.alerts?.length || 0;
+    const dashboardRiskTone = buildRiskTone({
+        overdueCount: overduePendingTasks.length,
+        dueIn48hCount: dueIn48hPendingTasks.length,
+        weatherAlertCount,
+    });
+    const dashboardWindowTasks = windowPressureTasks.slice(0, 4);
+    const dashboardWindowAction = overduePendingTasks.length > 0
+        ? {
+            href: `/${locale}/calendar`,
+            label: t('ops_window.action_recover'),
+        }
+        : dueIn48hPendingTasks.length > 0
+            ? {
+                href: `/${locale}/calendar`,
+                label: t('ops_window.action_prepare'),
+            }
+            : {
+                href: buildTodayChatHref(locale),
+                label: t('ops_window.action_plan'),
+            };
+
+    const projectOpsById = new Map<string, ProjectOpsSummary>();
+    for (const project of projects) {
+        const projectPendingTasks = pendingTasks.filter((task) => task.projectId === project.id);
+        const nextTask = projectPendingTasks.find((task) => Number.isFinite(toEpoch(task.dueAt)))
+            || projectPendingTasks[0]
+            || null;
+        const overdueCount = projectPendingTasks.filter((task) => {
+            const dueEpoch = toEpoch(task.dueAt);
+            return Number.isFinite(dueEpoch) && dueEpoch < todayStartEpoch;
+        }).length;
+        const dueIn48hCount = projectPendingTasks.filter((task) => {
+            const dueEpoch = toEpoch(task.dueAt);
+            return Number.isFinite(dueEpoch) && dueEpoch >= todayStartEpoch && dueEpoch <= window48hEndEpoch;
+        }).length;
+        const unscheduledCount = projectPendingTasks.filter((task) => !Number.isFinite(toEpoch(task.dueAt))).length;
+        const risk = buildRiskTone({
+            overdueCount,
+            dueIn48hCount,
+            weatherAlertCount,
+        });
+        projectOpsById.set(project.id, {
+            nextTask,
+            overdueCount,
+            dueIn48hCount,
+            unscheduledCount,
+            risk,
+        });
+    }
 
     return (
         <div className="min-h-screen bg-background font-sans">
@@ -585,31 +604,69 @@ export default async function DashboardProjectList({
                     </TrackedEventLink>
                 </section>
 
-                <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                        <h2 className="text-base font-bold text-slate-900">Activation Funnel ({RECENT_FUNNEL_DAYS}日)</h2>
-                        {funnelMetricsResult.hasError && (
-                            <span className="text-xs text-amber-700">一部イベントは推定値です</span>
-                        )}
+                <section data-testid="dashboard-ops-window" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h2 className="text-base font-bold text-slate-900">{t('ops_window.title')}</h2>
+                            <p className="text-xs text-slate-500">{t('ops_window.subtitle')}</p>
+                        </div>
+                        <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${riskBadgeClass(dashboardRiskTone)}`}>
+                            {t('ops_window.risk_prefix')} {tw(`risk.${dashboardRiskTone}`)}
+                        </span>
                     </div>
+
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                         <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                            <p className="text-xs text-slate-500">Onboarding完了</p>
-                            <p className="mt-1 text-lg font-bold text-slate-900">{funnelMetrics.onboardingCompleted}</p>
+                            <p className="text-xs text-slate-500">{t('ops_window.overdue')}</p>
+                            <p className="mt-1 text-lg font-bold text-slate-900">{overduePendingTasks.length}</p>
                         </div>
                         <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                            <p className="text-xs text-slate-500">Project作成</p>
-                            <p className="mt-1 text-lg font-bold text-slate-900">{funnelMetrics.projectCreated}</p>
+                            <p className="text-xs text-slate-500">{t('ops_window.due_today')}</p>
+                            <p className="mt-1 text-lg font-bold text-slate-900">{dueTodayPendingTasks.length}</p>
                         </div>
                         <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                            <p className="text-xs text-slate-500">Schedule生成</p>
-                            <p className="mt-1 text-lg font-bold text-slate-900">{funnelMetrics.scheduleGenerated}</p>
+                            <p className="text-xs text-slate-500">{t('ops_window.due_48h')}</p>
+                            <p className="mt-1 text-lg font-bold text-slate-900">{dueNext48hPendingTasks.length}</p>
                         </div>
                         <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                            <p className="text-xs text-slate-500">1件目完了</p>
-                            <p className="mt-1 text-lg font-bold text-slate-900">{funnelMetrics.firstTaskCompleted}</p>
+                            <p className="text-xs text-slate-500">{t('ops_window.weather_alerts')}</p>
+                            <p className="mt-1 text-lg font-bold text-slate-900">{weatherAlertCount}</p>
                         </div>
                     </div>
+
+                    {dashboardWindowTasks.length > 0 ? (
+                        <div className="mt-4 space-y-2">
+                            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{t('ops_window.priority_list')}</p>
+                            {dashboardWindowTasks.map((task) => (
+                                <div key={task.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2">
+                                    <div className="min-w-0">
+                                        <p className="truncate text-sm font-semibold text-slate-900">{task.title}</p>
+                                        <p className="truncate text-xs text-slate-600">{task.projectName || t('ops_window.unassigned_project')}</p>
+                                    </div>
+                                    <span className="shrink-0 text-xs font-semibold text-slate-600">
+                                        {toDateLabel(task.dueAt, locale, t('ops_window.unscheduled'))}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="mt-4 text-sm text-emerald-700">{t('ops_window.clear_note')}</p>
+                    )}
+
+                    {unscheduledPendingTasks.length > 0 && (
+                        <p className="mt-3 text-xs text-amber-700">
+                            {t('ops_window.unscheduled_note', { count: unscheduledPendingTasks.length })}
+                        </p>
+                    )}
+
+                    <TrackedEventLink
+                        href={dashboardWindowAction.href}
+                        eventName="dashboard_48h_window_action_clicked"
+                        eventProperties={{ risk: dashboardRiskTone, overdue: overduePendingTasks.length }}
+                        className="mt-3 inline-flex min-h-[44px] items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-100"
+                    >
+                        {dashboardWindowAction.label}
+                    </TrackedEventLink>
                 </section>
 
                 <FirstWeekChecklist items={checklistItems} show={showFirstWeekChecklist} />
@@ -656,33 +713,65 @@ export default async function DashboardProjectList({
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {projects.slice(0, 6).map((project) => (
-                                <Link key={project.id} href={`/${locale}/projects/${project.id}`} className="block group h-full">
-                                    <div className="border rounded-xl p-5 hover:shadow-md transition bg-white h-full flex flex-col border-gray-200 group-hover:border-green-200">
-                                        <div className="flex justify-between items-start mb-3">
-                                            <h3 className="text-lg font-semibold text-gray-900 group-hover:text-green-700 transition line-clamp-1">
-                                                {project.name}
-                                            </h3>
-                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${project.status === 'active' ? 'bg-green-100 text-green-800' :
-                                                project.status === 'completed' ? 'bg-blue-100 text-blue-800' :
-                                                    'bg-yellow-100 text-yellow-800'
-                                                }`}>
-                                                {project.status}
-                                            </span>
-                                        </div>
-                                        <div className="space-y-2 text-sm text-gray-600 flex-1">
-                                            <div className="flex items-center gap-2">
-                                                <span className="material-symbols-outlined text-gray-400 text-base">grass</span>
-                                                <span>{project.crop} {project.variety && `(${project.variety})`}</span>
+                            {projects.slice(0, 6).map((project) => {
+                                const opsSummary = projectOpsById.get(project.id);
+                                const nextTaskDueLabel = opsSummary?.nextTask
+                                    ? toDateLabel(opsSummary.nextTask.dueAt, locale, t('project_ops.date_unknown'))
+                                    : t('project_ops.no_due_tasks');
+                                const projectRiskTone: RiskTone = opsSummary?.risk || 'safe';
+
+                                return (
+                                    <Link key={project.id} href={`/${locale}/projects/${project.id}`} className="block group h-full">
+                                        <div className="border rounded-xl p-5 hover:shadow-md transition bg-white h-full flex flex-col border-gray-200 group-hover:border-green-200">
+                                            <div className="flex justify-between items-start mb-3">
+                                                <h3 className="text-lg font-semibold text-gray-900 group-hover:text-green-700 transition line-clamp-1">
+                                                    {project.name}
+                                                </h3>
+                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${project.status === 'active' ? 'bg-green-100 text-green-800' :
+                                                    project.status === 'completed' ? 'bg-blue-100 text-blue-800' :
+                                                        'bg-yellow-100 text-yellow-800'
+                                                    }`}>
+                                                    {project.status}
+                                                </span>
                                             </div>
-                                            <div className="flex items-center gap-2">
-                                                <span className="material-symbols-outlined text-gray-400 text-base">calendar_today</span>
-                                                <span>{new Date(project.startDate).toLocaleDateString(locale)}</span>
+                                            <div className="space-y-2 text-sm text-gray-600">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="material-symbols-outlined text-gray-400 text-base">grass</span>
+                                                    <span>{project.crop} {project.variety && `(${project.variety})`}</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="material-symbols-outlined text-gray-400 text-base">calendar_today</span>
+                                                    <span>{toDateLabel(project.startDate, locale, t('project_ops.date_unknown'))}</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                                <div className="mb-1 flex items-center justify-between gap-2">
+                                                    <p className="text-xs font-semibold text-slate-600">{t('project_ops.next_operation')}</p>
+                                                    <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${riskBadgeClass(projectRiskTone)}`}>
+                                                        {tw(`risk.${projectRiskTone}`)}
+                                                    </span>
+                                                </div>
+                                                <p className="line-clamp-1 text-sm font-semibold text-slate-900">
+                                                    {opsSummary?.nextTask?.title || t('project_ops.no_pending_tasks')}
+                                                </p>
+                                                <p className="mt-1 text-xs text-slate-600">
+                                                    {t('project_ops.due_label', { date: nextTaskDueLabel })}
+                                                </p>
+                                                {opsSummary && (
+                                                    <p className="mt-1 text-xs text-slate-500">
+                                                        {t('project_ops.risk_counts', {
+                                                            overdue: opsSummary.overdueCount,
+                                                            dueIn48h: opsSummary.dueIn48hCount,
+                                                            unscheduled: opsSummary.unscheduledCount,
+                                                        })}
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
-                                    </div>
-                                </Link>
-                            ))}
+                                    </Link>
+                                );
+                            })}
                         </div>
                     )}
                 </div>
