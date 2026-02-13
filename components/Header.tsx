@@ -19,15 +19,15 @@ interface Alert {
   name?: string;
 }
 
-interface JMAWarning {
-  code: string;
-  name: string;
-  severity: 'advisory' | 'warning' | 'emergency';
-}
-
-interface JMATyphoonInfo {
+interface LiveWeatherAlert {
   id: string;
-  name: string;
+  type: string;
+  severity: 'low' | 'medium' | 'high' | 'advisory' | 'warning' | 'emergency';
+  title: string;
+  description?: string;
+  location?: string;
+  validFrom?: string;
+  validTo?: string;
 }
 
 interface KPIs {
@@ -76,9 +76,9 @@ function useTheme(): [ThemeMode, (m: ThemeMode) => void] {
   }];
 }
 
-function statusClassForWarning(severity: JMAWarning['severity']): StatusBadgeProps['tone'] {
-  if (severity === 'emergency') return 'critical';
-  if (severity === 'warning') return 'warning';
+function statusClassForWarning(severity: LiveWeatherAlert['severity']): StatusBadgeProps['tone'] {
+  if (severity === 'emergency' || severity === 'high') return 'critical';
+  if (severity === 'warning' || severity === 'medium') return 'warning';
   return 'watch';
 }
 
@@ -122,8 +122,7 @@ export default function Header({ locale, user = null, alerts = [], kpis }: Heade
   const base = `/${locale}`;
   const [mobileOpen, setMobileOpen] = useState(false);
   const [theme, setTheme] = useTheme();
-  const [liveWarnings, setLiveWarnings] = useState<JMAWarning[]>([]);
-  const [typhoons, setTyphoons] = useState<JMATyphoonInfo[]>([]);
+  const [liveWarnings, setLiveWarnings] = useState<LiveWeatherAlert[]>([]);
   const { data: session, status: sessionStatus } = useSession();
 
   const currentUser = session?.user || user;
@@ -160,13 +159,12 @@ export default function Header({ locale, user = null, alerts = [], kpis }: Heade
 
     const fetchWarnings = async () => {
       try {
-        const response = await fetch('/api/weather?type=warnings,typhoon');
+        const response = await fetch('/api/weather/alerts');
         if (!response.ok) return;
         const data = await response.json();
         if (ignore) return;
 
-        setLiveWarnings(Array.isArray(data.warnings) ? data.warnings : []);
-        setTyphoons(Array.isArray(data.typhoons) ? data.typhoons : []);
+        setLiveWarnings(Array.isArray(data.alerts) ? data.alerts : []);
       } catch {
         // noop
       }
@@ -203,6 +201,7 @@ export default function Header({ locale, user = null, alerts = [], kpis }: Heade
   const avatarSrc =
     (currentUser as { avatarUrl?: string } | null)?.avatarUrl ||
     (currentUser as { image?: string } | null)?.image;
+  const liveTyphoon = liveWarnings.find((warning) => warning.type === 'typhoon');
 
   const warningChips = [
     ...alerts.map((manualAlert) => ({
@@ -216,12 +215,16 @@ export default function Header({ locale, user = null, alerts = [], kpis }: Heade
             : t('alerts.frost_warning', { temp: manualAlert.value }),
     })),
     ...liveWarnings.slice(0, 2).map((warning) => ({
-      id: `jma-${warning.code}`,
+      id: `alert-${warning.id}`,
       tone: statusClassForWarning(warning.severity),
-      label: warning.name,
+      label: warning.title,
     })),
-    ...(typhoons[0]
-      ? [{ id: `typhoon-${typhoons[0].id}`, tone: 'critical', label: `${typhoons[0].name} 接近` }]
+    ...(liveTyphoon
+      ? [{
+        id: `typhoon-${liveTyphoon.id}`,
+        tone: 'critical',
+        label: `${liveTyphoon.title} 接近`,
+      }]
       : []),
   ] as Array<{ id: string; tone: StatusBadgeProps['tone']; label: string }>;
 

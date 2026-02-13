@@ -47,10 +47,20 @@ export default function TaskSidePanel({ selectedDate, tasks, affectedTasks = [],
     useEffect(() => {
         const loadWeather = async () => {
             try {
-                const res = await fetch('/api/weather', { cache: 'no-store' });
+                const res = await fetch('/api/weather/overview', { cache: 'no-store' });
                 if (!res.ok) return;
                 const data = await res.json().catch(() => ({}));
-                if (Array.isArray(data?.forecast)) setForecast(data.forecast as ForecastDay[]);
+                const daily = Array.isArray(data?.daily)
+                    ? data.daily.map((day: any) => ({
+                        date: day.date,
+                        temperature: day.temperature,
+                        condition: day?.condition?.label || day.condition || '不明',
+                        icon: day?.condition?.icon || day.icon,
+                    }))
+                    : Array.isArray(data?.forecast)
+                        ? data.forecast
+                        : [];
+                if (Array.isArray(daily)) setForecast(daily as ForecastDay[]);
             } catch {
                 // ignore
             }

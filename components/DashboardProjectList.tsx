@@ -108,27 +108,37 @@ async function getProjects(cookieHeader: string): Promise<LoadResult<Project[]>>
     }
 }
 
-async function getWeather(): Promise<LoadResult<WeatherData>> {
+async function getWeather(cookieHeader: string): Promise<LoadResult<WeatherData>> {
     try {
         const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const res = await fetch(`${baseUrl}/api/v1/weather/forecast?lat=37.4&lon=138.9`, {
+        const res = await fetch(`${baseUrl}/api/v1/weather/overview`, {
             next: { revalidate: 3600 },
+            headers: withCookieHeaders(cookieHeader),
         });
 
         if (!res.ok) throw new Error(`Failed to fetch weather (${res.status})`);
         const data = await res.json();
 
-        const today = data.forecast?.[0];
+        const daily = Array.isArray(data.daily) ? data.daily : [];
+        const today = daily[0];
+        const mappedForecast = daily.map((day: any) => ({
+            date: day.date,
+            temperature: day.temperature,
+            condition: day?.condition?.label || day.condition || '不明',
+            icon: day?.condition?.icon || day.icon || '03d',
+            precipitation: day?.precipitationMm ?? day.precipitation ?? 0,
+        }));
+
         return {
             data: {
-                location: data.location || '長岡市',
+                location: data?.location?.label || data.location || '長岡市',
                 temperature: {
                     max: today?.temperature?.max ?? 0,
                     min: today?.temperature?.min ?? 0,
                 },
-                condition: data.condition || '不明',
-                alerts: data.alerts || [],
-                forecast: data.forecast || [],
+                condition: data?.current?.condition?.label || data.condition || '不明',
+                alerts: Array.isArray(data.alerts) ? data.alerts.map((alert: any) => alert.title) : [],
+                forecast: mappedForecast,
             },
             hasError: false,
         };
@@ -312,7 +322,7 @@ export default async function DashboardProjectList({
 
     const [projectsResult, weatherResult, tasksResult, activitiesResult, profileResult, funnelMetricsResult] = await Promise.all([
         getProjects(cookieHeader),
-        getWeather(),
+        getWeather(cookieHeader),
         getTasks(cookieHeader),
         getActivities(cookieHeader),
         getProfile(cookieHeader),

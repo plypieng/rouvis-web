@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
-// Enhanced forecast types for JMA API
+// Enhanced forecast types for weather intelligence API
 export interface DetailedForecast {
   time: string;
   temperature: number;
@@ -23,7 +23,7 @@ export interface WeeklyForecast {
   condition: string;
   icon: string;
   precipitation: number;
-  reliability?: string; // A, B, C
+  reliability?: string;
 }
 
 export interface NowcastEntry {
@@ -33,6 +33,7 @@ export interface NowcastEntry {
 }
 
 export interface WeatherWarning {
+  id: string;
   type: string;
   severity: 'advisory' | 'warning' | 'emergency';
   title: string;
@@ -78,9 +79,10 @@ export interface WeatherData {
 
 interface UseWeatherForecastOptions {
   fieldId?: string;
+  projectId?: string;
   lat?: number;
   lon?: number;
-  refreshInterval?: number; // in milliseconds, default: no auto-refresh
+  refreshInterval?: number;
 }
 
 interface UseWeatherForecastReturn {
@@ -100,29 +102,16 @@ interface UseWeatherForecastReturn {
   refetch: () => void;
 }
 
-/**
- * useWeatherForecast - Custom hook for fetching weather data
- *
- * Fetches 6-day forecast from /api/weather with optional field location.
- * Returns current weather and forecast array with loading/error states.
- *
- * Features:
- * - Optional fieldId parameter for field-specific weather
- * - Manual coordinates (lat/lon) override
- * - Caching with manual refetch capability
- * - Optional auto-refresh interval
- *
- * @example
- * ```tsx
- * const { current, forecast, loading, error, refetch } = useWeatherForecast({
- *   fieldId: 'field-123'
- * });
- * ```
- */
+function toWarningSeverity(severity: string): 'advisory' | 'warning' | 'emergency' {
+  if (severity === 'high' || severity === 'emergency') return 'emergency';
+  if (severity === 'medium' || severity === 'warning') return 'warning';
+  return 'advisory';
+}
+
 export function useWeatherForecast(
   options: UseWeatherForecastOptions = {}
 ): UseWeatherForecastReturn {
-  const { fieldId, lat, lon, refreshInterval } = options;
+  const { fieldId, projectId, lat, lon, refreshInterval } = options;
 
   const [current, setCurrent] = useState<Omit<WeatherData, 'forecast'> | null>(null);
   const [forecast, setForecast] = useState<WeatherForecast[]>([]);
@@ -144,27 +133,19 @@ export function useWeatherForecast(
       setLoading(true);
       setError(null);
 
-      // Build query parameters
       const params = new URLSearchParams();
-      params.append('type', 'all'); // Request all weather data
-      if (fieldId) {
-        params.append('fieldId', fieldId);
-      }
-      if (lat !== undefined) {
-        params.append('lat', lat.toString());
-      }
-      if (lon !== undefined) {
-        params.append('lon', lon.toString());
-      }
+      if (fieldId) params.append('fieldId', fieldId);
+      if (projectId) params.append('projectId', projectId);
+      if (lat !== undefined) params.append('lat', lat.toString());
+      if (lon !== undefined) params.append('lon', lon.toString());
 
       const queryString = params.toString();
-      const url = `/api/weather${queryString ? `?${queryString}` : ''}`;
+      const url = `/api/weather/overview${queryString ? `?${queryString}` : ''}`;
 
       const response = await fetch(url, {
         headers: {
           'Content-Type': 'application/json',
         },
-        // Add cache control for fresh data
         cache: 'no-store',
       });
 
@@ -173,77 +154,67 @@ export function useWeatherForecast(
       }
 
       const data: any = await response.json();
+      const daily = Array.isArray(data.daily) ? data.daily : [];
+      const alerts = Array.isArray(data.alerts) ? data.alerts : [];
 
-      // Parse detailed forecast (3-day hourly)
-      if (data.detailed) {
-        setLoadingDetailed(true);
-        setDetailed(data.detailed || []);
-        setLoadingDetailed(false);
-      }
+      const mappedWeekly: WeeklyForecast[] = daily.map((day: any) => ({
+        date: day.date,
+        temperature: day.temperature,
+        condition: day?.condition?.label || '不明',
+        icon: day?.condition?.icon || '03d',
+        precipitation: day?.precipitationMm ?? 0,
+      }));
 
-      // Parse weekly forecast (7-day)
-      if (data.weekly) {
-        setLoadingWeekly(true);
-        setWeekly(data.weekly || []);
-        setLoadingWeekly(false);
-      }
+      setWeekly(mappedWeekly);
+      setForecast(mappedWeekly.map((w) => ({
+        date: w.date,
+        temperature: w.temperature,
+        condition: w.condition,
+        icon: w.icon,
+        precipitation: w.precipitation,
+      })));
 
-      // Parse nowcast (1-hour precipitation)
-      if (data.nowcast) {
-        setLoadingNowcast(true);
-        setNowcast(data.nowcast || []);
-        setLoadingNowcast(false);
-      }
-
-      // Parse warnings
-      if (data.warnings) {
-        setLoadingWarnings(true);
-        setWarnings(data.warnings || []);
-        setLoadingWarnings(false);
-      }
-
-      // Parse typhoons
-      if (data.typhoons) {
-        setTyphoons(data.typhoons || []);
-      }
-
-      // Set current weather from detailed forecast (first entry)
-      if (data.detailed && data.detailed.length > 0) {
-        const firstEntry = data.detailed[0];
+      if (data.current) {
         setCurrent({
-          temperature: firstEntry.temperature,
-          humidity: firstEntry.humidity || 65,
-          windSpeed: firstEntry.windSpeed,
-          windDirection: firstEntry.windDirection,
-          condition: firstEntry.condition,
-          icon: firstEntry.icon,
-          timestamp: firstEntry.time,
+          temperature: data.current.temperature,
+          humidity: 0,
+          windSpeed: data.current.windSpeedKmh ?? 0,
+          windDirection: data.current.windDirectionLabel,
+          condition: data?.current?.condition?.label || '不明',
+          icon: data?.current?.condition?.icon || '03d',
+          timestamp: data.current.observedAt,
         });
-      } else if (data.temperature !== undefined) {
-        // Fallback to legacy format
-        setCurrent({
-          temperature: data.temperature,
-          humidity: data.humidity,
-          windSpeed: data.windSpeed,
-          windDirection: data.windDirection,
-          condition: data.condition,
-          icon: data.icon,
-          timestamp: data.timestamp,
-        });
-      }
-
-      // Convert weekly to legacy forecast format for backward compatibility
-      if (data.weekly) {
-        setForecast(data.weekly.map((w: WeeklyForecast) => ({
-          date: w.date,
-          temperature: w.temperature,
-          condition: w.condition,
-          icon: w.icon,
-          precipitation: w.precipitation,
-        })));
       } else {
-        setForecast(data.forecast || []);
+        setCurrent(null);
       }
+
+      setWarnings(alerts.map((alert: any) => ({
+        id: alert.id,
+        type: alert.type,
+        severity: toWarningSeverity(alert.severity),
+        title: alert.title,
+        description: alert.description,
+        issuedAt: alert.validFrom || new Date().toISOString(),
+        areas: [alert.location || data?.location?.label || '不明'],
+      })));
+
+      setTyphoons(alerts
+        .filter((alert: any) => alert.type === 'typhoon')
+        .map((alert: any) => ({
+          id: alert.id,
+          name: alert.title,
+          intensity: alert.severity,
+          position: {
+            lat: data?.location?.lat ?? 0,
+            lon: data?.location?.lon ?? 0,
+          },
+          isApproaching: true,
+          affectedAreas: [alert.location || data?.location?.label || '不明'],
+        })));
+
+      // These datasets are not yet provided by the backend weather intelligence v1.
+      setDetailed([]);
+      setNowcast([]);
     } catch (err) {
       console.error('Failed to fetch weather:', err);
       setError('天気情報の取得に失敗しました');
@@ -261,14 +232,12 @@ export function useWeatherForecast(
       setLoadingNowcast(false);
       setLoadingWarnings(false);
     }
-  }, [fieldId, lat, lon]);
+  }, [fieldId, projectId, lat, lon]);
 
-  // Initial fetch
   useEffect(() => {
     fetchWeather();
   }, [fetchWeather]);
 
-  // Auto-refresh if interval is specified
   useEffect(() => {
     if (!refreshInterval || refreshInterval <= 0) {
       return;
