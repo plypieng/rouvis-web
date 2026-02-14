@@ -3,8 +3,17 @@
 import { forwardRef, useImperativeHandle, useRef, useEffect, useState, useCallback } from 'react';
 import { Send, Loader2, RefreshCw, Undo2, Paperclip, X, ArrowRight } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { useTranslations } from 'next-intl';
 import { toastError } from '@/lib/feedback';
-import type { QuickApplyResult } from '@/types/project-cockpit';
+import { trackUXEvent } from '@/lib/analytics';
+import {
+  createArtifactFromStreamEvent,
+  extractCommandHandshakeFromContent,
+  extractReschedulePlanBlock,
+  stripHiddenBlocks,
+  type ChatkitEvent,
+} from '@/lib/chat-artifacts';
+import type { CommandArtifact, CommandHandshake, QuickApplyResult } from '@/types/project-cockpit';
 
 export type ChatMode = 'default' | 'reschedule' | 'diagnosis' | 'logging';
 export type ChatSuggestion = {
@@ -47,6 +56,8 @@ interface Message {
   createdAt?: string;
 }
 
+type ChatMemoryRecallScope = 'session' | 'project' | 'user';
+
 interface RouvisChatKitProps {
   className?: string;
   projectId?: string;
@@ -57,92 +68,92 @@ interface RouvisChatKitProps {
   onTaskUpdate?: () => void;
   onDiagnosisComplete?: (result: unknown) => void;
   onDraftCreate?: (draft: any) => void;
+  onCommandHandshakeChange?: (handshake: CommandHandshake | null) => void;
   density?: 'compact' | 'comfortable';
   growthStage?: string;
+  standoutMode?: boolean;
+  channel?: string;
+  channelKind?: string;
+  channelActorId?: string;
+  sessionActorId?: string;
+  pairingCode?: string;
+  mentions?: string[];
+  memoryRecallScope?: ChatMemoryRecallScope;
+  autoCreateThread?: boolean;
 }
 
-// Friendly status messages (no technical jargon)
-const FRIENDLY_STATUS: Record<string, string> = {
-  'planner': '考え中...',
-  'jma.getForecast': '天気を確認中...',
-  'plant_doctor.diagnose': '見てみますね...',
-  'scheduler.createTask': '予定に追加中...',
-  'scheduler.reschedulePlan': '予定を見直し中...',
-  'scheduler.updateTask': '予定を調整中...',
-  'activities.log': '記録中...',
+// Friendly status message translation keys.
+const FRIENDLY_STATUS_KEYS: Record<string, string> = {
+  'planner': 'cockpit.status.planner',
+  'jma.getForecast': 'cockpit.status.weather',
+  'plant_doctor.diagnose': 'cockpit.status.diagnosis',
+  'scheduler.createTask': 'cockpit.status.task_create',
+  'scheduler.reschedulePlan': 'cockpit.status.reschedule',
+  'scheduler.updateTask': 'cockpit.status.task_update',
+  'activities.log': 'cockpit.status.activity_log',
 };
 
-const MODE_CONFIG: Record<ChatMode, { label: string; color: string; bg: string; border: string }> = {
-  default: { label: '', color: '', bg: '', border: '' },
+const MODE_CONFIG: Record<ChatMode, { color: string; bg: string; border: string }> = {
+  default: { color: '', bg: '', border: '' },
   reschedule: {
-    label: 'スケジュール調整モード: 日程変更や優先順位の相談承ります',
     color: 'text-amber-700',
     bg: 'bg-amber-50',
     border: 'border-amber-200'
   },
   diagnosis: {
-    label: '診断モード: 写真を送ってください。AIが診断します',
     color: 'text-teal-700',
     bg: 'bg-teal-50',
     border: 'border-teal-200'
   },
   logging: {
-    label: '作業記録モード: 作業内容を教えてください',
     color: 'text-blue-700',
     bg: 'bg-blue-50',
     border: 'border-blue-200'
   },
 };
 
-function stripHiddenBlocks(content: string): string {
-  if (!content) return content;
-  return content
-    .replace(/\[\[(RESCHEDULE_PLAN|UPDATE_TASK|CHOICE):[\s\S]*?\]\]/g, '')
-    .trim();
-}
-
-function extractReschedulePlanBlock(content: string): string | null {
-  if (!content) return null;
-  const matched = content.match(/\[\[RESCHEDULE_PLAN:\s*([\s\S]*?)\]\]/);
-  return matched?.[0] || null;
-}
-
 // Time-aware greetings
-function getGreeting(weather?: { condition?: string }): { main: string; sub: string } {
+function getGreeting(
+  weather: { condition?: string } | undefined,
+  t: (key: string) => string
+): { main: string; sub: string } {
   const hour = new Date().getHours();
 
   if (hour >= 5 && hour < 10) {
-    return { main: 'おはようございます 🌱', sub: '今日も良い一日になりますように' };
+    return { main: t('cockpit.greeting.morning_main'), sub: t('cockpit.greeting.morning_sub') };
   } else if (hour >= 10 && hour < 17) {
     if (weather?.condition?.includes('雨')) {
-      return { main: '雨の日ですね ☔', sub: '計画を立てるのにいい日かも' };
+      return { main: t('cockpit.greeting.rain_main'), sub: t('cockpit.greeting.rain_sub') };
     }
-    return { main: '今日も畑日和ですね 🌱', sub: '何か気になることありますか？' };
+    return { main: t('cockpit.greeting.day_main'), sub: t('cockpit.greeting.day_sub') };
   } else if (hour >= 17 && hour < 21) {
-    return { main: 'お疲れさまです 🌾', sub: '今日の振り返りはいかがですか？' };
+    return { main: t('cockpit.greeting.evening_main'), sub: t('cockpit.greeting.evening_sub') };
   } else {
-    return { main: 'こんばんは 🌙', sub: '明日の準備はどうですか？' };
+    return { main: t('cockpit.greeting.night_main'), sub: t('cockpit.greeting.night_sub') };
   }
 }
 
 // Quick action suggestions (text links, not buttons)
-function getQuickSuggestions(growthStage?: string): ChatSuggestion[] {
+function getQuickSuggestions(
+  growthStage: string | undefined,
+  t: (key: string) => string
+): ChatSuggestion[] {
   const hour = new Date().getHours();
   const suggestions: ChatSuggestion[] = [];
 
   if (hour >= 5 && hour < 12) {
-    suggestions.push({ label: '今日の予定は？', message: '今日の作業予定を教えて' });
+    suggestions.push({ label: t('cockpit.suggestions.today_label'), message: t('cockpit.suggestions.today_message') });
   }
 
   if (growthStage?.toLowerCase().includes('seedling') || growthStage?.includes('育苗')) {
-    suggestions.push({ label: '水やり記録', message: '水やりを記録したい', mode: 'logging' });
+    suggestions.push({ label: t('cockpit.suggestions.watering_label'), message: t('cockpit.suggestions.watering_message'), mode: 'logging' });
   } else if (growthStage?.toLowerCase().includes('harvest') || growthStage?.includes('収穫')) {
-    suggestions.push({ label: '収穫記録', message: '収穫を記録したい', mode: 'logging' });
+    suggestions.push({ label: t('cockpit.suggestions.harvest_label'), message: t('cockpit.suggestions.harvest_message'), mode: 'logging' });
   } else {
-    suggestions.push({ label: '作業を記録', message: '作業を記録したい', mode: 'logging' });
+    suggestions.push({ label: t('cockpit.suggestions.log_label'), message: t('cockpit.suggestions.log_message'), mode: 'logging' });
   }
 
-  suggestions.push({ label: '天気', message: '今日の天気は？' });
+  suggestions.push({ label: t('cockpit.suggestions.weather_label'), message: t('cockpit.suggestions.weather_message') });
 
   return suggestions.slice(0, 3);
 }
@@ -157,15 +168,28 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   onTaskUpdate,
   onDiagnosisComplete,
   onDraftCreate,
+  onCommandHandshakeChange,
   density = 'comfortable',
   growthStage,
+  standoutMode = false,
+  channel = 'chat',
+  channelKind = 'direct',
+  channelActorId,
+  sessionActorId,
+  pairingCode,
+  mentions,
+  memoryRecallScope = 'session',
+  autoCreateThread = true,
 }, ref) => {
+  const t = useTranslations('chat');
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState(initialInput || '');
   const [isLoading, setIsLoading] = useState(false);
   const [threadId, setThreadId] = useState<string | undefined>(initialThreadId);
   const [currentStatus, setCurrentStatus] = useState<string>('');
   const [actionConfirmations, setActionConfirmations] = useState<ActionConfirmation[]>([]);
+  const [commandArtifacts, setCommandArtifacts] = useState<CommandArtifact[]>([]);
+  const [activeHandshake, setActiveHandshake] = useState<CommandHandshake | null>(null);
   const [weather, setWeather] = useState<{ condition?: string } | undefined>();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isUserNearBottom, setIsUserNearBottom] = useState(true);
@@ -179,25 +203,64 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   const lastAssistantFailedRef = useRef(false);
   const quickApplyInFlightRef = useRef(false);
   const lastActionTypeRef = useRef<ActionConfirmation['type'] | null>(null);
+  const createThreadPromiseRef = useRef<Promise<string | null> | null>(null);
+
+  const pushArtifact = useCallback((artifact: CommandArtifact | null) => {
+    if (!artifact || !standoutMode) return;
+    setCommandArtifacts(prev => [...prev.slice(-14), artifact]);
+  }, [standoutMode]);
+
+  const publishHandshake = useCallback((handshake: CommandHandshake | null) => {
+    setActiveHandshake(handshake);
+    onCommandHandshakeChange?.(handshake);
+  }, [onCommandHandshakeChange]);
+
+  const ensureThreadId = useCallback(async (): Promise<string | undefined> => {
+    if (threadId) return threadId;
+    if (!autoCreateThread) return undefined;
+
+    if (createThreadPromiseRef.current) {
+      const pendingThreadId = await createThreadPromiseRef.current;
+      return pendingThreadId || undefined;
+    }
+
+    createThreadPromiseRef.current = (async () => {
+      try {
+        const res = await fetch('/api/chatkit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'chatkit.create_thread',
+            payload: {
+              ...(projectId ? { projectId } : {}),
+            },
+          }),
+        });
+        if (!res.ok) return null;
+        const data = await res.json().catch(() => ({}));
+        const createdThreadId = typeof data?.thread?.id === 'string' ? data.thread.id : null;
+        if (createdThreadId) {
+          setThreadId(createdThreadId);
+        }
+        return createdThreadId;
+      } catch (error) {
+        console.warn('Failed to create thread:', error);
+        return null;
+      } finally {
+        createThreadPromiseRef.current = null;
+      }
+    })();
+
+    const createdThreadId = await createThreadPromiseRef.current;
+    return createdThreadId || undefined;
+  }, [autoCreateThread, projectId, threadId]);
 
   // Load chat history on mount
   useEffect(() => {
     const loadHistory = async () => {
       if (!threadId) {
-        if (projectId) {
-          try {
-            const res = await fetch('/api/chatkit', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ action: 'chatkit.create_thread', payload: { projectId } }),
-            });
-            if (res.ok) {
-              const data = await res.json();
-              if (data.thread?.id) setThreadId(data.thread.id);
-            }
-          } catch (e) {
-            console.warn('Failed to create thread:', e);
-          }
+        if (projectId && autoCreateThread) {
+          await ensureThreadId();
         }
         return;
       }
@@ -227,7 +290,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     };
 
     loadHistory();
-  }, [threadId, projectId]);
+  }, [autoCreateThread, ensureThreadId, projectId, threadId]);
 
   useEffect(() => {
     if (!initialMode) return;
@@ -246,11 +309,16 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     setCustomSuggestions(initialSuggestions);
   }, [initialSuggestions, messages.length]);
 
+  useEffect(() => {
+    setCommandArtifacts([]);
+    publishHandshake(null);
+  }, [threadId, publishHandshake]);
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        toastError('画像サイズは5MB以下にしてください');
+        toastError(t('cockpit.errors.image_size'));
         return;
       }
       const reader = new FileReader();
@@ -333,14 +401,22 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     setMessages(prev => [...prev, newAssistantMessage]);
 
     try {
+      const resolvedThreadId = threadId || await ensureThreadId();
       const response = await fetch('/api/chatkit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: apiMessages,
           projectId,
-          threadId,
+          threadId: resolvedThreadId,
           mode: overrideMode || chatMode, // Send active mode (prefer override if provided)
+          channel,
+          channelKind,
+          channelActorId,
+          sessionActorId,
+          pairingCode,
+          mentions,
+          recallScope: memoryRecallScope,
         }),
       });
 
@@ -386,19 +462,15 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
               continue;
             }
 
-            const event = data as {
-              type?: string;
-              delta?: { tool?: string; status?: string; content?: string };
-              citation?: { source?: string };
-              action?: { type?: string; undoData?: unknown };
-              toolName?: string;
-              result?: unknown;
-              data?: { type: string; options?: any[]; action?: string };
-            };
+            const event = data as ChatkitEvent;
+
+            const artifact = createArtifactFromStreamEvent(event);
+            pushArtifact(artifact);
 
             // Simple status update (no complex thinking UI)
             if (event.type === 'tool_call_delta' && event.delta?.tool) {
-              const friendlyStatus = FRIENDLY_STATUS[event.delta.tool] || '処理中...';
+              const statusKey = FRIENDLY_STATUS_KEYS[event.delta.tool];
+              const friendlyStatus = statusKey ? t(statusKey) : t('cockpit.status.processing');
               setCurrentStatus(friendlyStatus);
             }
 
@@ -432,16 +504,18 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
               const confirmation: ActionConfirmation = {
                 id: `confirm-${Date.now()}`,
                 type: actionType,
-                summary: actionType === 'task_created' ? '予定に追加しました' :
-                  actionType === 'activity_logged' ? '記録しました' :
-                    '更新しました',
+                summary: actionType === 'task_created'
+                  ? t('cockpit.confirmations.task_created')
+                  : actionType === 'activity_logged'
+                    ? t('cockpit.confirmations.activity_logged')
+                    : t('cockpit.confirmations.task_updated'),
                 undoData: event.action.undoData,
                 expiresAt: Date.now() + 30000,
               };
               setActionConfirmations(prev => [...prev, confirmation]);
-              setTimeout(() => {
+              window.setTimeout(() => {
                 setActionConfirmations(prev => prev.filter(c => c.id !== confirmation.id));
-              }, 5000);
+              }, Math.max(0, confirmation.expiresAt - Date.now()));
             }
 
             // Weather for context
@@ -475,8 +549,8 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
             if (event.type === 'custom_ui' && event.data) {
               if (event.data.type === 'choice' && event.data.options) {
                 const mappedOptions = event.data.options.map(opt => ({
-                  label: opt.label,
-                  message: opt.value,
+                  label: opt.label || t('cockpit.choice.default_label'),
+                  message: opt.value || '',
                 }));
                 setCustomSuggestions(mappedOptions);
               }
@@ -488,13 +562,42 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
         }
       }
 
+      const handshake = extractCommandHandshakeFromContent({
+        content: assistantRawContent,
+        promptFallback: content.trim() || t('cockpit.reschedule.default_prompt'),
+        source: 'chat',
+      });
+      if (handshake) {
+        const localizedHandshake: CommandHandshake = {
+          ...handshake,
+          summary: t('cockpit.handshake.summary_detected', {
+            count: handshake.affectedTasks.length,
+          }),
+        };
+        publishHandshake(localizedHandshake);
+        pushArtifact({
+          id: `artifact-plan-${Date.now()}`,
+          kind: 'plan',
+          title: t('cockpit.artifacts.plan_title'),
+          description: localizedHandshake.summary,
+          detail: t('cockpit.artifacts.plan_detail', { count: localizedHandshake.affectedTasks.length }),
+          tone: localizedHandshake.riskTone,
+          createdAt: new Date().toISOString(),
+          metadata: {
+            affectedTaskCount: localizedHandshake.affectedTasks.length,
+          },
+        });
+      } else if (overrideMode === 'reschedule' || chatMode === 'reschedule') {
+        publishHandshake(null);
+      }
+
       onTaskUpdate?.();
     } catch (error) {
       assistantFailed = true;
       console.error('Chat error:', error);
       setMessages(prev => prev.map(m =>
         m.id === assistantId
-          ? { ...m, content: m.content || 'うまくいかなかったみたい。', hasError: true }
+          ? { ...m, content: m.content || t('cockpit.errors.generic'), hasError: true }
           : m
       ));
     } finally {
@@ -503,7 +606,28 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
       setIsLoading(false);
       setCurrentStatus('');
     }
-  }, [messages, projectId, threadId, isLoading, selectedImage, onTaskUpdate, onDiagnosisComplete, onDraftCreate, chatMode]);
+  }, [
+    channel,
+    channelActorId,
+    channelKind,
+    ensureThreadId,
+    memoryRecallScope,
+    messages,
+    mentions,
+    projectId,
+    pairingCode,
+    sessionActorId,
+    threadId,
+    isLoading,
+    selectedImage,
+    onTaskUpdate,
+    onDiagnosisComplete,
+    onDraftCreate,
+    chatMode,
+    publishHandshake,
+    pushArtifact,
+    t,
+  ]);
 
   const runRescheduleQuickApply = useCallback(async (
     options: { prompt: string; confirmMessage?: string }
@@ -525,25 +649,26 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
       const proposalRaw = lastAssistantRawRef.current;
       const planBlock = extractReschedulePlanBlock(proposalRaw);
       if (!planBlock) {
+        publishHandshake(null);
         return { applied: false, reason: 'no_plan' };
       }
 
       lastActionTypeRef.current = null;
-      await sendMessage(options.confirmMessage?.trim() || 'この内容でお願いします', 'reschedule');
+      await sendMessage(options.confirmMessage?.trim() || t('cockpit.quick_apply_confirm_message'), 'reschedule');
       if (lastAssistantFailedRef.current) {
         return { applied: false, reason: 'apply_failed' };
       }
 
       const confirmationRaw = lastAssistantRawRef.current;
       const appliedByAction = lastActionTypeRef.current === 'task_updated';
-      const appliedByText = /予定を調整しました|更新しました|反映済み/.test(confirmationRaw);
+      const appliedByText = /予定を調整しました|更新しました|反映済み|applied|updated/i.test(confirmationRaw);
       return appliedByAction || appliedByText
         ? { applied: true }
         : { applied: false, reason: 'apply_unconfirmed' };
     } finally {
       quickApplyInFlightRef.current = false;
     }
-  }, [isLoading, sendMessage]);
+  }, [isLoading, publishHandshake, sendMessage, t]);
 
   const handleRetry = useCallback(() => {
     setMessages(prev => {
@@ -594,25 +719,67 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
       if (res.ok) {
         setActionConfirmations(prev => prev.filter(c => c.id !== confirmation.id));
         onTaskUpdate?.();
+        void trackUXEvent('command_artifact_undo_clicked', {
+          projectId: projectId || 'none',
+          actionType: confirmation.type,
+        });
       }
     } catch (e) {
       console.error('Undo failed:', e);
     }
-  }, [onTaskUpdate]);
+  }, [onTaskUpdate, projectId]);
 
-  const greeting = getGreeting(weather);
-  const suggestions = customSuggestions || getQuickSuggestions(growthStage);
+  const greeting = getGreeting(weather, t);
+  const suggestions = customSuggestions || getQuickSuggestions(growthStage, t);
   const isCompact = density === 'compact';
   const modeConfig = MODE_CONFIG[chatMode];
+  const modeLabelMap: Record<Exclude<ChatMode, 'default'>, string> = {
+    reschedule: t('cockpit.modes.reschedule.label'),
+    diagnosis: t('cockpit.modes.diagnosis.label'),
+    logging: t('cockpit.modes.logging.label'),
+  };
+  const modePlaceholderMap: Record<Exclude<ChatMode, 'default'>, string> = {
+    reschedule: t('cockpit.modes.reschedule.placeholder'),
+    diagnosis: t('cockpit.modes.diagnosis.placeholder'),
+    logging: t('cockpit.modes.logging.placeholder'),
+  };
+  const modeLabel = chatMode === 'default' ? '' : modeLabelMap[chatMode];
+  const inputPlaceholder = chatMode === 'default'
+    ? t('cockpit.placeholder_message')
+    : modePlaceholderMap[chatMode];
+  const handshakeToneClass = activeHandshake?.riskTone === 'critical'
+    ? 'status-critical'
+    : activeHandshake?.riskTone === 'warning'
+      ? 'status-warning'
+      : activeHandshake?.riskTone === 'watch'
+        ? 'status-watch'
+        : 'status-safe';
 
   return (
-    <div className={`flex flex-col h-full bg-card ${className}`}>
+    <div className={`surface-base flex flex-col h-full ${className}`} data-testid="chat-container">
       {/* Messages */}
       <div
         ref={messagesContainerRef}
         onScroll={handleMessagesScroll}
-        className="flex-1 overflow-y-auto p-4 space-y-4"
+        className="mobile-scroll flex-1 overflow-y-auto p-4 space-y-4"
       >
+        {standoutMode && (
+          <div className="surface-raised px-3 py-2 text-[11px]">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-border bg-card px-2 py-0.5 font-semibold">
+                {chatMode === 'default' ? t('cockpit.modes.default.label') : modeLabel}
+              </span>
+              {activeHandshake ? (
+                <span className={`rounded-full px-2 py-0.5 font-semibold ${handshakeToneClass}`}>
+                  {t('cockpit.handshake.affected', { count: activeHandshake.affectedTasks.length })}
+                </span>
+              ) : (
+                <span className="text-muted-foreground">{t('cockpit.handshake.none')}</span>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Empty state with personality */}
         {messages.length === 0 && !isLoading && (
           <div className="text-center py-12 px-6">
@@ -622,9 +789,9 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
         )}
 
         {messages.map((message) => (
-          <div key={message.id} className="space-y-1">
+          <div key={message.id} className="space-y-1" data-testid={message.hasError ? 'chat-error' : undefined}>
             {/* Message Bubble */}
-            <div className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`flex ${message.role === 'user' ? 'justify-end message-user' : 'justify-start message-assistant'}`}>
               <div
                 className={`max-w-[85%] px-4 py-3 ${message.role === 'user'
                   ? 'bg-primary text-primary-foreground rounded-2xl rounded-tr-md'
@@ -637,7 +804,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
                   <div className="mb-2">
                     <img
                       src={message.imageUrl}
-                      alt="Uploaded"
+                      alt={t('cockpit.images.uploaded_alt')}
                       className="max-w-full rounded-lg max-h-64 object-cover border border-black/10"
                     />
                   </div>
@@ -661,7 +828,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
                     className="mt-2 flex items-center gap-1 text-xs text-destructive/80 hover:text-destructive"
                   >
                     <RefreshCw className="w-3 h-3" />
-                    もう一度試す
+                    {t('cockpit.retry')}
                   </button>
                 )}
               </div>
@@ -670,7 +837,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
             {/* Simple source attribution (no confidence %) */}
             {message.source && (
               <p className="text-xs text-muted-foreground ml-1">
-                出典: {message.source}
+                {t('cockpit.citation_prefix')}: {message.source}
               </p>
             )}
           </div>
@@ -678,9 +845,93 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
 
         {/* Simple status line while loading */}
         {isLoading && currentStatus && (
-          <p className="text-sm text-muted-foreground animate-pulse pl-1">
+          <p className="text-sm text-muted-foreground animate-pulse pl-1" data-testid="streaming-indicator">
             {currentStatus}
           </p>
+        )}
+
+        {standoutMode && (activeHandshake || commandArtifacts.length > 0) && (
+          <section className="space-y-2" data-testid="command-artifact-timeline">
+            {activeHandshake && (
+              <article
+                data-testid="command-handshake-card"
+                className={`rounded-lg border px-3 py-2 text-xs ${handshakeToneClass}`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-semibold">{activeHandshake.summary}</p>
+                  <button
+                    type="button"
+                    className="touch-target rounded-md border border-current/30 px-2 py-1 font-semibold hover:bg-black/5"
+                    onClick={() => {
+                      void trackUXEvent('command_handshake_preview_in_chat', {
+                        projectId: projectId || 'none',
+                        affectedTasks: activeHandshake.affectedTasks.length,
+                      });
+                      void sendMessage(activeHandshake.prompt, 'reschedule');
+                    }}
+                  >
+                    {t('cockpit.handshake.preview')}
+                  </button>
+                </div>
+                <p className="mt-1 text-[11px] opacity-85">
+                  {t('cockpit.handshake.affected', { count: activeHandshake.affectedTasks.length })}
+                </p>
+              </article>
+            )}
+
+            {commandArtifacts.map((artifact) => {
+              const confidence = typeof artifact.metadata?.confidence === 'number'
+                ? Math.round(artifact.metadata.confidence * 100)
+                : null;
+              const choiceCount = typeof artifact.metadata?.options === 'object' && Array.isArray(artifact.metadata.options)
+                ? artifact.metadata.options.length
+                : 0;
+              const artifactTitle = artifact.kind === 'status'
+                ? t('cockpit.artifacts.status_title')
+                : artifact.kind === 'citation'
+                  ? t('cockpit.artifacts.citation_title')
+                  : artifact.kind === 'action_receipt'
+                    ? t('cockpit.artifacts.action_receipt_title')
+                    : artifact.kind === 'choice'
+                      ? t('cockpit.artifacts.choice_title')
+                      : artifact.kind === 'queue'
+                        ? t('cockpit.artifacts.queue_title')
+                        : artifact.kind === 'memory'
+                          ? t('cockpit.artifacts.memory_title')
+                          : artifact.kind === 'error'
+                            ? t('cockpit.artifacts.error_title')
+                            : artifact.title;
+              const artifactDescription = artifact.kind === 'choice'
+                ? t('cockpit.artifacts.choice_detail', { count: choiceCount })
+                : artifact.description;
+              return (
+                <button
+                  key={artifact.id}
+                  type="button"
+                  onClick={() => {
+                    void trackUXEvent('command_artifact_clicked', {
+                      projectId: projectId || 'none',
+                      kind: artifact.kind,
+                    });
+                  }}
+                  className="w-full rounded-lg border border-border/80 bg-secondary/35 px-3 py-2 text-left text-xs text-foreground hover:bg-secondary/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  data-testid={artifact.kind === 'citation' ? 'evidence-card' : `command-artifact-${artifact.kind}`}
+                >
+                  <p className="font-semibold">{artifactTitle}</p>
+                  {artifactDescription ? <p className="mt-0.5">{artifactDescription}</p> : null}
+                  {artifact.detail ? <p className="mt-0.5 text-muted-foreground">{artifact.detail}</p> : null}
+                  {artifact.kind === 'citation' ? (
+                    <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
+                      <span data-testid="citation">{t('cockpit.citation_label')}</span>
+                      <span data-testid="confidence-score">
+                        {confidence === null ? '-' : `${confidence}%`}
+                      </span>
+                    </div>
+                  ) : null}
+                </button>
+              );
+            })}
+          </section>
         )}
 
         {!isUserNearBottom && hasUnreadMessages && (
@@ -694,7 +945,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
               }}
               className="px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-medium shadow-md hover:opacity-90"
             >
-              最新のメッセージへ
+              {t('cockpit.jump_latest')}
             </button>
           </div>
         )}
@@ -711,6 +962,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
               <div
                 key={confirmation.id}
                 className="flex items-center justify-between py-2 px-4 bg-primary/10 text-primary text-sm rounded-lg"
+                data-testid="action-confirmation-card"
               >
                 <span>{confirmation.summary} ✓</span>
                 {!!confirmation.undoData && Date.now() < confirmation.expiresAt && (
@@ -719,7 +971,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
                     className="flex items-center gap-1 text-xs underline opacity-70 hover:opacity-100"
                   >
                     <Undo2 className="w-3 h-3" />
-                    取り消す
+                    {t('cockpit.undo')}
                   </button>
                 )}
               </div>
@@ -761,7 +1013,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
             <div className="relative inline-block">
               <img
                 src={selectedImage}
-                alt="Preview"
+                alt={t('cockpit.images.preview_alt')}
                 className="h-20 w-20 object-cover rounded-lg border border-border"
               />
               <button
@@ -789,6 +1041,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
               onClick={() => fileInputRef.current?.click()}
               className="p-2 ml-1 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full transition-colors"
               disabled={isLoading}
+              aria-label={t('cockpit.attach_image')}
             >
               <Paperclip className="w-5 h-5" />
             </button>
@@ -796,7 +1049,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={chatMode !== 'default' ? modeConfig.label.split(':')[0] + 'でメッセージ...' : 'メッセージ...'}
+              placeholder={inputPlaceholder}
               className={`flex-1 bg-transparent border-none px-2 py-2 min-h-[44px] focus:outline-none placeholder:text-muted-foreground ${isCompact ? 'text-sm' : 'text-base'}`}
               disabled={isLoading}
             />
@@ -806,7 +1059,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
               className={`text-primary-foreground rounded-full p-3 min-w-[44px] min-h-[44px] flex items-center justify-center hover:opacity-90 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed transition-all ${chatMode !== 'default' ? chatMode === 'reschedule' ? 'bg-amber-600' : chatMode === 'diagnosis' ? 'bg-teal-600' : 'bg-blue-600' : 'bg-primary'}`}
             >
               {isLoading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <Loader2 className="w-5 h-5 animate-spin" data-testid="message-loading" />
               ) : (
                 <Send className="w-5 h-5" />
               )}
@@ -821,13 +1074,13 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
               <span className="material-symbols-outlined text-[16px]">
                 {chatMode === 'reschedule' ? 'calendar_today' : chatMode === 'diagnosis' ? 'stethoscope' : 'edit_note'}
               </span>
-              <span>{modeConfig.label}</span>
+              <span>{modeLabel}</span>
             </div>
             <button
               onClick={() => setChatModeState('default')}
               className="hover:underline opacity-80 hover:opacity-100 uppercase tracking-wider text-[10px]"
             >
-              終了
+              {t('cockpit.exit')}
             </button>
           </div>
         )}

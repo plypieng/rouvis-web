@@ -328,6 +328,156 @@
       "watering_label": "💧 Do I need to water?",
       "watering": "Should I water today?"
     },
+    "cockpit": {
+      "new_conversation": "New Conversation",
+      "placeholder_message": "Type a message...",
+      "attach_image": "Attach image",
+      "retry": "Try again",
+      "undo": "Undo",
+      "exit": "Exit",
+      "jump_latest": "Jump to latest",
+      "citation_prefix": "Source",
+      "citation_label": "Evidence",
+      "quick_apply_confirm_message": "Please apply this plan.",
+      "reschedule": {
+        "default_prompt": "Please review and propose schedule changes."
+      },
+      "thread_titles": {
+        "today": "Today Focus",
+        "calendar": "Calendar Planning",
+        "project": "Project Assistant",
+        "context": "Context Chat"
+      },
+      "context_day_today": "Today",
+      "context_suggestions": {
+        "use_prompt_label": "Use this prompt",
+        "today_priority_label": "Top 3 priorities",
+        "today_priority_message": "Narrow today down to the top 3 tasks with reasons.",
+        "today_next_label": "Next after completion",
+        "today_next_message": "What should I do next after the task I just finished?",
+        "today_log_label": "Help me log work",
+        "today_log_message": "I want to log today's work.",
+        "calendar_day_plan_label": "{day} sequence",
+        "calendar_day_plan_message": "Reorder {day}'s schedule by time and optimize it.",
+        "calendar_risk_label": "Check weather risk",
+        "calendar_risk_message": "Rework the task order for {day} with weather risks in mind.",
+        "calendar_delay_label": "Delay candidates",
+        "calendar_delay_message": "Which tasks on {day} are safe to postpone?",
+        "project_focus_label": "This week's focus",
+        "project_focus_message": "Tell me the top 3 focus tasks for this project this week.",
+        "project_risk_label": "Pest and disease risk",
+        "project_risk_message": "What pest and disease risks should I watch this season?",
+        "project_template_label": "Log template",
+        "project_template_message": "Create a simple logging template for this project."
+      },
+      "standalone": {
+        "deck_label": "Command Deck",
+        "title": "Standalone Operations Chat",
+        "subtitle": "Manage proposal, evidence, and apply flow in one operator log.",
+        "thread_count": "{count} logs",
+        "context_active": "Context input: {intent}",
+        "open_log": "Open log",
+        "close_log": "Close log",
+        "command_log_title": "Command Log Rail",
+        "command_log_subtitle": "Session history and operation mode",
+        "search_label": "Search conversation log",
+        "search_placeholder": "Search logs",
+        "empty_log": "No matching logs found.",
+        "updated_at": "Updated: {time}",
+        "updated_unknown": "No timestamp",
+        "intents": {
+          "today": "Today operations",
+          "calendar": "Schedule tuning",
+          "project": "Project advisory",
+          "general": "General"
+        }
+      },
+      "greeting": {
+        "morning_main": "Good morning",
+        "morning_sub": "Let's keep today focused and practical.",
+        "rain_main": "Rainy day",
+        "rain_sub": "A good time to re-sequence operations.",
+        "day_main": "Great day for field operations",
+        "day_sub": "Let's sort your priorities together.",
+        "evening_main": "Good work today",
+        "evening_sub": "Let's review today and prep tomorrow.",
+        "night_main": "Good evening",
+        "night_sub": "Let's line up tomorrow's priorities."
+      },
+      "suggestions": {
+        "today_label": "Today's plan",
+        "today_message": "Show me today's task plan",
+        "watering_label": "Log watering",
+        "watering_message": "I want to log watering",
+        "harvest_label": "Log harvest",
+        "harvest_message": "I want to log harvest",
+        "log_label": "Log activity",
+        "log_message": "I want to log an activity",
+        "weather_label": "Check weather",
+        "weather_message": "What's today's weather?"
+      },
+      "modes": {
+        "default": {
+          "label": "Default Mode"
+        },
+        "reschedule": {
+          "label": "Reschedule Mode",
+          "placeholder": "Message in reschedule mode..."
+        },
+        "diagnosis": {
+          "label": "Diagnosis Mode",
+          "placeholder": "Message in diagnosis mode..."
+        },
+        "logging": {
+          "label": "Logging Mode",
+          "placeholder": "Message in logging mode..."
+        }
+      },
+      "status": {
+        "planner": "Thinking...",
+        "weather": "Checking weather...",
+        "diagnosis": "Running diagnosis...",
+        "task_create": "Creating task...",
+        "reschedule": "Reworking schedule...",
+        "task_update": "Updating task...",
+        "activity_log": "Logging activity...",
+        "processing": "Processing..."
+      },
+      "confirmations": {
+        "task_created": "Added to schedule",
+        "activity_logged": "Logged successfully",
+        "task_updated": "Updated successfully"
+      },
+      "handshake": {
+        "preview": "Preview in Chat",
+        "affected": "Affected tasks: {count}",
+        "none": "No active change plan.",
+        "summary_detected": "{count} schedule changes detected"
+      },
+      "artifacts": {
+        "plan_title": "Change plan detected",
+        "plan_detail": "Affected tasks: {count}",
+        "status_title": "Execution status",
+        "citation_title": "Evidence",
+        "action_receipt_title": "Action receipt",
+        "choice_title": "Operator choice",
+        "choice_detail": "{count} options available",
+        "queue_title": "Queue update",
+        "memory_title": "Memory state",
+        "error_title": "Execution error"
+      },
+      "choice": {
+        "default_label": "Option"
+      },
+      "errors": {
+        "image_size": "Image size must be 5MB or less.",
+        "generic": "Something went wrong. Please try again shortly."
+      },
+      "images": {
+        "uploaded_alt": "Uploaded image",
+        "preview_alt": "Image preview"
+      }
+    },
     "tools": {
       "attach_field": "Field",
       "attach_photo": "Photo"

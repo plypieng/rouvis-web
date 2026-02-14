@@ -609,6 +609,156 @@
       "watering_label": "💧 今日は灌水した方が良いですか？目安量も教えてください。?",
       "watering": "今日は灌水した方が良いですか？目安量も教えてください。?"
     },
+    "cockpit": {
+      "new_conversation": "新しい会話",
+      "placeholder_message": "メッセージを入力...",
+      "attach_image": "画像を添付",
+      "retry": "もう一度試す",
+      "undo": "取り消す",
+      "exit": "終了",
+      "jump_latest": "最新のメッセージへ",
+      "citation_prefix": "出典",
+      "citation_label": "根拠",
+      "quick_apply_confirm_message": "この内容でお願いします",
+      "reschedule": {
+        "default_prompt": "予定を見直して提案してください。"
+      },
+      "thread_titles": {
+        "today": "今日の重点",
+        "calendar": "カレンダー調整",
+        "project": "プロジェクト相談",
+        "context": "文脈チャット"
+      },
+      "context_day_today": "今日",
+      "context_suggestions": {
+        "use_prompt_label": "この内容で相談",
+        "today_priority_label": "今日の優先3つ",
+        "today_priority_message": "今日の優先作業を3つに絞って理由も教えて",
+        "today_next_label": "完了後の次作業",
+        "today_next_message": "今終わった作業の次にやるべきことは？",
+        "today_log_label": "作業記録を手伝って",
+        "today_log_message": "今日の作業を記録したい",
+        "calendar_day_plan_label": "{day}の段取り",
+        "calendar_day_plan_message": "{day}の予定を時間順に並べて最適化して",
+        "calendar_risk_label": "天気リスクを確認",
+        "calendar_risk_message": "{day}の天気リスクを踏まえて作業順を見直して",
+        "calendar_delay_label": "延期候補を知る",
+        "calendar_delay_message": "{day}で延期してよい作業を教えて",
+        "project_focus_label": "今週の重点作業",
+        "project_focus_message": "このプロジェクトの今週の重点作業を3つ教えて",
+        "project_risk_label": "病害虫リスク",
+        "project_risk_message": "この時期に注意すべき病害虫リスクは？",
+        "project_template_label": "記録テンプレート",
+        "project_template_message": "このプロジェクト向けの簡単な記録テンプレートを作って"
+      },
+      "standalone": {
+        "deck_label": "コマンドデッキ",
+        "title": "スタンドアロン運用チャット",
+        "subtitle": "提案・根拠・適用をひとつのログで管理します。",
+        "thread_count": "ログ {count}件",
+        "context_active": "文脈入力: {intent}",
+        "open_log": "ログを開く",
+        "close_log": "ログを閉じる",
+        "command_log_title": "コマンドログレール",
+        "command_log_subtitle": "実行セッションの履歴",
+        "search_label": "会話ログを検索",
+        "search_placeholder": "ログを検索",
+        "empty_log": "一致するログはありません。",
+        "updated_at": "更新: {time}",
+        "updated_unknown": "更新時刻なし",
+        "intents": {
+          "today": "今日の作業",
+          "calendar": "予定調整",
+          "project": "プロジェクト相談",
+          "general": "一般相談"
+        }
+      },
+      "greeting": {
+        "morning_main": "おはようございます",
+        "morning_sub": "今日も無理なく進めましょう。",
+        "rain_main": "雨の日ですね",
+        "rain_sub": "段取りの見直しに最適です。",
+        "day_main": "今日も畑日和ですね",
+        "day_sub": "気になる作業を一緒に整理しましょう。",
+        "evening_main": "お疲れさまです",
+        "evening_sub": "今日の実績と明日の準備を確認しましょう。",
+        "night_main": "こんばんは",
+        "night_sub": "明日の優先作業を整えましょう。"
+      },
+      "suggestions": {
+        "today_label": "今日の予定",
+        "today_message": "今日の作業予定を教えて",
+        "watering_label": "水やり記録",
+        "watering_message": "水やりを記録したい",
+        "harvest_label": "収穫記録",
+        "harvest_message": "収穫を記録したい",
+        "log_label": "作業を記録",
+        "log_message": "作業を記録したい",
+        "weather_label": "天気を確認",
+        "weather_message": "今日の天気は？"
+      },
+      "modes": {
+        "default": {
+          "label": "通常モード"
+        },
+        "reschedule": {
+          "label": "スケジュール調整モード",
+          "placeholder": "スケジュール調整でメッセージ..."
+        },
+        "diagnosis": {
+          "label": "診断モード",
+          "placeholder": "診断モードでメッセージ..."
+        },
+        "logging": {
+          "label": "作業記録モード",
+          "placeholder": "作業記録モードでメッセージ..."
+        }
+      },
+      "status": {
+        "planner": "考え中...",
+        "weather": "天気を確認中...",
+        "diagnosis": "診断中...",
+        "task_create": "予定に追加中...",
+        "reschedule": "予定を見直し中...",
+        "task_update": "予定を調整中...",
+        "activity_log": "記録中...",
+        "processing": "処理中..."
+      },
+      "confirmations": {
+        "task_created": "予定に追加しました",
+        "activity_logged": "記録しました",
+        "task_updated": "更新しました"
+      },
+      "handshake": {
+        "preview": "チャットで確認",
+        "affected": "影響タスク: {count}件",
+        "none": "アクティブな変更プランはありません。",
+        "summary_detected": "調整候補を{count}件検出しました"
+      },
+      "artifacts": {
+        "plan_title": "変更プランを検出しました",
+        "plan_detail": "影響タスク {count}件",
+        "status_title": "実行ステータス",
+        "citation_title": "根拠",
+        "action_receipt_title": "操作レシート",
+        "choice_title": "オペレーター選択",
+        "choice_detail": "候補 {count}件",
+        "queue_title": "キュー更新",
+        "memory_title": "メモリ状態",
+        "error_title": "実行エラー"
+      },
+      "choice": {
+        "default_label": "選択肢"
+      },
+      "errors": {
+        "image_size": "画像サイズは5MB以下にしてください",
+        "generic": "うまくいかなかったようです。時間をおいて再試行してください。"
+      },
+      "images": {
+        "uploaded_alt": "アップロード画像",
+        "preview_alt": "画像プレビュー"
+      }
+    },
     "tools": {
       "attach_field": "Field",
       "attach_photo": "Photo"

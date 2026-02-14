@@ -3,6 +3,14 @@ import { getBackendAuth } from '../../../lib/backend-proxy-auth';
 
 export const runtime = 'edge';
 
+async function readJsonSafe<T = Record<string, unknown>>(response: Response): Promise<T> {
+  try {
+    return await response.json() as T;
+  } catch {
+    return {} as T;
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -25,8 +33,9 @@ export async function POST(req: NextRequest) {
           ...auth.headers,
         },
       });
-      const data = await res.json();
+      const data = await readJsonSafe<{ threads?: unknown[] }>(res);
       return new Response(JSON.stringify({ threads: data.threads || [] }), {
+        status: res.status,
         headers: { 'Content-Type': 'application/json' },
       });
     }
@@ -40,8 +49,9 @@ export async function POST(req: NextRequest) {
         },
         body: JSON.stringify(body.payload || {}),
       });
-      const data = await res.json();
+      const data = await readJsonSafe<{ thread?: unknown }>(res);
       return new Response(JSON.stringify({ thread: data.thread }), {
+        status: res.status,
         headers: { 'Content-Type': 'application/json' },
       });
     }
@@ -55,7 +65,7 @@ export async function POST(req: NextRequest) {
         },
         body: JSON.stringify(body.payload || {}),
       });
-      const data = await res.json();
+      const data = await readJsonSafe<Record<string, unknown>>(res);
       return new Response(JSON.stringify(data), {
         status: res.status,
         headers: { 'Content-Type': 'application/json' },
@@ -71,11 +81,38 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'application/json',
         ...auth.headers,
       },
-      body: JSON.stringify({ messages, threadId, projectId, mode }),
+      body: JSON.stringify({
+        messages,
+        threadId,
+        projectId,
+        mode,
+        channel: typeof body.channel === 'string' ? body.channel : undefined,
+        channelKind: typeof body.channelKind === 'string' ? body.channelKind : undefined,
+        channelActorId: typeof body.channelActorId === 'string' ? body.channelActorId : undefined,
+        sessionActorId: typeof body.sessionActorId === 'string' ? body.sessionActorId : undefined,
+        pairingCode: typeof body.pairingCode === 'string' ? body.pairingCode : undefined,
+        mentions: Array.isArray(body.mentions) ? body.mentions : undefined,
+        schedulerQueue: body.schedulerQueue,
+        queueSettings: body.queueSettings,
+        clearThreadQueueSettings: body.clearThreadQueueSettings,
+        persistThreadQueueSettings: body.persistThreadQueueSettings,
+        highRiskScheduleChange: body.highRiskScheduleChange,
+        forceConsensus: body.forceConsensus,
+        recallScope: body.recallScope ?? body.memoryRecallScope,
+      }),
     });
 
     if (!response.ok) {
-      return new Response(JSON.stringify({ error: response.statusText }), {
+      const errorBody = await readJsonSafe<{
+        error?: string;
+        errorCode?: string;
+        requestId?: string;
+      }>(response);
+      return new Response(JSON.stringify({
+        error: errorBody.error || response.statusText || 'Request failed',
+        errorCode: errorBody.errorCode,
+        requestId: errorBody.requestId,
+      }), {
         status: response.status,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -210,7 +247,7 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const data = await res.json();
+    const data = await readJsonSafe<{ thread?: { messages?: unknown[] } }>(res);
     return new Response(JSON.stringify({
       messages: data.thread?.messages || []
     }), {

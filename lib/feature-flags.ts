@@ -2,6 +2,7 @@ export type WebFeatureFlags = {
   knowledgePage: boolean;
   marketPage: boolean;
   teamPage: boolean;
+  chatCockpitStandout: boolean;
 };
 
 function parseBooleanFlag(value: string | undefined, defaultValue = false): boolean {
@@ -22,6 +23,10 @@ export function getWebFeatureFlags(): WebFeatureFlags {
     ),
     teamPage: parseBooleanFlag(
       process.env.FEATURE_TEAM_PAGE ?? process.env.NEXT_PUBLIC_FEATURE_TEAM_PAGE,
+      false
+    ),
+    chatCockpitStandout: parseBooleanFlag(
+      process.env.FEATURE_CHAT_COCKPIT_STANDOUT ?? process.env.NEXT_PUBLIC_FEATURE_CHAT_COCKPIT_STANDOUT,
       false
     ),
   };

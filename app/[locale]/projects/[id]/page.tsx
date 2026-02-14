@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import ProjectDetailClient from '@/components/projects/ProjectDetailClient';
 import { cookies } from 'next/headers';
+import { getWebFeatureFlags } from '@/lib/feature-flags';
 
 async function getProject(id: string) {
     const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
@@ -23,9 +24,17 @@ export default async function ProjectDetailPage(props: { params: Promise<{ local
     const { locale, id } = params;
     const data = await getProject(id);
 
-    if (!data || !data.project) {
-        notFound();
-    }
+  if (!data || !data.project) {
+    notFound();
+  }
 
-    return <ProjectDetailClient project={data.project} locale={locale} />;
+  const featureFlags = getWebFeatureFlags();
+
+  return (
+    <ProjectDetailClient
+      project={data.project}
+      locale={locale}
+      chatCockpitStandoutEnabled={featureFlags.chatCockpitStandout}
+    />
+  );
 }

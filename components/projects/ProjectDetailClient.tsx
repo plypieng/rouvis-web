@@ -9,7 +9,12 @@ import ProjectHeader from '@/components/projects/ProjectHeader';
 import ProjectCalendar from '@/components/projects/ProjectCalendar';
 import ProjectAgentOnboarding from '@/components/projects/ProjectAgentOnboarding';
 import TaskCreateModal from './TaskCreateModal';
-import type { CockpitPanelMode, QuickApplyResult, QuickApplyState } from '@/types/project-cockpit';
+import type {
+    CockpitPanelMode,
+    CommandHandshake,
+    QuickApplyResult,
+    QuickApplyState,
+} from '@/types/project-cockpit';
 import { toastError, toastSuccess } from '@/lib/feedback';
 import { trackUXEvent } from '@/lib/analytics';
 
@@ -47,6 +52,7 @@ type Project = {
 interface ProjectDetailClientProps {
     project: Project;
     locale: string;
+    chatCockpitStandoutEnabled?: boolean;
 }
 
 type NoticeState = {
@@ -66,7 +72,11 @@ function clampSplitRatio(value: number): number {
     return Math.min(MAX_SPLIT, Math.max(MIN_SPLIT, value));
 }
 
-export default function ProjectDetailClient({ project, locale }: ProjectDetailClientProps) {
+export default function ProjectDetailClient({
+    project,
+    locale,
+    chatCockpitStandoutEnabled = false,
+}: ProjectDetailClientProps) {
     const t = useTranslations('projects');
     const router = useRouter();
     const pathname = usePathname();
@@ -79,6 +89,7 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
     const [splitRatio, setSplitRatio] = useState(DEFAULT_SPLIT);
     const [isResizing, setIsResizing] = useState(false);
     const [quickApplyState, setQuickApplyState] = useState<QuickApplyState>({ status: 'idle' });
+    const [activeHandshake, setActiveHandshake] = useState<CommandHandshake | null>(null);
     const [hasCompletedTask, setHasCompletedTask] = useState(
         () => (project.tasks || []).some((task) => task.status === 'completed')
     );
@@ -182,6 +193,11 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
             if (message) {
                 chatRef.current.sendMessage(message, 'reschedule');
             }
+            void trackUXEvent('command_handshake_preview_clicked', {
+                surface: 'project_detail',
+                projectId: project.id,
+                hasPrompt: Boolean(message),
+            });
         }
     };
 
@@ -251,6 +267,11 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
         setPanelMode('chat');
         updatePanelQuery('chat');
         setQuickApplyState({ status: 'running' });
+        void trackUXEvent('command_handshake_apply_clicked', {
+            surface: 'project_detail',
+            projectId: project.id,
+            hasPrompt: Boolean(prompt?.trim()),
+        });
 
         const result = await chatRef.current.runRescheduleQuickApply({
             prompt,
@@ -260,6 +281,11 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
         if (result.applied) {
             setQuickApplyState({ status: 'success', reason: t('calendar.quick_apply_success') });
             router.refresh();
+            void trackUXEvent('command_handshake_apply_result', {
+                surface: 'project_detail',
+                projectId: project.id,
+                applied: true,
+            });
             return result;
         }
 
@@ -276,8 +302,25 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
             status: 'error',
             reason: reasonMap[result.reason || ''] || t('calendar.quick_apply_error_generic'),
         });
+        void trackUXEvent('command_handshake_apply_result', {
+            surface: 'project_detail',
+            projectId: project.id,
+            applied: false,
+            reason: result.reason || 'unknown',
+        });
         return result;
-    }, [router, t, updatePanelQuery]);
+    }, [project.id, router, t, updatePanelQuery]);
+
+    const handleCommandHandshakeChange = useCallback((handshake: CommandHandshake | null) => {
+        setActiveHandshake(handshake);
+        if (!handshake) return;
+        void trackUXEvent('command_handshake_exposed', {
+            surface: 'project_detail',
+            projectId: project.id,
+            affectedTasks: handshake.affectedTasks.length,
+            tone: handshake.riskTone || 'safe',
+        });
+    }, [project.id]);
 
     const hasTasks = Boolean(project.tasks?.length);
 
@@ -287,10 +330,13 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
                 ref={chatRef}
                 className="surface-base h-full flex-1 overflow-hidden"
                 projectId={project.id}
+                memoryRecallScope="project"
                 onTaskUpdate={() => router.refresh()}
                 onDraftCreate={(draft) => handleTaskCreate(new Date(), draft)}
+                onCommandHandshakeChange={chatCockpitStandoutEnabled ? handleCommandHandshakeChange : undefined}
                 density="compact"
                 growthStage={project.currentStage}
+                standoutMode={chatCockpitStandoutEnabled}
             />
         </div>
     );
@@ -307,6 +353,7 @@ export default function ProjectDetailClient({ project, locale }: ProjectDetailCl
                 onTaskCreate={handleTaskCreate}
                 onQuickApplyRequest={handleQuickApplyRequest}
                 quickApplyState={quickApplyState}
+                externalHandshake={chatCockpitStandoutEnabled ? activeHandshake : null}
             />
         </div>
     ) : (

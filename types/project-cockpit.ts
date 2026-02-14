@@ -23,3 +23,46 @@ export type QuickApplyResult = {
   applied: boolean;
   reason?: string;
 };
+
+export type CommandRiskTone = 'safe' | 'watch' | 'warning' | 'critical';
+
+export type CommandHandshakeTask = {
+  id: string;
+  title: string;
+  dueDate: string;
+  fromDate?: string;
+  toDate?: string;
+  reason?: string;
+};
+
+export type CommandHandshake = {
+  id: string;
+  source: 'chat' | 'calendar';
+  summary: string;
+  prompt: string;
+  affectedTasks: CommandHandshakeTask[];
+  createdAt: string;
+  planRaw?: string;
+  riskTone?: CommandRiskTone;
+};
+
+export type CommandArtifactKind =
+  | 'status'
+  | 'citation'
+  | 'action_receipt'
+  | 'choice'
+  | 'plan'
+  | 'queue'
+  | 'memory'
+  | 'error';
+
+export type CommandArtifact = {
+  id: string;
+  kind: CommandArtifactKind;
+  title: string;
+  description?: string;
+  detail?: string;
+  tone?: CommandRiskTone;
+  createdAt: string;
+  metadata?: Record<string, unknown>;
+};

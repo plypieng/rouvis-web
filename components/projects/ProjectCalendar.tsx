@@ -18,7 +18,13 @@ import MonthGrid from './calendar/MonthGrid';
 import ProjectYearView from './ProjectYearView';
 import TaskSidePanel from './calendar/TaskSidePanel';
 import ProjectInsightsPanel from './ProjectInsightsPanel';
-import type { ProjectTaskItem, QuickApplyResult, QuickApplyState, TaskMovePayload } from '@/types/project-cockpit';
+import type {
+  CommandHandshake,
+  ProjectTaskItem,
+  QuickApplyResult,
+  QuickApplyState,
+  TaskMovePayload,
+} from '@/types/project-cockpit';
 
 interface ProjectCalendarProps {
   startDate: string;
@@ -34,6 +40,7 @@ interface ProjectCalendarProps {
   onTaskCreate?: (date: Date, initialData?: { title: string; description?: string }) => void;
   onQuickApplyRequest?: (prompt: string) => Promise<QuickApplyResult>;
   quickApplyState?: QuickApplyState;
+  externalHandshake?: CommandHandshake | null;
 }
 
 type RescheduleSuggestion = {
@@ -65,6 +72,7 @@ export default function ProjectCalendar({
   onTaskCreate,
   onQuickApplyRequest,
   quickApplyState,
+  externalHandshake,
 }: ProjectCalendarProps) {
   const locale = useLocale();
   const t = useTranslations('projects.calendar');
@@ -103,6 +111,19 @@ export default function ProjectCalendar({
   const taskSignature = tasks.map((task) => `${task.id}:${task.dueDate}:${task.status}`).join('|');
 
   useEffect(() => {
+    if (externalHandshake) {
+      setRescheduleSuggestion({
+        summary: externalHandshake.summary,
+        prompt: externalHandshake.prompt,
+        affectedTasks: externalHandshake.affectedTasks.map(task => ({
+          id: task.id,
+          title: task.title,
+          dueDate: task.dueDate,
+        })),
+      });
+      return;
+    }
+
     let isActive = true;
     const fetchSuggestion = async () => {
       try {
@@ -119,7 +140,7 @@ export default function ProjectCalendar({
     return () => {
       isActive = false;
     };
-  }, [project.id, taskSignature]);
+  }, [externalHandshake, project.id, taskSignature]);
 
   const affectedTaskIds = useMemo(
     () => new Set((rescheduleSuggestion?.affectedTasks || []).map((task) => task.id)),
@@ -237,12 +258,14 @@ export default function ProjectCalendar({
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 p-3 sm:p-4">
       {rescheduleSuggestion ? (
-        <section className="surface-base border-brand-waterline/30 p-3">
+        <section className="surface-base border-brand-waterline/30 p-3" data-testid="calendar-handshake-rail">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{t('handshake_title')}</p>
-              <p className="mt-0.5 text-sm font-semibold text-foreground">{rescheduleSuggestion.summary}</p>
-              <p className="text-xs text-muted-foreground">
+              <p className="mt-0.5 text-sm font-semibold text-foreground" data-testid="calendar-handshake-summary">
+                {rescheduleSuggestion.summary}
+              </p>
+              <p className="text-xs text-muted-foreground" data-testid="calendar-handshake-affected">
                 {t('handshake_affected', { count: rescheduleSuggestion.affectedTasks?.length || 0 })}
               </p>
             </div>
@@ -251,6 +274,7 @@ export default function ProjectCalendar({
                 type="button"
                 onClick={() => onRescheduleRequest?.(rescheduleSuggestion.prompt)}
                 className="touch-target rounded-lg border border-border bg-secondary px-3 py-2 text-xs font-semibold text-secondary-foreground hover:bg-secondary/75"
+                data-testid="calendar-handshake-preview"
               >
                 {t('handshake_preview')}
               </button>
@@ -259,6 +283,7 @@ export default function ProjectCalendar({
                 onClick={handleQuickApply}
                 disabled={!onQuickApplyRequest || quickApplyState?.status === 'running'}
                 className="touch-target rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-55"
+                data-testid="calendar-handshake-apply"
               >
                 {quickApplyState?.status === 'running' ? t('handshake_apply_running') : t('handshake_apply')}
               </button>

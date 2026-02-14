@@ -33,7 +33,7 @@ test.describe('Error Handling and Loading States', () => {
     await page.goto('http://localhost:3002/ja/chat');
 
     // Mock network failure
-    await page.route('**/api/chat/**', route => route.abort());
+    await page.route('**/api/chatkit**', route => route.abort());
 
     const inputField = page.locator('input[placeholder*="メッセージ"]');
     const sendButton = page.locator('button[type="submit"]');
@@ -212,7 +212,7 @@ test.describe('Error Handling and Loading States', () => {
     await page.goto('http://localhost:3002/ja/chat');
 
     // Mock timeout
-    await page.route('**/api/chat/**', async route => {
+    await page.route('**/api/chatkit**', async route => {
       await page.waitForTimeout(35000); // Longer than timeout
       await route.fulfill({ status: 200, body: '{}' });
     });
@@ -365,7 +365,7 @@ test.describe('Error Handling and Loading States', () => {
     await page.goto('http://localhost:3002/ja/chat');
 
     // Mock rate limit error
-    await page.route('**/api/chat/**', route => route.fulfill({
+    await page.route('**/api/chatkit**', route => route.fulfill({
       status: 429,
       contentType: 'application/json',
       body: JSON.stringify({

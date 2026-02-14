@@ -1,7 +1,22 @@
 import { test, expect, type BrowserContext } from '@playwright/test';
 import { encode } from 'next-auth/jwt';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const SESSION_SECRET = process.env.NEXTAUTH_SECRET || 'dev-secret';
+function resolveNextAuthSecret(): string {
+  if (process.env.NEXTAUTH_SECRET) return process.env.NEXTAUTH_SECRET;
+
+  const envPath = path.join(process.cwd(), '.env.local');
+  if (!fs.existsSync(envPath)) return 'dev-secret';
+
+  const envRaw = fs.readFileSync(envPath, 'utf8');
+  const matched = envRaw.match(/^\s*NEXTAUTH_SECRET\s*=\s*(.+)\s*$/m);
+  if (!matched?.[1]) return 'dev-secret';
+
+  return matched[1].replace(/^['"]|['"]$/g, '').trim();
+}
+
+const SESSION_SECRET = resolveNextAuthSecret();
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3002';
 
 async function attachAuthenticatedSession(context: BrowserContext) {
@@ -121,13 +136,13 @@ test.describe('P1 contextual UX regression', () => {
     await page.goto(contextUrl);
     await expect(page.getByText('今日の優先3つ')).toBeVisible();
 
-    const threadTitles = page.locator('div.text-sm.font-medium.mb-1', { hasText: 'Today Focus' });
-    const firstVisitCount = await threadTitles.count();
+    const threadItems = page.getByTestId('chat-thread-item');
+    const firstVisitCount = await threadItems.count();
 
     await page.goto(contextUrl);
     await expect(page.getByText('今日の優先3つ')).toBeVisible();
 
-    await expect.poll(async () => threadTitles.count()).toBeGreaterThan(firstVisitCount);
+    await expect.poll(async () => threadItems.count()).toBeGreaterThan(firstVisitCount);
   });
 
   test('shows dashboard inline warning and tracks retry click', async ({ page }) => {

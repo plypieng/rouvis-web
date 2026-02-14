@@ -1,6 +1,54 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type BrowserContext } from '@playwright/test';
+import { encode } from 'next-auth/jwt';
+import fs from 'node:fs';
+import path from 'node:path';
+
+function resolveNextAuthSecret(): string {
+  if (process.env.NEXTAUTH_SECRET) return process.env.NEXTAUTH_SECRET;
+
+  const envPath = path.join(process.cwd(), '.env.local');
+  if (!fs.existsSync(envPath)) return 'dev-secret';
+
+  const envRaw = fs.readFileSync(envPath, 'utf8');
+  const matched = envRaw.match(/^\s*NEXTAUTH_SECRET\s*=\s*(.+)\s*$/m);
+  if (!matched?.[1]) return 'dev-secret';
+
+  return matched[1].replace(/^['"]|['"]$/g, '').trim();
+}
+
+const SESSION_SECRET = resolveNextAuthSecret();
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3002';
+
+async function attachAuthenticatedSession(context: BrowserContext) {
+  const userId = process.env.PLAYWRIGHT_AUTH_USER_ID || 'e2e-user-1';
+  const token = await encode({
+    secret: SESSION_SECRET,
+    token: {
+      sub: userId,
+      id: userId,
+      email: process.env.PLAYWRIGHT_AUTH_EMAIL || 'e2e@example.com',
+      name: process.env.PLAYWRIGHT_AUTH_NAME || 'E2E User',
+      onboardingComplete: true,
+    },
+    maxAge: 30 * 24 * 60 * 60,
+  });
+
+  await context.addCookies([
+    {
+      name: 'next-auth.session-token',
+      value: token,
+      url: BASE_URL,
+      httpOnly: true,
+      sameSite: 'Lax',
+    },
+  ]);
+}
 
 test.describe('Reschedule Flow', () => {
+  test.beforeEach(async ({ context }) => {
+    await attachAuthenticatedSession(context);
+  });
+
   test('hides reschedule plan blocks in chat output', async ({ page }) => {
     await page.route('**/api/chatkit**', async route => {
       const request = route.request();
@@ -65,7 +113,7 @@ test.describe('Reschedule Flow', () => {
 
     await page.goto('http://localhost:3002/ja/chat');
 
-    const chatInput = page.locator('input[placeholder*="メッセージ"]');
+    const chatInput = page.locator('input[type="text"]');
     await expect(chatInput).toBeVisible();
     await chatInput.fill('予定を変えて');
     await chatInput.press('Enter');
