@@ -338,6 +338,7 @@ export default function ProjectCalendar({
             <div className="min-h-0 flex-1">
               {view === 'month' ? (
                 <MonthGrid
+                  projectId={project.id}
                   currentDate={currentDate}
                   selectedDate={selectedDate}
                   onSelectDate={setSelectedDate}
@@ -359,6 +360,7 @@ export default function ProjectCalendar({
 
           <div className="min-h-0">
             <TaskSidePanel
+              projectId={project.id}
               selectedDate={selectedDate}
               tasks={calendarTasks}
               affectedTasks={rescheduleSuggestion?.affectedTasks || []}

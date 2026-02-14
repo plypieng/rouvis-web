@@ -22,8 +22,6 @@ interface MonthWeatherState {
 interface UseMonthWeatherOptions {
     fieldId?: string;
     projectId?: string;
-    lat?: number;
-    lon?: number;
 }
 
 export function useMonthWeather(year: number, month: number, options: UseMonthWeatherOptions = {}) {
@@ -32,9 +30,18 @@ export function useMonthWeather(year: number, month: number, options: UseMonthWe
         loading: true,
         error: null
     });
-    const { fieldId, projectId, lat, lon } = options;
+    const { fieldId, projectId } = options;
 
     const fetchMonthWeather = useCallback(async () => {
+        if (!fieldId && !projectId) {
+            setState({
+                data: {},
+                loading: false,
+                error: 'Weather scope is required',
+            });
+            return;
+        }
+
         try {
             setState(prev => ({ ...prev, loading: true, error: null }));
 
@@ -44,8 +51,6 @@ export function useMonthWeather(year: number, month: number, options: UseMonthWe
             });
             if (fieldId) params.set('fieldId', fieldId);
             if (projectId) params.set('projectId', projectId);
-            if (typeof lat === 'number') params.set('lat', lat.toString());
-            if (typeof lon === 'number') params.set('lon', lon.toString());
 
             const res = await fetch(`/api/weather/forecast/monthly?${params.toString()}`);
             if (!res.ok) throw new Error('Failed to fetch weather');
@@ -69,7 +74,7 @@ export function useMonthWeather(year: number, month: number, options: UseMonthWe
             console.error('Failed to fetch monthly weather:', error);
             setState(prev => ({ ...prev, loading: false, error: 'Weather fetch failed' }));
         }
-    }, [year, month, fieldId, projectId, lat, lon]);
+    }, [year, month, fieldId, projectId]);
 
     useEffect(() => {
         fetchMonthWeather();

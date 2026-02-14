@@ -80,8 +80,6 @@ export interface WeatherData {
 interface UseWeatherForecastOptions {
   fieldId?: string;
   projectId?: string;
-  lat?: number;
-  lon?: number;
   refreshInterval?: number;
 }
 
@@ -111,7 +109,7 @@ function toWarningSeverity(severity: string): 'advisory' | 'warning' | 'emergenc
 export function useWeatherForecast(
   options: UseWeatherForecastOptions = {}
 ): UseWeatherForecastReturn {
-  const { fieldId, projectId, lat, lon, refreshInterval } = options;
+  const { fieldId, projectId, refreshInterval } = options;
 
   const [current, setCurrent] = useState<Omit<WeatherData, 'forecast'> | null>(null);
   const [forecast, setForecast] = useState<WeatherForecast[]>([]);
@@ -129,6 +127,16 @@ export function useWeatherForecast(
   const [error, setError] = useState<string | null>(null);
 
   const fetchWeather = useCallback(async () => {
+    if (!fieldId && !projectId) {
+      setError('天気情報の取得には projectId か fieldId が必要です');
+      setLoading(false);
+      setLoadingDetailed(false);
+      setLoadingWeekly(false);
+      setLoadingNowcast(false);
+      setLoadingWarnings(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -136,8 +144,6 @@ export function useWeatherForecast(
       const params = new URLSearchParams();
       if (fieldId) params.append('fieldId', fieldId);
       if (projectId) params.append('projectId', projectId);
-      if (lat !== undefined) params.append('lat', lat.toString());
-      if (lon !== undefined) params.append('lon', lon.toString());
 
       const queryString = params.toString();
       const url = `/api/weather/overview${queryString ? `?${queryString}` : ''}`;
@@ -232,7 +238,7 @@ export function useWeatherForecast(
       setLoadingNowcast(false);
       setLoadingWarnings(false);
     }
-  }, [fieldId, projectId, lat, lon]);
+  }, [fieldId, projectId]);
 
   useEffect(() => {
     fetchWeather();

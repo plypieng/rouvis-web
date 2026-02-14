@@ -1,200 +1,275 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import MapDrawer from './MapDrawer';
-import { toastError, toastSuccess } from '@/lib/feedback';
+import { useEffect, useMemo, useState } from 'react';
+import { toastError } from '@/lib/feedback';
 
-interface Field {
-    id: string;
-    name: string;
-    crop?: string;
-    area?: number;
-    color?: string;
-}
-
-interface FieldSelectorProps {
-    selectedFieldId: string;
-    onChange: (fieldId: string) => void;
-}
-
-type LatLng = { lat: number; lng: number };
-type NewFieldData = {
-    name: string;
-    polygon: LatLng[];
-    location: LatLng;
-    color: string;
-    area: number;
+type FieldScopeValue = {
+  fieldIds: string[];
+  primaryFieldId: string | null;
 };
 
-export default function FieldSelector({ selectedFieldId, onChange }: FieldSelectorProps) {
-    const [fields, setFields] = useState<Field[]>([]);
-    const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-    const [loading, setLoading] = useState(true);
-    const [notice, setNotice] = useState<{
-        type: 'error' | 'success';
-        message: string;
-        retry?: () => void;
-    } | null>(null);
+type FieldRecord = {
+  id: string;
+  name: string;
+  crop?: string | null;
+  areaSqm?: number | null;
+  area?: number | null;
+  color?: string | null;
+  geoStatus?: string | null;
+};
 
-    // Fetch Fields
-    const fetchFields = async () => {
-        try {
-            // Use local API proxy to avoid cross-origin auth issues
-            const res = await fetch('/api/v1/fields');
-            if (res.ok) {
-                const data = await res.json();
-                setFields(data.fields || []);
-                return;
-            }
-            const payload = await res.json().catch(() => ({}));
-            throw new Error(payload?.error || '圃場一覧の取得に失敗しました');
-        } catch (error) {
-            console.error('Failed to fetch fields', error);
-            const message = error instanceof Error ? error.message : '圃場一覧の取得に失敗しました';
-            setNotice({
-                type: 'error',
-                message,
-                retry: () => { void fetchFields(); },
-            });
-            toastError(message, {
-                label: '再試行',
-                onClick: () => { void fetchFields(); },
-            });
-        } finally {
-            setLoading(false);
-        }
-    };
+interface FieldSelectorProps {
+  value: FieldScopeValue;
+  onChange: (next: FieldScopeValue) => void;
+}
 
-    useEffect(() => {
-        fetchFields();
-    }, []);
+function normalizeField(raw: any): FieldRecord {
+  return {
+    id: String(raw?.id || ''),
+    name: String(raw?.name || 'Unnamed field'),
+    crop: raw?.crop || null,
+    areaSqm: typeof raw?.areaSqm === 'number'
+      ? raw.areaSqm
+      : (typeof raw?.area === 'number' ? raw.area : null),
+    area: typeof raw?.area === 'number'
+      ? raw.area
+      : (typeof raw?.areaSqm === 'number' ? raw.areaSqm : null),
+    color: typeof raw?.color === 'string' ? raw.color : null,
+    geoStatus: typeof raw?.geoStatus === 'string' ? raw.geoStatus : null,
+  };
+}
 
-    const handleSaveNewField = async (fieldData: NewFieldData) => {
-        try {
-            setNotice(null);
-            // Use local API proxy to avoid cross-origin auth issues
-            const res = await fetch('/api/v1/fields', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: fieldData.name,
-                    area: fieldData.area,
-                    color: fieldData.color,
-                    polygon: fieldData.polygon,
-                    location: fieldData.location,
-                }),
-            });
+function isSelectable(field: FieldRecord): boolean {
+  return field.geoStatus !== 'missing';
+}
 
-            if (res.ok) {
-                const data = await res.json();
-                // Refresh list and select new field
-                await fetchFields();
-                onChange(data.field.id);
-                setIsDrawerOpen(false);
-                setNotice({
-                    type: 'success',
-                    message: '圃場を保存しました',
-                });
-                toastSuccess('圃場を保存しました');
-            } else {
-                const payload = await res.json().catch(() => ({}));
-                throw new Error(payload?.error || '圃場の保存に失敗しました');
-            }
-        } catch (error) {
-            console.error('Error saving field', error);
-            const message = error instanceof Error ? error.message : '圃場の保存に失敗しました';
-            setNotice({
-                type: 'error',
-                message,
-                retry: () => {
-                    void handleSaveNewField(fieldData);
-                },
-            });
-            toastError(message, {
-                label: '再試行',
-                onClick: () => {
-                    void handleSaveNewField(fieldData);
-                },
-            });
-        }
-    };
+function statusLabel(field: FieldRecord): string {
+  if (field.geoStatus === 'verified') return '位置:検証済み';
+  if (field.geoStatus === 'approximate') return '位置:近似';
+  return '位置:未設定';
+}
 
-    if (loading) return <div className="animate-pulse h-24 bg-gray-100 rounded-xl"></div>;
+function statusTone(field: FieldRecord): string {
+  if (field.geoStatus === 'verified') return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+  if (field.geoStatus === 'approximate') return 'border-amber-200 bg-amber-50 text-amber-700';
+  return 'border-red-200 bg-red-50 text-red-700';
+}
 
-    return (
-        <div className="space-y-3">
-            <label className="block text-sm font-medium text-gray-700">Select Field (Location)</label>
+function areaLabel(field: FieldRecord): string {
+  const areaSqm = typeof field.areaSqm === 'number'
+    ? field.areaSqm
+    : (typeof field.area === 'number' ? field.area : null);
+  if (!areaSqm || areaSqm <= 0) return '面積未設定';
+  return `${(areaSqm / 10000).toFixed(2)} ha`;
+}
 
-            {notice && (
-                <div
-                    className={`rounded-lg border px-3 py-2 text-sm ${
-                        notice.type === 'success'
-                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                            : 'border-red-200 bg-red-50 text-red-700'
-                    }`}
-                >
-                    <div className="flex items-center justify-between gap-3">
-                        <span>{notice.message}</span>
-                        {notice.retry && (
-                            <button
-                                type="button"
-                                onClick={notice.retry}
-                                className="rounded-md border border-current px-2 py-1 text-xs font-semibold hover:bg-white/40"
-                            >
-                                再試行
-                            </button>
-                        )}
-                    </div>
-                </div>
-            )}
+export default function FieldSelector({ value, onChange }: FieldSelectorProps) {
+  const [fields, setFields] = useState<FieldRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {/* Existing Fields */}
-                {fields.map((field) => (
-                    <button
-                        key={field.id}
-                        type="button"
-                        onClick={() => onChange(field.id)}
-                        className={`relative p-3 rounded-xl border-2 text-left transition-all ${selectedFieldId === field.id
-                            ? 'border-green-500 bg-green-50 ring-1 ring-green-500'
-                            : 'border-gray-200 hover:border-gray-300 bg-white'
-                            }`}
-                    >
-                        <div className="flex items-center gap-2 mb-1">
-                            <div
-                                className="w-3 h-3 rounded-full"
-                                style={{ backgroundColor: field.color || '#ccc' }}
-                            />
-                            <span className="font-medium text-gray-900 truncate">{field.name}</span>
-                        </div>
-                        <div className="text-xs text-gray-500">
-                            {field.area ? `${(field.area / 10000).toFixed(2)} ha` : 'No area'}
-                        </div>
-                        {selectedFieldId === field.id && (
-                            <div className="absolute top-2 right-2 text-green-600">
-                                <span className="material-symbols-outlined text-lg">check_circle</span>
-                            </div>
-                        )}
-                    </button>
-                ))}
+  const fieldById = useMemo(() => {
+    const map = new Map<string, FieldRecord>();
+    for (const field of fields) map.set(field.id, field);
+    return map;
+  }, [fields]);
 
-                {/* Add New Button */}
-                <button
-                    type="button"
-                    onClick={() => setIsDrawerOpen(true)}
-                    className="flex flex-col items-center justify-center p-3 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 hover:border-green-500 hover:text-green-600 hover:bg-green-50 transition-all gap-1"
-                >
-                    <span className="material-symbols-outlined">add_location_alt</span>
-                    <span className="text-sm font-medium">Draw New Field</span>
-                </button>
-            </div>
+  const selectedFieldIds = value.fieldIds;
+  const primaryFieldId = value.primaryFieldId;
 
-            {/* Map Drawer Modal */}
-            <MapDrawer
-                isOpen={isDrawerOpen}
-                onClose={() => setIsDrawerOpen(false)}
-                onSave={handleSaveNewField}
-            />
+  const fetchFields = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/v1/fields', { cache: 'no-store' });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload?.error || '圃場一覧の取得に失敗しました');
+      }
+      const payload = await res.json();
+      const nextFields = Array.isArray(payload?.fields)
+        ? payload.fields.map((item: any) => normalizeField(item)).filter((item: FieldRecord) => Boolean(item.id))
+        : [];
+      setFields(nextFields);
+    } catch (nextError) {
+      console.error('Failed to fetch fields', nextError);
+      setError(nextError instanceof Error ? nextError.message : '圃場一覧の取得に失敗しました');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void fetchFields();
+  }, []);
+
+  useEffect(() => {
+    if (!fields.length) {
+      if (selectedFieldIds.length || primaryFieldId) {
+        onChange({ fieldIds: [], primaryFieldId: null });
+      }
+      return;
+    }
+
+    const selectableIds = new Set(fields.filter(isSelectable).map((field) => field.id));
+    const normalizedFieldIds = selectedFieldIds.filter((id) => selectableIds.has(id));
+    const normalizedPrimary = normalizedFieldIds.includes(primaryFieldId || '')
+      ? (primaryFieldId as string)
+      : (normalizedFieldIds[0] || null);
+
+    const sameIds = normalizedFieldIds.length === selectedFieldIds.length
+      && normalizedFieldIds.every((id, index) => id === selectedFieldIds[index]);
+    const samePrimary = normalizedPrimary === primaryFieldId;
+
+    if (!sameIds || !samePrimary) {
+      onChange({
+        fieldIds: normalizedFieldIds,
+        primaryFieldId: normalizedPrimary,
+      });
+    }
+  }, [fields, onChange, primaryFieldId, selectedFieldIds]);
+
+  const toggleField = (field: FieldRecord) => {
+    if (!isSelectable(field)) {
+      toastError('位置情報が未設定の圃場は選択できません。Mapページでピンまたは境界を設定してください。');
+      return;
+    }
+
+    const exists = selectedFieldIds.includes(field.id);
+    const nextFieldIds = exists
+      ? selectedFieldIds.filter((id) => id !== field.id)
+      : [...selectedFieldIds, field.id];
+
+    const nextPrimary = !nextFieldIds.length
+      ? null
+      : exists && primaryFieldId === field.id
+        ? nextFieldIds[0]
+        : (primaryFieldId || field.id);
+
+    onChange({
+      fieldIds: nextFieldIds,
+      primaryFieldId: nextPrimary,
+    });
+  };
+
+  const setPrimary = (fieldId: string) => {
+    if (!selectedFieldIds.includes(fieldId)) return;
+    onChange({
+      fieldIds: selectedFieldIds,
+      primaryFieldId: fieldId,
+    });
+  };
+
+  return (
+    <div className="space-y-3 rounded-xl border border-border bg-card p-4">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Field Scope</p>
+          <h3 className="text-sm font-semibold text-foreground">圃場を選択 (複数可)</h3>
         </div>
-    );
+        <span className="rounded-full border border-border bg-secondary px-2 py-1 text-[11px] font-semibold text-secondary-foreground">
+          {selectedFieldIds.length}件選択
+        </span>
+      </div>
+
+      {loading ? (
+        <div className="rounded-lg border border-border bg-secondary/35 px-3 py-4 text-sm text-muted-foreground">
+          圃場一覧を読み込み中...
+        </div>
+      ) : null}
+
+      {error ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-700">
+          {error}
+          <button
+            type="button"
+            onClick={() => { void fetchFields(); }}
+            className="ml-3 rounded-md border border-current px-2 py-1 text-xs font-semibold"
+          >
+            再試行
+          </button>
+        </div>
+      ) : null}
+
+      {!loading && !error && fields.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-border bg-secondary/25 px-3 py-4 text-sm text-muted-foreground">
+          圃場がありません。先にMapページで圃場を作成してください。
+        </div>
+      ) : null}
+
+      {!loading && !error && fields.length > 0 ? (
+        <div className="space-y-2">
+          {fields.map((field) => {
+            const selected = selectedFieldIds.includes(field.id);
+            const primary = primaryFieldId === field.id;
+            const selectable = isSelectable(field);
+            return (
+              <div
+                key={field.id}
+                className={`rounded-lg border p-3 transition ${selected
+                  ? 'border-brand-waterline/55 bg-brand-waterline/10'
+                  : selectable
+                    ? 'border-border bg-card'
+                    : 'border-red-200 bg-red-50/40'
+                  }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleField(field)}
+                    className="flex min-w-0 flex-1 items-start gap-2 text-left"
+                  >
+                    <span
+                      className={`mt-0.5 inline-flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border text-[10px] font-semibold ${selected
+                        ? 'border-brand-waterline bg-brand-waterline text-white'
+                        : 'border-border bg-card text-transparent'
+                        }`}
+                    >
+                      ✓
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold text-foreground">{field.name}</span>
+                      <span className="block text-xs text-muted-foreground">
+                        {field.crop || '作物未設定'} · {areaLabel(field)}
+                      </span>
+                    </span>
+                  </button>
+
+                  {selected ? (
+                    <button
+                      type="button"
+                      onClick={() => setPrimary(field.id)}
+                      className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${primary
+                        ? 'border-brand-seedling/55 bg-brand-seedling/12 text-foreground'
+                        : 'border-border bg-secondary text-muted-foreground'
+                        }`}
+                    >
+                      {primary ? 'Primary' : 'Set primary'}
+                    </button>
+                  ) : null}
+                </div>
+
+                <div className="mt-2 flex items-center gap-2">
+                  <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusTone(field)}`}>
+                    {statusLabel(field)}
+                  </span>
+                  {!selectable ? (
+                    <span className="text-[11px] font-medium text-red-700">スケジューリング不可</span>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+
+      {selectedFieldIds.length > 0 && primaryFieldId ? (
+        <p className="text-xs text-muted-foreground">
+          Primary圃場: <span className="font-semibold text-foreground">{fieldById.get(primaryFieldId)?.name || '-'}</span>
+        </p>
+      ) : (
+        <p className="text-xs text-red-700">少なくとも1つの圃場を選択してください。</p>
+      )}
+    </div>
+  );
 }

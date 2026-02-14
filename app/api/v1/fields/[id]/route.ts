@@ -128,12 +128,5 @@ export async function DELETE(request: NextRequest) {
 
 function normalizeFieldPayload(body: unknown) {
   const record = (body && typeof body === 'object') ? (body as Record<string, unknown>) : {};
-  const polygon = record.polygon;
-  const location = record.location;
-
-  return {
-    ...record,
-    polygon: polygon && typeof polygon === 'object' ? JSON.stringify(polygon) : polygon,
-    location: location && typeof location === 'object' ? JSON.stringify(location) : location,
-  };
+  return { ...record };
 }

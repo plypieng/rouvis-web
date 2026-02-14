@@ -18,6 +18,7 @@ interface Task {
 }
 
 interface TaskSidePanelProps {
+    projectId?: string;
     selectedDate: Date;
     tasks: Task[];
     affectedTasks?: Array<{ id: string; title: string; dueDate: string }>;
@@ -32,7 +33,7 @@ type ForecastDay = {
     icon?: string;
 };
 
-export default function TaskSidePanel({ selectedDate, tasks, affectedTasks = [], onAddTask, onTaskComplete }: TaskSidePanelProps) {
+export default function TaskSidePanel({ projectId, selectedDate, tasks, affectedTasks = [], onAddTask, onTaskComplete }: TaskSidePanelProps) {
     const locale = useLocale();
     const t = useTranslations('projects.calendar');
     const tProject = useTranslations('projects');
@@ -47,7 +48,10 @@ export default function TaskSidePanel({ selectedDate, tasks, affectedTasks = [],
     useEffect(() => {
         const loadWeather = async () => {
             try {
-                const res = await fetch('/api/weather/overview', { cache: 'no-store' });
+                const params = new URLSearchParams();
+                if (projectId) params.set('projectId', projectId);
+                const query = params.toString();
+                const res = await fetch(`/api/weather/overview${query ? `?${query}` : ''}`, { cache: 'no-store' });
                 if (!res.ok) return;
                 const data = await res.json().catch(() => ({}));
                 const daily = Array.isArray(data?.daily)
@@ -66,7 +70,7 @@ export default function TaskSidePanel({ selectedDate, tasks, affectedTasks = [],
             }
         };
         loadWeather();
-    }, []);
+    }, [projectId]);
 
     const forecastForSelectedDate = useMemo(() => {
         const key = format(selectedDate, 'yyyy-MM-dd');

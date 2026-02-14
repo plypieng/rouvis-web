@@ -46,6 +46,7 @@ type TaskPayload = {
     description?: string;
     dueDate?: string;
     priority?: string;
+    fieldId: string;
     status: 'pending' | 'completed';
     isBackfilled?: boolean;
     isAssumed?: boolean;
@@ -144,7 +145,8 @@ export default function ProjectWizard({ locale }: { locale: string }) {
 
     const [step, setStep] = useState<WizardStep>('project-type');
     const [cropAnalysis, setCropAnalysis] = useState<CropAnalysis | null>(null);
-    const [selectedField, setSelectedField] = useState<{ id: string } | null>(null);
+    const [selectedFieldIds, setSelectedFieldIds] = useState<string[]>([]);
+    const [primaryFieldId, setPrimaryFieldId] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [loadingMode, setLoadingMode] = useState<'scan' | 'manual' | null>(null);
     const [notice, setNotice] = useState<NoticeState>(null);
@@ -230,6 +232,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
 
     const toTaskPayload = (
         task: GeneratedTask,
+        fieldId: string,
         status: TaskPayload['status'],
         isBackfilledTask?: boolean
     ): TaskPayload => ({
@@ -237,24 +240,25 @@ export default function ProjectWizard({ locale }: { locale: string }) {
         description: task.description,
         dueDate: task.dueDate,
         priority: task.priority,
+        fieldId,
         status,
         ...(isBackfilledTask ? { isBackfilled: true } : {}),
     });
 
-    const buildTaskPayloads = (schedule: GeneratedSchedule, isBackfilled: boolean): TaskPayload[] => {
+    const buildTaskPayloads = (schedule: GeneratedSchedule, isBackfilled: boolean, fieldId: string): TaskPayload[] => {
         if (isBackfilled) {
             const pastTasks = (schedule.pastTasks || []).flatMap((week) =>
-                (week.tasks || []).map((task) => toTaskPayload(task, 'completed', true))
+                (week.tasks || []).map((task) => toTaskPayload(task, fieldId, 'completed', true))
             );
-            const currentTasks = (schedule.currentWeekTasks || []).map((task) => toTaskPayload(task, 'pending'));
+            const currentTasks = (schedule.currentWeekTasks || []).map((task) => toTaskPayload(task, fieldId, 'pending'));
             const futureTasks = (schedule.futureTasks || []).flatMap((week) =>
-                (week.tasks || []).map((task) => toTaskPayload(task, 'pending'))
+                (week.tasks || []).map((task) => toTaskPayload(task, fieldId, 'pending'))
             );
             return [...pastTasks, ...currentTasks, ...futureTasks];
         }
 
         return (schedule.weeks || []).flatMap((week) =>
-            (week.tasks || []).map((task) => toTaskPayload(task, 'pending'))
+            (week.tasks || []).map((task) => toTaskPayload(task, fieldId, 'pending'))
         );
     };
 
@@ -291,7 +295,8 @@ export default function ProjectWizard({ locale }: { locale: string }) {
     };
 
     const generateAndPersistInitialSchedule = async (
-        projectId: string
+        projectId: string,
+        defaultFieldId: string
     ): Promise<{ taskCount: number; usedFallback: boolean; firstPendingTaskId: string | null }> => {
         if (!cropAnalysis) throw new Error('作物情報が見つかりません');
 
@@ -356,7 +361,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
             }
 
             const schedule: GeneratedSchedule = generatedData?.schedule || generatedData;
-            tasks = buildTaskPayloads(schedule, isBackfilled);
+            tasks = buildTaskPayloads(schedule, isBackfilled, defaultFieldId);
             if (!tasks.length) {
                 throw new Error('初回スケジュールにタスクが含まれていませんでした');
             }
@@ -372,6 +377,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                 description: task.description,
                 dueDate: task.dueDate,
                 priority: task.priority,
+                fieldId: defaultFieldId,
                 status: task.status,
                 isBackfilled: task.isBackfilled,
                 isAssumed: task.isAssumed,
@@ -550,6 +556,15 @@ export default function ProjectWizard({ locale }: { locale: string }) {
     // Step 3: Field Context -> Create Project (Directly)
     const handleCreateProject = async () => {
         if (!cropAnalysis) return;
+        if (!selectedFieldIds.length || !primaryFieldId) {
+            const message = '圃場を1つ以上選択し、Primary圃場を設定してください。';
+            setNotice({
+                type: 'error',
+                message,
+            });
+            toastError(message);
+            return;
+        }
         setNotice(null);
         setLoading(true);
 
@@ -564,7 +579,9 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                     crop: cropAnalysis.crop,
                     variety: cropAnalysis.variety,
                     startDate: plantingDate || new Date().toISOString().split('T')[0],
-                    fieldId: selectedField?.id,
+                    fieldIds: selectedFieldIds,
+                    primaryFieldId,
+                    fieldId: primaryFieldId,
                     notes: cropAnalysis.notes,
                     tasks: [],
                     schedulingPreferences: preferenceTemplates.find(
@@ -593,13 +610,13 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                 void trackUXEvent('project_created', {
                     flow: 'wizard',
                     projectType: projectType || 'new',
-                    hasField: Boolean(selectedField?.id),
+                    hasField: selectedFieldIds.length > 0,
                 });
             }
 
             setNotice({ type: 'info', message: 'AIが初回スケジュールを作成しています...' });
             toastInfo('AIが初回スケジュールを作成しています...');
-            const { taskCount, usedFallback, firstPendingTaskId } = await generateAndPersistInitialSchedule(projectId);
+            const { taskCount, usedFallback, firstPendingTaskId } = await generateAndPersistInitialSchedule(projectId, primaryFieldId);
             void trackUXEvent('schedule_generated', {
                 flow: 'wizard',
                 taskCount,
@@ -893,8 +910,14 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                     )}
                 </div>
                 <FieldSelector
-                    selectedFieldId={selectedField?.id ?? ''}
-                    onChange={(id) => setSelectedField({ id })}
+                    value={{
+                        fieldIds: selectedFieldIds,
+                        primaryFieldId,
+                    }}
+                    onChange={(scope) => {
+                        setSelectedFieldIds(scope.fieldIds);
+                        setPrimaryFieldId(scope.primaryFieldId);
+                    }}
                 />
                 <div className="flex justify-end gap-4">
                     <button
@@ -905,7 +928,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                     </button>
                     <button
                         onClick={handleCreateProject}
-                        disabled={loading || templatesLoading}
+                        disabled={loading || templatesLoading || !selectedFieldIds.length || !primaryFieldId}
                         className="rounded-lg bg-primary px-8 py-3 text-lg font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
                     >
                         {loading

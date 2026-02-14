@@ -16,6 +16,7 @@ import { useMonthWeather } from '@/hooks/useMonthWeather';
 import type { ProjectTaskItem } from '@/types/project-cockpit';
 
 interface MonthGridProps {
+  projectId?: string;
   currentDate: Date;
   selectedDate: Date;
   onSelectDate: (date: Date) => void;
@@ -165,6 +166,7 @@ function DayCell({
 }
 
 export default function MonthGrid({
+  projectId,
   currentDate,
   selectedDate,
   onSelectDate,
@@ -184,7 +186,9 @@ export default function MonthGrid({
   const projectStart = new Date(startDate);
   const projectEnd = targetHarvestDate ? new Date(targetHarvestDate) : null;
 
-  const { data: weatherData } = useMonthWeather(monthStart.getFullYear(), monthStart.getMonth() + 1);
+  const { data: weatherData } = useMonthWeather(monthStart.getFullYear(), monthStart.getMonth() + 1, {
+    projectId,
+  });
 
   const getTasksForDay = (day: Date) => (
     tasks.filter((task) => isSameDay(new Date(task.dueDate), day))

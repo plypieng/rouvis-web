@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function PUT(req: NextRequest) {
+async function proxyUpdate(req: NextRequest, method: 'PUT' | 'PATCH') {
   const projectId = extractId(req);
   if (!projectId) {
     return NextResponse.json({ error: 'Invalid project id' }, { status: 400 });
@@ -60,7 +60,7 @@ export async function PUT(req: NextRequest) {
       || req.headers.get('x-idempotency-key');
     const requestId = req.headers.get('x-request-id');
     const res = await fetch(`${BACKEND_URL}/api/v1/projects/${projectId}`, {
-      method: 'PUT',
+      method,
       headers: {
         'Content-Type': 'application/json',
         ...auth.headers,
@@ -78,9 +78,17 @@ export async function PUT(req: NextRequest) {
     }
     return response;
   } catch (error) {
-    console.error('Project proxy PUT error:', error);
+    console.error(`Project proxy ${method} error:`, error);
     return NextResponse.json({ error: 'Failed to update project' }, { status: 500 });
   }
+}
+
+export async function PUT(req: NextRequest) {
+  return proxyUpdate(req, 'PUT');
+}
+
+export async function PATCH(req: NextRequest) {
+  return proxyUpdate(req, 'PATCH');
 }
 
 export async function DELETE(req: NextRequest) {

@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
     appendQueryParam(params, 'lon', request.nextUrl.searchParams.get('lon'));
     appendQueryParam(params, 'fieldId', request.nextUrl.searchParams.get('fieldId'));
     appendQueryParam(params, 'projectId', request.nextUrl.searchParams.get('projectId'));
+    appendQueryParam(params, 'includePerField', request.nextUrl.searchParams.get('includePerField'));
 
     const response = await fetch(
       `${backendUrl}/api/v1/weather/overview${params.toString() ? `?${params.toString()}` : ''}`,

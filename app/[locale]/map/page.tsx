@@ -1,9 +1,9 @@
-import MapTab from '../../../components/MapTab';
+import FieldStudio from '../../../components/fields/FieldStudio';
 
 export default function MapPage() {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <MapTab />
+    <div className="min-h-screen bg-background">
+      <FieldStudio />
     </div>
   );
 }

@@ -16,6 +16,8 @@ interface InitialProjectData {
     targetHarvestDate?: string;
     notes?: string;
     fieldId?: string;
+    fieldIds?: string[];
+    primaryFieldId?: string;
 }
 
 type NoticeState = {
@@ -38,7 +40,10 @@ export default function CreateProjectForm({ locale, initialData }: { locale: str
         startDate: initialData?.startDate || new Date().toISOString().split('T')[0],
         targetHarvestDate: initialData?.targetHarvestDate || '',
         notes: initialData?.notes || '',
-        fieldId: initialData?.fieldId || '',
+        fieldIds: Array.isArray(initialData?.fieldIds)
+            ? initialData!.fieldIds.filter((id) => typeof id === 'string' && id.length > 0)
+            : (initialData?.fieldId ? [initialData.fieldId] : []),
+        primaryFieldId: initialData?.primaryFieldId || initialData?.fieldId || '',
     });
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -46,8 +51,12 @@ export default function CreateProjectForm({ locale, initialData }: { locale: str
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleFieldChange = (fieldId: string) => {
-        setFormData(prev => ({ ...prev, fieldId }));
+    const handleFieldScopeChange = (scope: { fieldIds: string[]; primaryFieldId: string | null }) => {
+        setFormData(prev => ({
+            ...prev,
+            fieldIds: scope.fieldIds,
+            primaryFieldId: scope.primaryFieldId || '',
+        }));
     };
 
     const handleSuggest = async () => {
@@ -81,8 +90,8 @@ export default function CreateProjectForm({ locale, initialData }: { locale: str
         e.preventDefault();
         setNotice(null);
 
-        if (!formData.fieldId) {
-            const message = '圃場を選択してください。';
+        if (!formData.fieldIds.length || !formData.primaryFieldId) {
+            const message = '圃場を1つ以上選択し、Primary圃場を設定してください。';
             setNotice({ type: 'error', message });
             toastError(message);
             return;
@@ -97,7 +106,10 @@ export default function CreateProjectForm({ locale, initialData }: { locale: str
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(formData),
+                body: JSON.stringify({
+                    ...formData,
+                    fieldId: formData.primaryFieldId,
+                }),
             });
 
             if (!res.ok) {
@@ -110,7 +122,7 @@ export default function CreateProjectForm({ locale, initialData }: { locale: str
             toastSuccess(successMessage);
             void trackUXEvent('project_created', {
                 flow: 'manual_form',
-                hasField: Boolean(formData.fieldId),
+                hasField: formData.fieldIds.length > 0,
             });
             router.push(`/${locale}/projects/${data.project.id}`);
             router.refresh();
@@ -167,8 +179,11 @@ export default function CreateProjectForm({ locale, initialData }: { locale: str
             {/* Field Selector Section */}
             <div>
                 <FieldSelector
-                    selectedFieldId={formData.fieldId}
-                    onChange={handleFieldChange}
+                    value={{
+                        fieldIds: formData.fieldIds,
+                        primaryFieldId: formData.primaryFieldId || null,
+                    }}
+                    onChange={handleFieldScopeChange}
                 />
             </div>
 

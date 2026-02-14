@@ -6,11 +6,13 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { z } from 'zod';
 import { Loader2, ChevronDown, Info, ArrowRight } from 'lucide-react';
 import { PREFECTURES, EXPERIENCE_OPTIONS, FARMING_TYPES, COMMON_CROPS } from '../../../lib/prefectures';
-import FieldMapEditor from '@/components/fields/FieldMapEditor';
+import turfArea from '@turf/area';
+import FieldMapCanvas from '@/components/fields/FieldMapCanvas';
 import { toastError } from '@/lib/feedback';
 import { trackUXEvent } from '@/lib/analytics';
 import { useTranslations } from 'next-intl';
 import type { FarmerUiMode } from '@/types/farmer-ui-mode';
+import type { FieldCentroid, GeoJsonPolygon } from '@/components/fields/types';
 
 // Validation schemas
 const profileSchema = z.object({
@@ -29,10 +31,9 @@ const fieldSchema = z.object({
 });
 
 type ProfileData = z.infer<typeof profileSchema>;
-type LatLng = { lat: number; lng: number };
 type FieldData = z.infer<typeof fieldSchema> & {
-  polygon?: LatLng[];
-  location?: LatLng | null;
+  geometry?: GeoJsonPolygon | null;
+  centroid?: FieldCentroid | null;
 };
 type NoticeState = {
   type: 'error' | 'success';
@@ -68,6 +69,22 @@ function getOnboardingReasonMessage(reason: string | null, from: string | null):
   }
 
   return '初期設定が未完了のため、この手順を完了してからアプリをご利用ください。';
+}
+
+function geometryAreaHa(geometry: GeoJsonPolygon | null | undefined): number | null {
+  if (!geometry) return null;
+  try {
+    const feature = {
+      type: 'Feature' as const,
+      geometry,
+      properties: {},
+    };
+    const sqm = turfArea(feature as any);
+    if (!Number.isFinite(sqm) || sqm <= 0) return null;
+    return Number((sqm / 10000).toFixed(2));
+  } catch {
+    return null;
+  }
 }
 
 export default function OnboardingPage() {
@@ -266,6 +283,9 @@ export default function OnboardingPage() {
     setNotice(null);
     try {
       fieldSchema.parse(fieldData);
+      if (!fieldData.centroid && !fieldData.geometry) {
+        throw new Error('位置ピンまたは圃場境界を設定してください');
+      }
       setErrors({});
       setIsSubmitting(true);
 
@@ -276,11 +296,12 @@ export default function OnboardingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: fieldData.name,
-          area: (fieldData.area || 0) * 10000, // Convert Ha to SqM for storage
+          areaSqm: (fieldData.area || 0) * 10000, // Convert Ha to SqM for storage
           crop: selectedCrop?.label || fieldData.crop,
           planting_date: fieldData.plantingDate || null,
-          polygon: fieldData.polygon,
-          location: fieldData.location,
+          geometry: fieldData.geometry || null,
+          centroid: fieldData.centroid || null,
+          geoStatus: fieldData.geometry ? 'verified' : 'approximate',
         }),
       });
 
@@ -297,8 +318,8 @@ export default function OnboardingPage() {
       }
       void trackUXEvent('onboarding_field_saved', {
         mode: fieldEntryMode,
-        hasPolygon: Boolean(fieldData.polygon && fieldData.polygon.length > 2),
-        hasLocation: Boolean(fieldData.location),
+        hasPolygon: Boolean(fieldData.geometry && fieldData.geometry.coordinates[0].length > 3),
+        hasLocation: Boolean(fieldData.centroid),
       });
       router.push(`/${locale}/projects/create`);
     } catch (err) {
@@ -327,24 +348,6 @@ export default function OnboardingPage() {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleSkipField = async () => {
-    // Refresh session (best-effort) then go straight to project creation.
-    try {
-      await update();
-    } catch (error) {
-      console.warn('Session update failed before project creation redirect:', error);
-    }
-    const destination = `/${locale}/projects/create`;
-    void trackUXEvent('onboarding_field_skipped', {
-      mode: fieldEntryMode,
-    });
-    void trackUXEvent('onboarding_completed', {
-      skippedField: true,
-      destination,
-    });
-    router.push(destination);
   };
 
   const setTodayDate = () => {
@@ -592,30 +595,45 @@ export default function OnboardingPage() {
             </div>
             <p className="mt-2 text-xs text-gray-600">
               {fieldEntryMode === 'quick'
-                ? '圃場名と面積だけで先に開始できます。地図は後から編集可能です。'
-                : '地図で囲んで面積を自動計算し、より正確な記録にできます。'}
+                ? '地図をタップして位置ピンを設定します。スケジュール開始に必須です。'
+                : '地図で境界をタップして面積を自動計算できます。'}
             </p>
           </div>
 
-          {fieldEntryMode === 'detailed' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                畑の場所と形
-                <span className="text-gray-400 font-normal ml-2">地図をタップして囲むと面積が自動計算されます</span>
-              </label>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              圃場の位置
+              <span className="text-gray-400 font-normal ml-2">
+                {fieldEntryMode === 'quick'
+                  ? '地図をタップしてピンを落としてください'
+                  : '地図をタップして境界点を追加してください'}
+              </span>
+            </label>
 
-              <FieldMapEditor
-                onFieldChange={(data) => {
-                  setFieldData(prev => ({
-                    ...prev,
-                    area: data.area,
-                    polygon: data.polygon,
-                    location: data.location
-                  }));
-                }}
-              />
-            </div>
-          )}
+            <FieldMapCanvas
+              fields={[]}
+              selectedFieldId={null}
+              draftGeometry={fieldData.geometry || null}
+              draftCentroid={fieldData.centroid || null}
+              drawMode={fieldEntryMode === 'quick' ? 'centroid' : 'polygon'}
+              riskByFieldId={{}}
+              onSelectField={() => { }}
+              onDraftGeometryChange={(geometry) => {
+                const areaHa = geometryAreaHa(geometry);
+                setFieldData((prev) => ({
+                  ...prev,
+                  geometry,
+                  area: areaHa ?? prev.area,
+                }));
+              }}
+              onDraftCentroidChange={(centroid) => {
+                setFieldData((prev) => ({
+                  ...prev,
+                  centroid,
+                }));
+              }}
+            />
+          </div>
 
           {/* Area (Read-only / Manual Override) */}
           <div>
@@ -628,14 +646,14 @@ export default function OnboardingPage() {
               step="0.01"
               value={fieldData.area?.toString() || ''}
               onChange={(e) => setFieldData({ ...fieldData, area: parseFloat(e.target.value) || 0 })}
-              placeholder={fieldEntryMode === 'detailed' ? '地図から自動計算' : '例: 0.3'}
+              placeholder={fieldEntryMode === 'detailed' ? '地図から自動計算 (手動上書き可)' : '例: 0.3'}
               className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${errors.area ? 'border-red-500' : 'border-gray-200'
                 }`}
             />
             <p className="mt-1 text-xs text-gray-400">
               {fieldEntryMode === 'detailed'
                 ? '地図で囲むと自動入力されます（手動修正も可）'
-                : 'おおよその面積でOKです。後で地図編集で精度を上げられます。'}
+                : 'ピン登録時は概算面積を入力してください。後で境界編集で精度を上げられます。'}
             </p>
             {errors.area && <p className="mt-1 text-sm text-red-600">{errors.area}</p>}
           </div>
@@ -695,7 +713,7 @@ export default function OnboardingPage() {
           {/* ... buttons ... */}
           <button
             onClick={handleFieldSubmit}
-            disabled={isSubmitting}
+            disabled={isSubmitting || (!fieldData.centroid && !fieldData.geometry)}
             className="w-full px-6 py-4 bg-emerald-600 text-white rounded-xl hover:bg-emerald-500 transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {isSubmitting ? (
@@ -719,13 +737,7 @@ export default function OnboardingPage() {
             >
               戻る
             </button>
-            <button
-              onClick={handleSkipField}
-              disabled={isSubmitting}
-              className="text-gray-400 hover:text-gray-600 text-sm"
-            >
-              圃場登録をスキップして続ける →
-            </button>
+            <span className="text-xs text-gray-400">位置ピンは必須です</span>
           </div>
         </div>
       </OnboardingLayout>
