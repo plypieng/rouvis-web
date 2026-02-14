@@ -12,15 +12,11 @@ type BackendTask = {
   id: string;
   title: string;
   description?: string | null;
-  dueDate: string;
+  dueAt: string;
+  projectId?: string | null;
+  projectName?: string | null;
   priority?: 'low' | 'medium' | 'high' | string;
   status?: string;
-};
-
-type BackendProject = {
-  id: string;
-  name: string;
-  tasks?: BackendTask[];
 };
 
 const FILTER_VALUES: CalendarFilterKey[] = ['all', 'overdue', 'today', 'next48h'];
@@ -38,14 +34,14 @@ function sanitizeFilterParam(value?: string): CalendarFilterKey {
     : 'all';
 }
 
-async function getProjects() {
+async function getTasks() {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
 
   try {
     const cookieStore = await cookies();
     const cookieHeader = cookieStore.getAll().map((cookie) => `${cookie.name}=${cookie.value}`).join('; ');
 
-    const res = await fetch(`${baseUrl}/api/v1/projects`, {
+    const res = await fetch(`${baseUrl}/api/v1/tasks`, {
       cache: 'no-store',
       headers: {
         ...(cookieHeader ? { Cookie: cookieHeader } : {}),
@@ -53,14 +49,14 @@ async function getProjects() {
     });
 
     if (!res.ok) {
-      console.error('Failed to fetch projects:', res.status);
+      console.error('Failed to fetch tasks:', res.status);
       return [];
     }
 
     const data = await res.json();
-    return (data.projects || []) as BackendProject[];
+    return (data.tasks || []) as BackendTask[];
   } catch (error) {
-    console.error('Error fetching projects:', error);
+    console.error('Error fetching tasks:', error);
     return [];
   }
 }
@@ -74,7 +70,7 @@ export default async function CalendarPage(props: {
   const { locale } = params;
 
   const session = await getServerSessionFromToken();
-  const projects = await getProjects();
+  const backendTasks = await getTasks();
 
   const user = (session?.user || {}) as {
     uiMode?: string | null;
@@ -83,35 +79,31 @@ export default async function CalendarPage(props: {
 
   const mode: FarmerUiMode = resolveFarmerUiMode(user.uiMode ?? null, user.experienceLevel ?? null);
 
-  const tasks: StandaloneCalendarTask[] = projects.flatMap((project) => {
-    const projectTasks = Array.isArray(project.tasks) ? project.tasks : [];
+  const tasks: StandaloneCalendarTask[] = backendTasks
+    .filter((task) => task?.dueAt)
+    .flatMap((task) => {
+      const parsedDueAt = new Date(task.dueAt);
+      if (!Number.isFinite(parsedDueAt.getTime())) {
+        return [];
+      }
 
-    return projectTasks
-      .filter((task) => task?.dueDate)
-      .flatMap((task) => {
-        const parsedDueAt = new Date(task.dueDate);
-        if (!Number.isFinite(parsedDueAt.getTime())) {
-          return [];
-        }
-
-        return [{
-          id: task.id,
-          title: task.title,
-          description: task.description ?? undefined,
-          dueAt: parsedDueAt.toISOString(),
-          projectId: project.id,
-          projectName: project.name,
-          priority:
-            task.priority === 'low' || task.priority === 'medium' || task.priority === 'high'
-              ? task.priority
-              : 'medium',
-          status:
-            task.status === 'completed' || task.status === 'scheduled' || task.status === 'cancelled'
-              ? task.status
-              : 'pending',
-        }];
-      });
-  });
+      return [{
+        id: task.id,
+        title: task.title,
+        description: task.description ?? undefined,
+        dueAt: parsedDueAt.toISOString(),
+        projectId: task.projectId ?? undefined,
+        projectName: task.projectName ?? undefined,
+        priority:
+          task.priority === 'low' || task.priority === 'medium' || task.priority === 'high'
+            ? task.priority
+            : 'medium',
+        status:
+          task.status === 'completed' || task.status === 'scheduled' || task.status === 'cancelled'
+            ? task.status
+            : 'pending',
+      }];
+    });
 
   return (
     <section className="py-4 sm:py-6">

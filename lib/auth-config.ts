@@ -11,6 +11,12 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { prisma, authPrisma } from "./prisma";
 import { resolveFarmerUiMode } from "./farmerUiMode";
+import * as fs from "fs";
+
+const debugLog = (label: string, data: any) => {
+  const line = `[${new Date().toISOString()}] ${label}: ${JSON.stringify(data)}\n`;
+  try { fs.appendFileSync('/tmp/nextauth-debug.log', line); } catch { }
+};
 
 const normalizeEnvValue = (value?: string) => value?.replace(/\\[rn]/g, '').trim();
 const googleClientId = normalizeEnvValue(process.env.GOOGLE_CLIENT_ID);
@@ -22,8 +28,44 @@ if (!hasGoogleOAuth && !isDemoMode) {
   throw new Error('Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET');
 }
 
+const baseAdapter = PrismaAdapter(authPrisma);
+
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(authPrisma),
+  adapter: {
+    ...baseAdapter,
+    // Wrap linkAccount to handle re-authentication gracefully.
+    // When using prompt:'consent', Google always re-issues tokens.
+    // The default adapter's linkAccount calls create() which fails on 
+    // the unique constraint. We catch that and update instead.
+    linkAccount: async (account: Record<string, any>) => {
+      debugLog('LINK_ACCOUNT', { provider: account.provider, providerAccountId: account.providerAccountId, userId: account.userId });
+      try {
+        return await baseAdapter.linkAccount!(account as any);
+      } catch (err: any) {
+        debugLog('LINK_ACCOUNT_ERROR', { name: err?.name, message: err?.message?.substring(0, 300) });
+        // If it's a duplicate, update the existing record
+        if (err?.message?.includes('Unique constraint') || err?.code === 'P2002') {
+          await (authPrisma as any).account.updateMany({
+            where: {
+              provider: account.provider,
+              providerAccountId: account.providerAccountId,
+            },
+            data: {
+              refresh_token: account.refresh_token ?? null,
+              access_token: account.access_token ?? null,
+              expires_at: account.expires_at ?? null,
+              token_type: account.token_type ?? null,
+              scope: account.scope ?? null,
+              id_token: account.id_token ?? null,
+              session_state: account.session_state ?? null,
+            },
+          });
+          return;
+        }
+        throw err;
+      }
+    },
+  },
   providers: [
     ...(hasGoogleOAuth
       ? [
@@ -129,7 +171,44 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
+  // Fix "State cookie was missing" error on localhost.
+  // Next.js 16 App Router + NextAuth v4 requires explicit cookie config
+  // to prevent the state/PKCE cookies from being lost during OAuth callback.
+  useSecureCookies: false,
+  cookies: {
+    state: {
+      name: 'next-auth.state',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax' as const,
+        path: '/',
+        secure: false,
+      },
+    },
+    pkceCodeVerifier: {
+      name: 'next-auth.pkce.code_verifier',
+      options: {
+        httpOnly: true,
+        sameSite: 'lax' as const,
+        path: '/',
+        secure: false,
+      },
+    },
+  },
   callbacks: {
+    /**
+     * SignIn Callback: Runs during sign-in process.
+     * Useful for debugging OAuth callback errors.
+     */
+    async signIn({ user, account, profile }) {
+      debugLog('SIGNIN_CALLBACK', {
+        userId: user?.id,
+        email: user?.email,
+        provider: account?.provider,
+        type: account?.type,
+      });
+      return true;
+    },
     /**
      * JWT Callback: Runs when JWT is created or updated.
      */
@@ -164,26 +243,33 @@ export const authOptions: NextAuthOptions = {
       // Check if user has completed onboarding.
       // Completion requires profile + at least one field or project.
       if (token.id) {
-        const userId = token.id as string;
-        const [userProfile, firstField, firstProject] = await Promise.all([
-          prisma.userProfile.findUnique({
-            where: { userId },
-            select: { id: true, uiMode: true, experienceLevel: true },
-          }),
-          prisma.field.findFirst({
-            where: { userId },
-            select: { id: true },
-          }),
-          prisma.project.findFirst({
-            where: { userId },
-            select: { id: true },
-          }),
-        ]);
+        try {
+          const userId = token.id as string;
+          const [userProfile, firstField, firstProject] = await Promise.all([
+            prisma.userProfile.findUnique({
+              where: { userId },
+              select: { id: true, experienceLevel: true },
+            }),
+            prisma.field.findFirst({
+              where: { userId },
+              select: { id: true },
+            }),
+            prisma.project.findFirst({
+              where: { userId },
+              select: { id: true },
+            }),
+          ]);
 
-        const profileComplete = Boolean(userProfile);
-        token.profileComplete = profileComplete;
-        token.onboardingComplete = Boolean(profileComplete && (firstField || firstProject));
-        token.uiMode = resolveFarmerUiMode(userProfile?.uiMode, userProfile?.experienceLevel);
+          const profileComplete = Boolean(userProfile);
+          token.profileComplete = profileComplete;
+          token.onboardingComplete = Boolean(profileComplete && (firstField || firstProject));
+          token.uiMode = resolveFarmerUiMode(undefined, userProfile?.experienceLevel);
+        } catch (error) {
+          debugLog('JWT_ONBOARDING_CHECK_ERROR', { error: (error as any)?.message?.substring(0, 200) });
+          // Don't block login if onboarding check fails
+          token.profileComplete = false;
+          token.onboardingComplete = false;
+        }
       }
 
       return token;
@@ -202,6 +288,27 @@ export const authOptions: NextAuthOptions = {
         session.user.uiMode = token.uiMode as 'new_farmer' | 'veteran_farmer' | undefined;
       }
       return session;
+    },
+  },
+  debug: process.env.NODE_ENV === 'development',
+  logger: {
+    error(code: string, metadata: any) {
+      const errDetail = metadata?.error || metadata;
+      debugLog('ERROR_' + code, {
+        name: errDetail?.name,
+        message: errDetail?.message,
+        stack: errDetail?.stack?.substring(0, 500),
+        ...metadata,
+      });
+      console.error('[NextAuth][Error]', code, JSON.stringify(metadata, null, 2));
+    },
+    warn(code: string) {
+      debugLog('WARN', code);
+      console.warn('[NextAuth][Warn]', code);
+    },
+    debug(code: string, metadata: any) {
+      debugLog('DEBUG_' + code, metadata);
+      console.log('[NextAuth][Debug]', code, metadata);
     },
   },
   secret: process.env.NEXTAUTH_SECRET,
