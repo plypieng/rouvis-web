@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { RiskSeverity } from './types';
 
 type WeatherPanelState = {
@@ -38,6 +38,35 @@ function toneClass(severity: RiskSeverity): string {
   }
 }
 
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError';
+}
+
+async function readResponseError(response: Response): Promise<string> {
+  const fallback = `status_${response.status}`;
+  const cloned = response.clone();
+
+  try {
+    const payload = await response.json();
+    if (typeof payload?.error === 'string' && payload.error.trim()) {
+      return payload.error;
+    }
+  } catch {
+    // Ignore JSON parsing errors and fallback to text.
+  }
+
+  try {
+    const text = await cloned.text();
+    if (text.trim()) {
+      return text.slice(0, 160);
+    }
+  } catch {
+    // Ignore text parsing errors and return status fallback.
+  }
+
+  return fallback;
+}
+
 export default function FieldWeatherPanel({ fieldId, onSeverityChange }: FieldWeatherPanelProps) {
   const [state, setState] = useState<WeatherPanelState>({
     loading: false,
@@ -48,6 +77,11 @@ export default function FieldWeatherPanel({ fieldId, onSeverityChange }: FieldWe
     location: '-',
     alerts: 0,
   });
+  const onSeverityChangeRef = useRef(onSeverityChange);
+
+  useEffect(() => {
+    onSeverityChangeRef.current = onSeverityChange;
+  }, [onSeverityChange]);
 
   useEffect(() => {
     if (!fieldId) {
@@ -64,28 +98,26 @@ export default function FieldWeatherPanel({ fieldId, onSeverityChange }: FieldWe
       return;
     }
 
-    let active = true;
+    const controller = new AbortController();
     setState((prev) => ({ ...prev, loading: true, error: null }));
 
     const load = async () => {
       try {
-        const [overviewRes, risksRes] = await Promise.all([
-          fetch(`/api/weather/overview?fieldId=${encodeURIComponent(fieldId)}`, { cache: 'no-store' }),
-          fetch(`/api/weather/risks/scheduling?fieldId=${encodeURIComponent(fieldId)}`, { cache: 'no-store' }),
-        ]);
+        const overviewRes = await fetch(`/api/weather/overview?fieldId=${encodeURIComponent(fieldId)}`, {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
 
-        if (!overviewRes.ok || !risksRes.ok) {
-          throw new Error('weather_unavailable');
+        if (!overviewRes.ok) {
+          const detail = await readResponseError(overviewRes);
+          throw new Error(detail);
         }
 
         const overview = await overviewRes.json();
-        const riskPayload = await risksRes.json();
-        const risks = Array.isArray(riskPayload?.risks) ? riskPayload.risks : [];
+        const risks = Array.isArray(overview?.schedulingRisks) ? overview.schedulingRisks : [];
         const severity = severityFromRisks(risks);
         const topRisk = risks[0];
         const confidence = typeof topRisk?.confidence === 'number' ? topRisk.confidence : 1;
-
-        if (!active) return;
 
         setState({
           loading: false,
@@ -96,9 +128,9 @@ export default function FieldWeatherPanel({ fieldId, onSeverityChange }: FieldWe
           alerts: Array.isArray(overview?.alerts) ? overview.alerts.length : 0,
           summary: topRisk?.reason || '直近の重大リスクは検知されていません。',
         });
-        onSeverityChange?.(severity);
+        onSeverityChangeRef.current?.(severity);
       } catch (error) {
-        if (!active) return;
+        if (isAbortError(error)) return;
         setState((prev) => ({
           ...prev,
           loading: false,
@@ -107,16 +139,16 @@ export default function FieldWeatherPanel({ fieldId, onSeverityChange }: FieldWe
           severity: 'watch',
           confidence: 0,
         }));
-        onSeverityChange?.('watch');
+        onSeverityChangeRef.current?.('watch');
       }
     };
 
     void load();
 
     return () => {
-      active = false;
+      controller.abort();
     };
-  }, [fieldId, onSeverityChange]);
+  }, [fieldId]);
 
   const confidenceText = useMemo(() => `${Math.round(state.confidence * 100)}%`, [state.confidence]);
 

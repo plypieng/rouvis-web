@@ -259,14 +259,19 @@ export default function FieldStudio() {
     }
   };
 
-  const onSeverityChange = (severity: RiskSeverity) => {
+  const onSeverityChange = useCallback((severity: RiskSeverity) => {
     const fieldId = draft.id || selectedFieldId;
     if (!fieldId) return;
-    setRiskByFieldId((prev) => ({
-      ...prev,
-      [fieldId]: severity,
-    }));
-  };
+    setRiskByFieldId((prev) => {
+      if (prev[fieldId] === severity) {
+        return prev;
+      }
+      return {
+        ...prev,
+        [fieldId]: severity,
+      };
+    });
+  }, [draft.id, selectedFieldId]);
 
   return (
     <div className="mx-auto flex w-full max-w-[1320px] flex-col gap-4 px-4 py-4 lg:h-[calc(100vh-96px)] lg:max-h-[980px] lg:flex-row">

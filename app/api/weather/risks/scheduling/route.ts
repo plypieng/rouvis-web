@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { appendQueryParam, getWeatherBackendUrl, getWeatherProxyHeaders } from '../../_shared';
+import {
+  appendQueryParam,
+  fetchWeatherUpstream,
+  getWeatherBackendUrl,
+  getWeatherProxyHeaders,
+  isWeatherTimeoutError,
+} from '../../_shared';
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,11 +19,10 @@ export async function GET(request: NextRequest) {
     appendQueryParam(params, 'days', request.nextUrl.searchParams.get('days'));
     appendQueryParam(params, 'byField', request.nextUrl.searchParams.get('byField'));
 
-    const response = await fetch(
+    const response = await fetchWeatherUpstream(
       `${backendUrl}/api/v1/weather/risks/scheduling${params.toString() ? `?${params.toString()}` : ''}`,
       {
         headers: await getWeatherProxyHeaders(request),
-        signal: AbortSignal.timeout(10000),
       },
     );
 
@@ -33,6 +38,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data);
   } catch (error) {
     console.error('Weather scheduling risks API proxy error:', error);
+    if (isWeatherTimeoutError(error)) {
+      return NextResponse.json(
+        { error: 'Weather upstream timeout' },
+        { status: 504 },
+      );
+    }
     return NextResponse.json({ error: 'Failed to fetch weather scheduling risks' }, { status: 500 });
   }
 }
