@@ -184,11 +184,61 @@ export default function FieldMapCanvas({
 }: FieldMapCanvasProps) {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<maplibregl.Map | null>(null);
+  const drawModeRef = useRef<DrawMode>(drawMode);
+  const draftGeometryRef = useRef<GeoJsonPolygon | null>(draftGeometry);
+  const selectedFieldIdRef = useRef<string | null>(selectedFieldId);
+  const onSelectFieldRef = useRef(onSelectField);
+  const onDraftGeometryChangeRef = useRef(onDraftGeometryChange);
+  const onDraftCentroidChangeRef = useRef(onDraftCentroidChange);
 
   const fieldGeoJson = useMemo(() => featureCollection(fields, riskByFieldId), [fields, riskByFieldId]);
   const centroidGeoJson = useMemo(() => pointCollection(fields), [fields]);
   const draftGeoJson = useMemo(() => draftFeature(draftGeometry), [draftGeometry]);
   const draftCentroidGeoJson = useMemo(() => draftCentroidFeature(draftCentroid), [draftCentroid]);
+  const fieldGeoJsonRef = useRef(fieldGeoJson);
+  const centroidGeoJsonRef = useRef(centroidGeoJson);
+  const draftGeoJsonRef = useRef(draftGeoJson);
+  const draftCentroidGeoJsonRef = useRef(draftCentroidGeoJson);
+
+  useEffect(() => {
+    drawModeRef.current = drawMode;
+  }, [drawMode]);
+
+  useEffect(() => {
+    draftGeometryRef.current = draftGeometry;
+  }, [draftGeometry]);
+
+  useEffect(() => {
+    selectedFieldIdRef.current = selectedFieldId;
+  }, [selectedFieldId]);
+
+  useEffect(() => {
+    onSelectFieldRef.current = onSelectField;
+  }, [onSelectField]);
+
+  useEffect(() => {
+    onDraftGeometryChangeRef.current = onDraftGeometryChange;
+  }, [onDraftGeometryChange]);
+
+  useEffect(() => {
+    onDraftCentroidChangeRef.current = onDraftCentroidChange;
+  }, [onDraftCentroidChange]);
+
+  useEffect(() => {
+    fieldGeoJsonRef.current = fieldGeoJson;
+  }, [fieldGeoJson]);
+
+  useEffect(() => {
+    centroidGeoJsonRef.current = centroidGeoJson;
+  }, [centroidGeoJson]);
+
+  useEffect(() => {
+    draftGeoJsonRef.current = draftGeoJson;
+  }, [draftGeoJson]);
+
+  useEffect(() => {
+    draftCentroidGeoJsonRef.current = draftCentroidGeoJson;
+  }, [draftCentroidGeoJson]);
 
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
@@ -205,7 +255,7 @@ export default function FieldMapCanvas({
     map.on('load', () => {
       map.addSource('fields-source', {
         type: 'geojson',
-        data: fieldGeoJson as any,
+        data: fieldGeoJsonRef.current as any,
       });
 
       map.addLayer({
@@ -226,7 +276,7 @@ export default function FieldMapCanvas({
           'line-color': ['coalesce', ['get', 'color'], '#22c55e'],
           'line-width': [
             'case',
-            ['==', ['get', 'id'], selectedFieldId || ''],
+            ['==', ['get', 'id'], selectedFieldIdRef.current || ''],
             3,
             1.5,
           ],
@@ -251,7 +301,7 @@ export default function FieldMapCanvas({
           ],
           'line-width': [
             'case',
-            ['==', ['get', 'id'], selectedFieldId || ''],
+            ['==', ['get', 'id'], selectedFieldIdRef.current || ''],
             7,
             4,
           ],
@@ -261,7 +311,7 @@ export default function FieldMapCanvas({
 
       map.addSource('centroid-source', {
         type: 'geojson',
-        data: centroidGeoJson as any,
+        data: centroidGeoJsonRef.current as any,
       });
 
       map.addLayer({
@@ -278,7 +328,7 @@ export default function FieldMapCanvas({
 
       map.addSource('draft-source', {
         type: 'geojson',
-        data: draftGeoJson as any,
+        data: draftGeoJsonRef.current as any,
       });
 
       map.addLayer({
@@ -304,7 +354,7 @@ export default function FieldMapCanvas({
 
       map.addSource('draft-centroid-source', {
         type: 'geojson',
-        data: draftCentroidGeoJson as any,
+        data: draftCentroidGeoJsonRef.current as any,
       });
 
       map.addLayer({
@@ -321,28 +371,29 @@ export default function FieldMapCanvas({
 
       map.on('click', 'fields-fill', (event) => {
         const id = event.features?.[0]?.properties?.id;
-        if (typeof id === 'string') onSelectField(id);
+        if (typeof id === 'string') onSelectFieldRef.current(id);
       });
 
       map.on('click', (event) => {
-        if (drawMode === 'none') return;
+        if (drawModeRef.current === 'none') return;
 
         const lon = event.lngLat.lng;
         const lat = event.lngLat.lat;
 
-        if (drawMode === 'centroid') {
-          onDraftCentroidChange({ lat, lon });
+        if (drawModeRef.current === 'centroid') {
+          onDraftCentroidChangeRef.current({ lat, lon });
           return;
         }
 
-        const existingPoints = draftGeometry ? geometryRing(draftGeometry).slice(0, -1) : [];
+        const liveDraftGeometry = draftGeometryRef.current;
+        const existingPoints = liveDraftGeometry ? geometryRing(liveDraftGeometry).slice(0, -1) : [];
         const nextPoints = [...existingPoints, { lat, lon }];
         const nextGeometry = geometryFromPoints(nextPoints);
-        onDraftGeometryChange(nextGeometry);
+        onDraftGeometryChangeRef.current(nextGeometry);
 
         if (nextGeometry) {
           const center = centroidFromGeometry(nextGeometry);
-          if (center) onDraftCentroidChange(center);
+          if (center) onDraftCentroidChangeRef.current(center);
         }
       });
     });
@@ -353,18 +404,7 @@ export default function FieldMapCanvas({
       map.remove();
       mapInstanceRef.current = null;
     };
-  }, [
-    centroidGeoJson,
-    draftCentroidGeoJson,
-    draftGeometry,
-    draftGeoJson,
-    drawMode,
-    fieldGeoJson,
-    onDraftCentroidChange,
-    onDraftGeometryChange,
-    onSelectField,
-    selectedFieldId,
-  ]);
+  }, []);
 
   useEffect(() => {
     const map = mapInstanceRef.current;
