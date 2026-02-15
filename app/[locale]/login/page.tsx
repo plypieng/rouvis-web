@@ -16,6 +16,9 @@ function LoginPageContent() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get('callbackUrl');
   const safeCallbackUrl = callbackUrl?.startsWith('/') ? callbackUrl : null;
+  const errorCode = searchParams.get('error');
+  const errorReason = searchParams.get('reason');
+  const isAdmissionDenied = errorCode === 'AccessDenied' && errorReason === 'admission_denied';
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -49,6 +52,21 @@ function LoginPageContent() {
             <h2 className="text-2xl font-bold text-gray-900">{t('title')}</h2>
             <p className="mt-2 text-gray-600">{t('subtitle')}</p>
           </div>
+
+          {isAdmissionDenied && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <p>{t('admissionDenied')}</p>
+              <Link href={`/${locale}/signup`} className="mt-2 inline-block font-semibold text-amber-900 underline">
+                {t('requestAccessCta')}
+              </Link>
+            </div>
+          )}
+
+          {!isAdmissionDenied && Boolean(errorCode) && (
+            <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {t('error')}
+            </div>
+          )}
 
           <GoogleSignInButton callbackUrl={safeCallbackUrl ?? `/${locale}/onboarding`} />
 

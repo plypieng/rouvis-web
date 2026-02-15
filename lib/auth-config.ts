@@ -11,6 +11,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { prisma, authPrisma } from "./prisma";
 import { resolveFarmerUiMode } from "./farmerUiMode";
+import { evaluateAuthAdmission } from "./auth-admission";
 import * as fs from "fs";
 
 const debugLog = (label: string, data: any) => {
@@ -206,6 +207,26 @@ export const authOptions: NextAuthOptions = {
         provider: account?.provider,
         type: account?.type,
       });
+
+      if (account?.provider === 'google') {
+        const profileEmail = typeof (profile as { email?: unknown } | undefined)?.email === 'string'
+          ? (profile as { email: string }).email
+          : null;
+        const admission = evaluateAuthAdmission({
+          mode: process.env.AUTH_ADMISSION_MODE,
+          allowlist: process.env.AUTH_ADMISSION_ALLOWLIST,
+          email: user?.email || profileEmail,
+        });
+
+        if (!admission.allowed) {
+          debugLog('SIGNIN_ADMISSION_DENIED', {
+            email: user?.email || profileEmail,
+            reason: admission.reason,
+            mode: admission.mode,
+          });
+          return '/login?error=AccessDenied&reason=admission_denied';
+        }
+      }
       return true;
     },
     /**
