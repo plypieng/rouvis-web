@@ -19,6 +19,9 @@ export default function RecordsPage() {
     if (action === 'log') {
       setShowLogModal(true);
     }
+    if (action === 'voice') {
+      setShowLogModal(true);
+    }
     if (action === 'schedule') {
       setShowTaskModal(true);
     }
@@ -41,6 +44,8 @@ export default function RecordsPage() {
 
       <ActivityLogModal
         isOpen={showLogModal}
+        autoStartVoice={action === 'voice'}
+        locale={locale}
         onClose={() => {
           setShowLogModal(false);
           clearActionQuery();

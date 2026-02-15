@@ -245,7 +245,7 @@ export default function TodayCommandCenter({
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
             {t('command_center.quick_actions_title')}
           </p>
-          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-4">
             <button
               type="button"
               onClick={() => {
@@ -274,6 +274,14 @@ export default function TodayCommandCenter({
               className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50"
             >
               {t('command_center.log_activity')}
+            </TrackedEventLink>
+            <TrackedEventLink
+              href={`/${locale}/records?action=voice`}
+              eventName="today_command_center_voice_log_clicked"
+              eventProperties={{ surface: 'today_command_center_quick_actions', mode }}
+              className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-teal-200 bg-white px-3 py-2 text-sm font-semibold text-teal-700 transition hover:bg-teal-50"
+            >
+              {t('command_center.voice_log')}
             </TrackedEventLink>
             <TrackedEventLink
               href={todayChatHref}
