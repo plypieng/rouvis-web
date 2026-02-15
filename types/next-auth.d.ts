@@ -14,6 +14,8 @@ declare module "next-auth" {
       profileComplete?: boolean;
       onboardingComplete?: boolean;
       uiMode?: FarmerUiMode;
+      workspaceId?: string | null;
+      role?: string | null;
     };
   }
 
@@ -28,6 +30,8 @@ declare module "next-auth" {
     profileComplete?: boolean;
     onboardingComplete?: boolean;
     uiMode?: FarmerUiMode;
+    workspaceId?: string | null;
+    role?: string | null;
   }
 }
 
@@ -42,5 +46,7 @@ declare module "next-auth/jwt" {
     profileComplete?: boolean;
     onboardingComplete?: boolean;
     uiMode?: FarmerUiMode;
+    workspaceId?: string | null;
+    role?: string | null;
   }
 }

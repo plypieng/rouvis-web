@@ -11,6 +11,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { prisma, authPrisma } from "./prisma";
 import { resolveFarmerUiMode } from "./farmerUiMode";
+import { GOOGLE_AUTH_SCOPE, resolveSessionClaimsFromToken } from "./auth-contract";
 import { evaluateAuthAdmission } from "./auth-admission";
 import * as fs from "fs";
 
@@ -76,8 +77,7 @@ export const authOptions: NextAuthOptions = {
           clientSecret: googleClientSecret!,
           authorization: {
             params: {
-              // Request calendar scope for Google Calendar integration
-              scope: 'openid email profile',
+              scope: GOOGLE_AUTH_SCOPE,
               access_type: 'offline',
               prompt: 'consent',
             },
@@ -292,6 +292,9 @@ export const authOptions: NextAuthOptions = {
         }
       }
 
+      token.workspaceId = typeof token.workspaceId === 'string' ? token.workspaceId : null;
+      token.role = typeof token.role === 'string' ? token.role : null;
+
       return token;
     },
 
@@ -300,12 +303,15 @@ export const authOptions: NextAuthOptions = {
      */
     async session({ session, token }) {
       if (session.user && token) {
-        session.user.id = (token.id as string | undefined) ?? (token.sub as string) ?? '';
-        session.user.email = token.email as string;
-        session.user.name = token.name as string;
-        session.user.profileComplete = Boolean(token.profileComplete);
-        session.user.onboardingComplete = Boolean(token.onboardingComplete);
-        session.user.uiMode = token.uiMode as 'new_farmer' | 'veteran_farmer' | undefined;
+        const claims = resolveSessionClaimsFromToken(token as Record<string, unknown>);
+        session.user.id = claims.id;
+        session.user.email = claims.email;
+        session.user.name = claims.name;
+        session.user.profileComplete = claims.profileComplete;
+        session.user.onboardingComplete = claims.onboardingComplete;
+        session.user.uiMode = claims.uiMode;
+        session.user.workspaceId = claims.workspaceId;
+        session.user.role = claims.role;
       }
       return session;
     },
