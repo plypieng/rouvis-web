@@ -58,6 +58,8 @@ model User {
   userProfile   UserProfile?
   accountDataRequests AccountDataRequest[]
   auditEvents   AuditEvent[]
+  workspaceMemberships WorkspaceMembership[]
+  personalWorkspace Workspace? @relation("PersonalWorkspaceOwner")
 }
 
 model UserProfile {
@@ -92,6 +94,43 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+model Workspace {
+  id                String   @id @default(cuid())
+  name              String
+  personalForUserId String?  @unique
+  personalForUser   User?    @relation("PersonalWorkspaceOwner", fields: [personalForUserId], references: [id], onDelete: SetNull)
+  memberships       WorkspaceMembership[]
+  projects          Project[]
+  fields            Field[]
+  chatSessions      ChatSession[]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([createdAt])
+}
+
+model WorkspaceMembership {
+  id          String        @id @default(cuid())
+  workspaceId String
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        WorkspaceRole @default(OWNER)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+  @@index([workspaceId, role])
+}
+
 // 4. Custom Application Models
 
 model ChatMessage {
@@ -110,6 +149,8 @@ model Project {
   id                String    @id @default(cuid())
   userId            String
   user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspaceId       String?
+  workspace         Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
   name              String
   crop              String
   variety           String?
@@ -125,6 +166,9 @@ model Project {
   tasks      Task[]
   activities Activity[]
   chatSessions ChatSession[]
+
+  @@index([workspaceId])
+  @@index([workspaceId, userId])
 }
 
 model Task {
@@ -179,10 +223,14 @@ model Field {
   color     String?  // Hex color code for visualization
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspaceId String?
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+  @@index([workspaceId])
+  @@index([workspaceId, userId])
 }
 
 model ChatSession {
@@ -193,6 +241,8 @@ model ChatSession {
 
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspaceId String?
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
 
   projectId String?
   project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -200,6 +250,7 @@ model ChatSession {
   messages  ChatMessage[]
 
   @@index([userId])
+  @@index([workspaceId])
   @@index([projectId])
 }
 

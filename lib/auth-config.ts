@@ -13,6 +13,7 @@ import { prisma, authPrisma } from "./prisma";
 import { resolveFarmerUiMode } from "./farmerUiMode";
 import { GOOGLE_AUTH_SCOPE, resolveSessionClaimsFromToken } from "./auth-contract";
 import { evaluateAuthAdmission } from "./auth-admission";
+import { ensureWorkspaceContextForUser } from "./workspaceMembership";
 import * as fs from "fs";
 
 const debugLog = (label: string, data: any) => {
@@ -232,7 +233,7 @@ export const authOptions: NextAuthOptions = {
     /**
      * JWT Callback: Runs when JWT is created or updated.
      */
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       // Initial sign in
       if (user) {
         token.id = user.id;
@@ -292,8 +293,26 @@ export const authOptions: NextAuthOptions = {
         }
       }
 
-      token.workspaceId = typeof token.workspaceId === 'string' ? token.workspaceId : null;
-      token.role = typeof token.role === 'string' ? token.role : null;
+      const userId = typeof token.id === 'string' ? token.id : null;
+
+      if (userId) {
+        try {
+          const workspaceContext = await ensureWorkspaceContextForUser(userId, {
+            preferredWorkspaceId: typeof token.workspaceId === 'string' ? token.workspaceId : null,
+            backfillLegacyRecords: Boolean(user) || trigger === 'update' || typeof token.workspaceId !== 'string',
+          });
+
+          token.workspaceId = workspaceContext.workspaceId;
+          token.role = workspaceContext.role;
+        } catch (error) {
+          debugLog('JWT_WORKSPACE_CONTEXT_ERROR', { error: (error as any)?.message?.substring(0, 200) });
+          token.workspaceId = null;
+          token.role = null;
+        }
+      } else {
+        token.workspaceId = null;
+        token.role = null;
+      }
 
       return token;
     },
