@@ -1,10 +1,36 @@
 import Link from 'next/link';
-import { Calendar, TrendingUp, Book, Settings, ChevronRight, User } from 'lucide-react';
+import { AlertCircle, Calendar, TrendingUp, Book, Settings, ChevronRight, User } from 'lucide-react';
 import { getServerSessionFromToken } from '@/lib/server-auth';
 import { getWebFeatureFlags } from '@/lib/feature-flags';
+import MenuNoticeTracker from '@/components/MenuNoticeTracker';
 
-export default async function MenuPage({ params }: { params: Promise<{ locale: string }> }) {
+type MenuNoticeKey = 'team_unavailable' | 'market_unavailable' | null;
+
+function parseMenuNotice(rawNotice: string | undefined): MenuNoticeKey {
+    if (rawNotice === 'team_unavailable') return 'team_unavailable';
+    if (rawNotice === 'market_unavailable') return 'market_unavailable';
+    return null;
+}
+
+function menuNoticeMessage(notice: MenuNoticeKey): string | null {
+    if (notice === 'team_unavailable') {
+        return 'チーム機能は現在公開されていません。使える画面へ自動で戻しました。';
+    }
+    if (notice === 'market_unavailable') {
+        return '市場機能は現在公開されていません。使える画面へ自動で戻しました。';
+    }
+    return null;
+}
+
+export default async function MenuPage(props: {
+    params: Promise<{ locale: string }>;
+    searchParams?: Promise<{ notice?: string }>;
+}) {
+    const { params, searchParams } = props;
     const { locale } = await params;
+    const resolvedSearchParams = searchParams ? await searchParams : undefined;
+    const notice = parseMenuNotice(resolvedSearchParams?.notice);
+    const noticeMessage = menuNoticeMessage(notice);
     const session = await getServerSessionFromToken();
     const featureFlags = getWebFeatureFlags();
     const displayName = session?.user?.name || session?.user?.email || 'ユーザー';
@@ -38,11 +64,38 @@ export default async function MenuPage({ params }: { params: Promise<{ locale: s
 
     return (
         <div className="min-h-screen bg-gray-50 pb-24">
+            <MenuNoticeTracker notice={notice} />
             <header className="bg-white border-b border-gray-200 px-4 py-4 sticky top-0 z-10">
                 <h1 className="text-lg font-bold text-gray-900">メニュー (Menu)</h1>
             </header>
 
             <main className="p-4 space-y-6">
+                {noticeMessage ? (
+                    <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+                        <div className="flex items-start gap-2">
+                            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                            <div>
+                                <p className="text-sm font-semibold">利用可能な画面へ移動しました</p>
+                                <p className="mt-1 text-sm">{noticeMessage}</p>
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                    <Link
+                                        href={`/${locale}`}
+                                        className="inline-flex items-center rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100"
+                                    >
+                                        ダッシュボードへ戻る
+                                    </Link>
+                                    <Link
+                                        href={`/${locale}/chat`}
+                                        className="inline-flex items-center rounded-lg bg-amber-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-800"
+                                    >
+                                        チャットで相談
+                                    </Link>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                ) : null}
+
                 {/* Profile Summary */}
                 <section className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex items-center gap-4">
                     <div className="w-14 h-14 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">

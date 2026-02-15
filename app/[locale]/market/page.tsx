@@ -1,6 +1,6 @@
 import { Store, BarChart3, Package, Truck } from 'lucide-react';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import { getWebFeatureFlags } from '@/lib/feature-flags';
 
 export default async function MarketPage({ params }: { params: Promise<{ locale: string }> }) {
@@ -8,7 +8,7 @@ export default async function MarketPage({ params }: { params: Promise<{ locale:
     const featureFlags = getWebFeatureFlags();
 
     if (!featureFlags.marketPage) {
-        notFound();
+        redirect(`/${locale}/menu?notice=market_unavailable`);
     }
 
     return (

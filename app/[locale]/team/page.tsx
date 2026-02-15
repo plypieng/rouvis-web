@@ -1,6 +1,6 @@
 import { Users, CalendarDays, CheckSquare, UserPlus } from 'lucide-react';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import { getWebFeatureFlags } from '@/lib/feature-flags';
 
 export default async function TeamPage({ params }: { params: Promise<{ locale: string }> }) {
@@ -8,7 +8,7 @@ export default async function TeamPage({ params }: { params: Promise<{ locale: s
     const featureFlags = getWebFeatureFlags();
 
     if (!featureFlags.teamPage) {
-        notFound();
+        redirect(`/${locale}/menu?notice=team_unavailable`);
     }
 
     return (
