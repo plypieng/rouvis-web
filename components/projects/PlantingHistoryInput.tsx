@@ -58,8 +58,7 @@ export default function PlantingHistoryInput({
         setAnalyzing(true);
         try {
             const base64 = await fileToBase64(file);
-            const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-            const res = await fetch(`${baseUrl}/api/v1/agents/analyze-plant-photo`, {
+            const res = await fetch('/api/v1/agents/analyze-plant-photo', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ crop, image: base64 }),

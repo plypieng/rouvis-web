@@ -34,8 +34,7 @@ export default function ConversationalQA({
         setFetching(true);
         setErrorMessage(null);
         try {
-            const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-            const res = await fetch(`${baseUrl}/api/v1/agents/get-conversational-questions`, {
+            const res = await fetch('/api/v1/agents/get-conversational-questions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ crop }),
@@ -79,8 +78,7 @@ export default function ConversationalQA({
         setLoading(true);
         setErrorMessage(null);
         try {
-            const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-            const res = await fetch(`${baseUrl}/api/v1/agents/estimate-planting-date`, {
+            const res = await fetch('/api/v1/agents/estimate-planting-date', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ crop, answers: finalAnswers }),

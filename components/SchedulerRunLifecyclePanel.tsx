@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 type SchedulerAsyncRunState = 'queued' | 'running' | 'merged' | 'skipped' | 'failed';
 
@@ -65,7 +65,6 @@ function stateClass(state: SchedulerAsyncRunState): string {
 }
 
 export function SchedulerRunLifecyclePanel() {
-  const apiBase = useMemo(() => process.env.NEXT_PUBLIC_API_BASE_URL || '', []);
   const [jobId, setJobId] = useState('');
   const [runs, setRuns] = useState<SchedulerAsyncRun[]>([]);
   const [queueDepth, setQueueDepth] = useState(0);
@@ -78,7 +77,7 @@ export function SchedulerRunLifecyclePanel() {
 
   const refreshSlo = useCallback(async () => {
     try {
-      const response = await fetch(`${apiBase}/api/v1/agents/scheduler/runtime-status`, {
+      const response = await fetch('/api/v1/agents/scheduler/runtime-status', {
         credentials: 'include',
       });
       if (!response.ok) {
@@ -91,13 +90,13 @@ export function SchedulerRunLifecyclePanel() {
     } catch (fetchError) {
       setSloError(fetchError instanceof Error ? fetchError.message : 'Failed to load scheduler SLO');
     }
-  }, [apiBase]);
+  }, []);
 
   const refreshRuns = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${apiBase}/api/v1/agents/scheduler/job-runs?limit=30&refresh=1`, {
+      const response = await fetch('/api/v1/agents/scheduler/job-runs?limit=30&refresh=1', {
         credentials: 'include',
       });
       if (!response.ok) {
@@ -112,7 +111,7 @@ export function SchedulerRunLifecyclePanel() {
     } finally {
       setLoading(false);
     }
-  }, [apiBase, refreshSlo]);
+  }, [refreshSlo]);
 
   useEffect(() => {
     void refreshRuns();
@@ -138,7 +137,7 @@ export function SchedulerRunLifecyclePanel() {
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetch(`${apiBase}/api/v1/agents/scheduler/run-now`, {
+      const response = await fetch('/api/v1/agents/scheduler/run-now', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -154,13 +153,13 @@ export function SchedulerRunLifecyclePanel() {
     } finally {
       setSubmitting(false);
     }
-  }, [apiBase, jobId, refreshRuns]);
+  }, [jobId, refreshRuns]);
 
   const retryRun = useCallback(async (runId: string) => {
     setSubmitting(true);
     setError(null);
     try {
-      const response = await fetch(`${apiBase}/api/v1/agents/scheduler/job-runs`, {
+      const response = await fetch('/api/v1/agents/scheduler/job-runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -176,7 +175,7 @@ export function SchedulerRunLifecyclePanel() {
     } finally {
       setSubmitting(false);
     }
-  }, [apiBase, refreshRuns]);
+  }, [refreshRuns]);
 
   return (
     <div className="space-y-4">

@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 
 import { CalendarView } from '../../../components/CalendarView';
 import { resolveFarmerUiMode } from '../../../lib/farmerUiMode';
+import { getServerAppBaseUrl } from '../../../lib/server-app-base-url';
 import { getServerSessionFromToken } from '../../../lib/server-auth';
 import type { FarmerUiMode } from '../../../types/farmer-ui-mode';
 import type { CalendarFilterKey, StandaloneCalendarTask } from '../../../types/standalone-calendar';
@@ -35,13 +36,13 @@ function sanitizeFilterParam(value?: string): CalendarFilterKey {
 }
 
 async function getTasks() {
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
+  const appBaseUrl = await getServerAppBaseUrl();
 
   try {
     const cookieStore = await cookies();
     const cookieHeader = cookieStore.getAll().map((cookie) => `${cookie.name}=${cookie.value}`).join('; ');
 
-    const res = await fetch(`${baseUrl}/api/v1/tasks`, {
+    const res = await fetch(`${appBaseUrl}/api/v1/tasks`, {
       cache: 'no-store',
       headers: {
         ...(cookieHeader ? { Cookie: cookieHeader } : {}),

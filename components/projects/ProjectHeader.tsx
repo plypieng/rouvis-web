@@ -3,7 +3,6 @@
 import { useTranslations } from 'next-intl';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
 import ProjectEditModal from './ProjectEditModal';
 import ArchiveConfirmation from './ArchiveConfirmation';
 import UndoSnackbar from '../UndoSnackbar';
@@ -57,7 +56,6 @@ export default function ProjectHeader({ project, compact }: ProjectHeaderProps) 
     const router = useRouter();
     const params = useParams<{ locale: string }>();
     const locale = (params?.locale as string) || 'ja';
-    const { data: session } = useSession();
     const [showMenu, setShowMenu] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [showArchiveDialog, setShowArchiveDialog] = useState(false);
@@ -147,9 +145,7 @@ export default function ProjectHeader({ project, compact }: ProjectHeaderProps) 
     useEffect(() => {
         const fetchStages = async () => {
             try {
-                const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-                const userId = (session?.user as { id?: string })?.id;
-                const res = await fetch(`${baseUrl}/api/v1/knowledge/crops?crop=${encodeURIComponent(project.crop)}${userId ? `&userId=${encodeURIComponent(userId)}` : ''}`);
+                const res = await fetch(`/api/v1/knowledge/crops?crop=${encodeURIComponent(project.crop)}`);
                 if (!res.ok) {
                     setStages(DEFAULT_STAGES);
                     return;
@@ -183,7 +179,7 @@ export default function ProjectHeader({ project, compact }: ProjectHeaderProps) 
         };
 
         fetchStages();
-    }, [project.crop, session?.user]);
+    }, [project.crop]);
 
     // Helper to get icon for stage key
     const getStageIcon = (key: string) => {

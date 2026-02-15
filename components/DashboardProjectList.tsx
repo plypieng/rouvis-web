@@ -7,6 +7,7 @@ import TodayCommandCenter, { type TodayCommandTask } from './TodayCommandCenter'
 import FirstWeekChecklist, { type ChecklistItem } from './FirstWeekChecklist';
 import TrackedEventLink from './TrackedEventLink';
 import { resolveFarmerUiMode } from '@/lib/farmerUiMode';
+import { getServerAppBaseUrl } from '@/lib/server-app-base-url';
 import type { FarmerUiMode } from '@/types/farmer-ui-mode';
 
 interface Project {
@@ -138,10 +139,9 @@ function requestTimeoutSignal(ms = 4500): AbortSignal | undefined {
     return undefined;
 }
 
-async function getProjects(cookieHeader: string): Promise<LoadResult<Project[]>> {
+async function getProjects(appBaseUrl: string, cookieHeader: string): Promise<LoadResult<Project[]>> {
     try {
-        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const res = await fetch(`${baseUrl}/api/v1/projects`, {
+        const res = await fetch(`${appBaseUrl}/api/v1/projects`, {
             cache: 'no-store',
             headers: withCookieHeaders(cookieHeader),
             signal: requestTimeoutSignal(),
@@ -162,10 +162,9 @@ async function getProjects(cookieHeader: string): Promise<LoadResult<Project[]>>
     }
 }
 
-async function getWeather(cookieHeader: string, copy: WeatherCopy): Promise<LoadResult<WeatherData>> {
+async function getWeather(appBaseUrl: string, cookieHeader: string, copy: WeatherCopy): Promise<LoadResult<WeatherData>> {
     try {
-        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const res = await fetch(`${baseUrl}/api/v1/weather/overview`, {
+        const res = await fetch(`${appBaseUrl}/api/weather/overview`, {
             next: { revalidate: 3600 },
             headers: withCookieHeaders(cookieHeader),
             signal: requestTimeoutSignal(),
@@ -222,10 +221,9 @@ async function getWeather(cookieHeader: string, copy: WeatherCopy): Promise<Load
     }
 }
 
-async function getTasks(cookieHeader: string): Promise<LoadResult<DashboardTask[]>> {
+async function getTasks(appBaseUrl: string, cookieHeader: string): Promise<LoadResult<DashboardTask[]>> {
     try {
-        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const res = await fetch(`${baseUrl}/api/v1/tasks`, {
+        const res = await fetch(`${appBaseUrl}/api/v1/tasks`, {
             cache: 'no-store',
             headers: withCookieHeaders(cookieHeader),
             signal: requestTimeoutSignal(),
@@ -246,10 +244,9 @@ async function getTasks(cookieHeader: string): Promise<LoadResult<DashboardTask[
     }
 }
 
-async function getActivities(cookieHeader: string): Promise<LoadResult<DashboardActivity[]>> {
+async function getActivities(appBaseUrl: string, cookieHeader: string): Promise<LoadResult<DashboardActivity[]>> {
     try {
-        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const res = await fetch(`${baseUrl}/api/v1/activities`, {
+        const res = await fetch(`${appBaseUrl}/api/v1/activities`, {
             cache: 'no-store',
             headers: withCookieHeaders(cookieHeader),
             signal: requestTimeoutSignal(),
@@ -270,10 +267,9 @@ async function getActivities(cookieHeader: string): Promise<LoadResult<Dashboard
     }
 }
 
-async function getProfile(cookieHeader: string): Promise<LoadResult<ProfilePayload>> {
+async function getProfile(appBaseUrl: string, cookieHeader: string): Promise<LoadResult<ProfilePayload>> {
     try {
-        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        const res = await fetch(`${baseUrl}/api/v1/profile`, {
+        const res = await fetch(`${appBaseUrl}/api/v1/profile`, {
             cache: 'no-store',
             headers: withCookieHeaders(cookieHeader),
             signal: requestTimeoutSignal(),
@@ -307,10 +303,9 @@ async function getProfile(cookieHeader: string): Promise<LoadResult<ProfilePaylo
     }
 }
 
-async function persistInferredUiMode(cookieHeader: string, uiMode: FarmerUiMode): Promise<void> {
+async function persistInferredUiMode(appBaseUrl: string, cookieHeader: string, uiMode: FarmerUiMode): Promise<void> {
     try {
-        const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-        await fetch(`${baseUrl}/api/v1/profile`, {
+        await fetch(`${appBaseUrl}/api/v1/profile`, {
             method: 'POST',
             cache: 'no-store',
             headers: {
@@ -341,17 +336,18 @@ export default async function DashboardProjectList({
     ]);
     const cookieStore = await cookies();
     const cookieHeader = cookieStore.getAll().map((cookie) => `${cookie.name}=${cookie.value}`).join('; ');
+    const appBaseUrl = await getServerAppBaseUrl();
 
     const [projectsResult, weatherResult, tasksResult, activitiesResult, profileResult] = await Promise.all([
-        getProjects(cookieHeader),
-        getWeather(cookieHeader, {
+        getProjects(appBaseUrl, cookieHeader),
+        getWeather(appBaseUrl, cookieHeader, {
             fallbackLocation: t('weather_defaults.location'),
             unknownCondition: t('weather_defaults.unknown_condition'),
             fetchFailedCondition: t('weather_defaults.fetch_failed_condition'),
         }),
-        getTasks(cookieHeader),
-        getActivities(cookieHeader),
-        getProfile(cookieHeader),
+        getTasks(appBaseUrl, cookieHeader),
+        getActivities(appBaseUrl, cookieHeader),
+        getProfile(appBaseUrl, cookieHeader),
     ]);
 
     const projects = projectsResult.data;
@@ -370,7 +366,7 @@ export default async function DashboardProjectList({
     const dashboardModeTestId = isVeteranMode ? 'dashboard-mode-veteran' : 'dashboard-mode-new';
 
     if (profile && !profile.uiMode) {
-        await persistInferredUiMode(cookieHeader, resolvedUiMode);
+        await persistInferredUiMode(appBaseUrl, cookieHeader, resolvedUiMode);
     }
 
     const hasDataFetchError = forceDataError

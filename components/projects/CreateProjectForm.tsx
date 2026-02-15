@@ -63,8 +63,7 @@ export default function CreateProjectForm({ locale, initialData }: { locale: str
         if (!formData.crop) return;
         setSuggesting(true);
         try {
-            const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-            const res = await fetch(`${baseUrl}/api/v1/agents/recommend`, {
+            const res = await fetch('/api/v1/agents/recommend', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ crop: formData.crop }),
@@ -100,8 +99,7 @@ export default function CreateProjectForm({ locale, initialData }: { locale: str
         setLoading(true);
 
         try {
-            const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:4000';
-            const res = await fetch(`${baseUrl}/api/v1/projects`, {
+            const res = await fetch('/api/v1/projects', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
