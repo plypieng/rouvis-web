@@ -742,6 +742,17 @@
       "requestAccessCta": "Request Beta Access",
       "terms": "By signing in, you agree to our Terms of Service and Privacy Policy."
     },
+    "waitlist": {
+      "title": "Request Beta Access",
+      "subtitle": "ROUVIS is currently invite-only. Join the waitlist and we will contact your farm team in rollout order.",
+      "contactLabel": "Contact us for access",
+      "alreadyInvited": "Already invited?",
+      "signInCta": "Sign in with Google",
+      "source": {
+        "landing": "Use Sign In only if your team already has beta access.",
+        "admissionDenied": "Your last sign-in was denied because this account is not admitted yet. Request access below."
+      }
+    },
     "onboarding": {
       "progress": "Step {current} of {total}",
       "welcome": {
@@ -845,6 +856,10 @@
       "cta_login": "Sign In",
       "cta_demo": "Watch Demo",
       "cta_beta": "Request Beta Access",
+      "choice_signin_label": "Already invited",
+      "choice_signin_desc": "Use Sign In if your team already has beta access.",
+      "choice_waitlist_label": "Need access",
+      "choice_waitlist_desc": "Use Request Beta Access to join the waitlist.",
       "chip_1": "JMA weather integration",
       "chip_2": "Field-first mobile workflow",
       "chip_3": "Automatic work history",

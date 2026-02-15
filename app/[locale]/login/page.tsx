@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { Suspense, useEffect } from 'react';
 import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
+import TrackedEventLink from '@/components/TrackedEventLink';
 
 function LoginPageContent() {
   const t = useTranslations('auth.signIn');
@@ -56,9 +57,14 @@ function LoginPageContent() {
           {isAdmissionDenied && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
               <p>{t('admissionDenied')}</p>
-              <Link href={`/${locale}/signup`} className="mt-2 inline-block font-semibold text-amber-900 underline">
+              <TrackedEventLink
+                href={`/${locale}/signup?source=login_admission_denied`}
+                eventName="login_admission_denied_request_access_clicked"
+                eventProperties={{ surface: 'login_error' }}
+                className="mt-2 inline-block font-semibold text-amber-900 underline"
+              >
                 {t('requestAccessCta')}
-              </Link>
+              </TrackedEventLink>
             </div>
           )}
 

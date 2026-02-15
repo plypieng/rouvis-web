@@ -21,6 +21,7 @@ import { Noto_Sans_JP, Noto_Serif_JP } from 'next/font/google';
 import { Logo } from './Logo';
 import { useTranslations } from 'next-intl';
 import { DemoAutoStart } from './DemoAutoStart';
+import TrackedEventLink from './TrackedEventLink';
 
 interface LandingPageProps {
     locale: string;
@@ -41,7 +42,10 @@ const notoSerifJp = Noto_Serif_JP({
 export default function LandingPage({ locale }: LandingPageProps) {
     const t = useTranslations('landing');
     const demoModeEnabled = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
-    const isClosedBeta = true;
+    const isClosedBeta = process.env.NEXT_PUBLIC_CLOSED_BETA !== 'false';
+
+    const buildSignInHref = (surface: string) => `/${locale}/login?intent=sign_in&source=${surface}`;
+    const buildWaitlistHref = (surface: string) => `/${locale}/signup?intent=waitlist&source=${surface}`;
 
     const painPoints = [
         {
@@ -113,18 +117,22 @@ export default function LandingPage({ locale }: LandingPageProps) {
                         </span>
                     </div>
                     <div className="flex items-center gap-2 sm:gap-3">
-                        <Link
-                            href={`/${locale}/login`}
+                        <TrackedEventLink
+                            href={buildSignInHref('landing_header')}
+                            eventName="landing_cta_sign_in_clicked"
+                            eventProperties={{ surface: 'header', destination: 'login' }}
                             className="inline-flex min-h-[44px] items-center rounded-full px-4 text-sm font-semibold text-slate-700 transition hover:bg-white/80 hover:text-slate-900"
                         >
                             {t('hero.cta_login')}
-                        </Link>
-                        <Link
-                            href={`/${locale}/signup`}
+                        </TrackedEventLink>
+                        <TrackedEventLink
+                            href={buildWaitlistHref('landing_header')}
+                            eventName="landing_cta_waitlist_clicked"
+                            eventProperties={{ surface: 'header', destination: 'signup' }}
                             className="inline-flex min-h-[44px] items-center rounded-full bg-[#1a7c44] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#136236] sm:px-6"
                         >
                             {isClosedBeta ? t('hero.cta_beta') : t('hero.cta_start')}
-                        </Link>
+                        </TrackedEventLink>
                     </div>
                 </div>
             </header>
@@ -163,13 +171,15 @@ export default function LandingPage({ locale }: LandingPageProps) {
                         </div>
 
                         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                            <Link
-                                href={`/${locale}/signup`}
+                            <TrackedEventLink
+                                href={buildWaitlistHref('landing_hero_primary')}
+                                eventName="landing_cta_waitlist_clicked"
+                                eventProperties={{ surface: 'hero_primary', destination: 'signup' }}
                                 className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-full bg-[#1a7c44] px-7 py-3 text-base font-semibold text-white shadow-lg shadow-[#1a7c44]/20 transition hover:-translate-y-0.5 hover:bg-[#136236]"
                             >
                                 {isClosedBeta ? t('hero.cta_beta') : t('hero.cta_start')}
                                 <ArrowRight className="h-4 w-4" />
-                            </Link>
+                            </TrackedEventLink>
 
                             {demoModeEnabled ? (
                                 <Suspense fallback={
@@ -183,13 +193,34 @@ export default function LandingPage({ locale }: LandingPageProps) {
                                     <DemoAutoStart locale={locale} />
                                 </Suspense>
                             ) : (
-                                <Link
-                                    href={`/${locale}/login`}
+                                <TrackedEventLink
+                                    href={buildSignInHref('landing_hero_secondary')}
+                                    eventName="landing_cta_sign_in_clicked"
+                                    eventProperties={{ surface: 'hero_secondary', destination: 'login' }}
                                     className="inline-flex min-h-[48px] items-center justify-center rounded-full border border-[#cfd8e4] bg-white px-7 py-3 text-base font-semibold text-slate-700 transition hover:border-[#9ebbe0] hover:text-slate-900"
                                 >
                                     {t('hero.cta_login')}
-                                </Link>
+                                </TrackedEventLink>
                             )}
+                        </div>
+
+                        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                            <div className="rounded-2xl border border-[#d8e3f3] bg-white/90 p-4">
+                                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#245e9e]">
+                                    {t('hero.choice_signin_label')}
+                                </p>
+                                <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                                    {t('hero.choice_signin_desc')}
+                                </p>
+                            </div>
+                            <div className="rounded-2xl border border-[#d7e6d5] bg-white/90 p-4">
+                                <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#1c7c44]">
+                                    {t('hero.choice_waitlist_label')}
+                                </p>
+                                <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                                    {t('hero.choice_waitlist_desc')}
+                                </p>
+                            </div>
                         </div>
 
                         <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -406,18 +437,22 @@ export default function LandingPage({ locale }: LandingPageProps) {
                                 {t('cta.subtitle')}
                             </p>
                             <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-                                <Link
-                                    href={`/${locale}/signup`}
+                                <TrackedEventLink
+                                    href={buildWaitlistHref('landing_footer')}
+                                    eventName="landing_cta_waitlist_clicked"
+                                    eventProperties={{ surface: 'footer', destination: 'signup' }}
                                     className="inline-flex min-h-[48px] items-center justify-center rounded-full bg-white px-7 py-3 text-base font-semibold text-[#1b7b44] transition hover:bg-[#eaf5ed]"
                                 >
                                     {isClosedBeta ? t('hero.cta_beta') : t('cta.primary')}
-                                </Link>
-                                <Link
-                                    href={`/${locale}/login`}
+                                </TrackedEventLink>
+                                <TrackedEventLink
+                                    href={buildSignInHref('landing_footer')}
+                                    eventName="landing_cta_sign_in_clicked"
+                                    eventProperties={{ surface: 'footer', destination: 'login' }}
                                     className="inline-flex min-h-[48px] items-center justify-center rounded-full border border-white/70 px-7 py-3 text-base font-semibold text-white transition hover:bg-white/15"
                                 >
                                     {t('cta.secondary')}
-                                </Link>
+                                </TrackedEventLink>
                             </div>
                         </motion.div>
                     </div>

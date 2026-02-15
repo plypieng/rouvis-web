@@ -993,6 +993,17 @@
       "requestAccessCta": "ベータ参加を申請",
       "terms": "ログインすることで、利用規約とプライバシーポリシーに同意したものとみなされます。"
     },
+    "waitlist": {
+      "title": "ベータ参加を申請",
+      "subtitle": "ROUVISは現在招待制です。順次ご案内するため、まずは順番待ち登録をお願いします。",
+      "contactLabel": "参加申請はこちら",
+      "alreadyInvited": "すでに招待済みの方",
+      "signInCta": "Googleでログイン",
+      "source": {
+        "landing": "招待済みの場合のみログインをご利用ください。",
+        "admissionDenied": "このアカウントはまだ招待対象外のためログインできませんでした。下記から参加申請してください。"
+      }
+    },
     "onboarding": {
       "progress": "ステップ {current} / {total}",
       "welcome": {
@@ -1163,6 +1174,10 @@
       "cta_login": "ログイン",
       "cta_demo": "デモを見る",
       "cta_beta": "ベータ参加を申請",
+      "choice_signin_label": "招待済みの方",
+      "choice_signin_desc": "すでにベータ招待済みの方はログインへ進んでください。",
+      "choice_waitlist_label": "はじめての方",
+      "choice_waitlist_desc": "まだ招待がない場合は、ベータ参加申請から順番待ち登録してください。",
       "chip_1": "気象庁データ連携",
       "chip_2": "スマホで現場入力",
       "chip_3": "作業履歴を自動蓄積",
