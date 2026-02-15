@@ -8,13 +8,27 @@ import { getBackendAuth } from '@/lib/backend-proxy-auth';
 
 export const maxDuration = 30;
 
-type ChatErrorCode = 'UNAUTHORIZED' | 'VALIDATION_ERROR' | 'RATE_LIMITED' | 'INTERNAL_ERROR';
+type ChatErrorCode =
+  | 'UNAUTHORIZED'
+  | 'VALIDATION_ERROR'
+  | 'RATE_LIMITED'
+  | 'ENTITLEMENT_REQUIRED'
+  | 'INTERNAL_ERROR';
 type AiTier = 'free' | 'pro';
+type BillingPlan = 'FREE' | 'PRO' | 'ENTERPRISE';
+type EntitlementKey = 'ai.chat' | 'ai.recommend' | 'ai.scheduler';
+type EntitlementEnforcementMode = 'off' | 'report-only' | 'enforce';
 
 const DEFAULT_CHAT_PROMPT_LIMIT: Record<AiTier, number> = {
   free: 4_000,
   pro: 12_000,
 };
+const DEFAULT_PLAN_ENTITLEMENTS: Record<BillingPlan, EntitlementKey[]> = {
+  FREE: ['ai.chat'],
+  PRO: ['ai.chat', 'ai.recommend', 'ai.scheduler'],
+  ENTERPRISE: ['ai.chat', 'ai.recommend', 'ai.scheduler'],
+};
+const ENTITLEMENT_VALUES = new Set<EntitlementKey>(['ai.chat', 'ai.recommend', 'ai.scheduler']);
 
 function normalizeTier(value: unknown): AiTier | null {
   if (typeof value !== 'string') return null;
@@ -28,6 +42,75 @@ function parsePositiveInt(value: string | undefined, fallback: number): number {
   const parsed = Number.parseInt(value || '', 10);
   if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
   return parsed;
+}
+
+function normalizePlan(value: unknown): BillingPlan | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'pro') return 'PRO';
+  if (normalized === 'enterprise') return 'ENTERPRISE';
+  if (normalized === 'free' || normalized === 'basic') return 'FREE';
+  return null;
+}
+
+function parseEntitlementEnforcementMode(rawMode: string | undefined): EntitlementEnforcementMode {
+  const normalized = (rawMode || '').trim().toLowerCase();
+  if (normalized === 'off') return 'off';
+  if (normalized === 'enforce') return 'enforce';
+  return 'report-only';
+}
+
+function parseEntitlementList(rawValue: unknown): EntitlementKey[] {
+  if (!Array.isArray(rawValue)) return [];
+  const unique = new Set<EntitlementKey>();
+  for (const rawItem of rawValue) {
+    if (typeof rawItem !== 'string') continue;
+    const entitlement = rawItem.trim().toLowerCase() as EntitlementKey;
+    if (ENTITLEMENT_VALUES.has(entitlement)) {
+      unique.add(entitlement);
+    }
+  }
+  return Array.from(unique);
+}
+
+function hasExplicitEntitlementList(tokenRecord: Record<string, unknown> | null): boolean {
+  if (!tokenRecord) return false;
+  return Array.isArray(tokenRecord.entitlements) || Array.isArray(tokenRecord.aiEntitlements);
+}
+
+function resolveUserPlan(params: { explicitTier?: unknown; tokenPlan?: unknown }): BillingPlan {
+  const explicitPlan = normalizePlan(params.tokenPlan);
+  if (explicitPlan) return explicitPlan;
+
+  const explicitTier = normalizeTier(params.explicitTier);
+  if (explicitTier === 'pro') return 'PRO';
+  return 'FREE';
+}
+
+function resolveUserEntitlements(params: {
+  tokenRecord: Record<string, unknown> | null;
+  plan: BillingPlan;
+}): EntitlementKey[] {
+  const tokenEntitlements = parseEntitlementList(
+    params.tokenRecord?.entitlements ?? params.tokenRecord?.aiEntitlements
+  );
+
+  if (hasExplicitEntitlementList(params.tokenRecord)) {
+    return tokenEntitlements;
+  }
+
+  return DEFAULT_PLAN_ENTITLEMENTS[params.plan];
+}
+
+function getEntitlementUpgradeHint(required: EntitlementKey): string {
+  switch (required) {
+    case 'ai.scheduler':
+      return 'Upgrade to PRO to enable advanced scheduler advice.';
+    case 'ai.recommend':
+      return 'Upgrade to PRO to enable crop recommendation AI.';
+    default:
+      return 'Upgrade your plan to access this AI feature.';
+  }
 }
 
 function parseTierOverrides(): Record<string, AiTier> {
@@ -81,8 +164,9 @@ function toErrorResponse(params: {
   code: ChatErrorCode;
   message: string;
   requestId: string;
+  details?: unknown;
 }) {
-  const payload = {
+  const payload: Record<string, unknown> = {
     code: params.code,
     message: params.message,
     requestId: params.requestId,
@@ -90,6 +174,9 @@ function toErrorResponse(params: {
     error: params.message,
     errorCode: params.code,
   };
+  if (params.details !== undefined) {
+    payload.details = params.details;
+  }
   return NextResponse.json(payload, {
     status: params.status,
     headers: { 'X-Request-Id': params.requestId },
@@ -134,7 +221,53 @@ export async function POST(req: NextRequest) {
       : typeof token?.sub === 'string'
         ? token.sub
         : undefined;
+    if (!userId) {
+      return toErrorResponse({
+        status: 401,
+        code: 'UNAUTHORIZED',
+        message: 'Unauthorized',
+        requestId,
+      });
+    }
+
     const explicitTier = tokenRecord?.aiTier ?? tokenRecord?.plan;
+    const plan = resolveUserPlan({
+      explicitTier,
+      tokenPlan: tokenRecord?.plan,
+    });
+    const entitlements = resolveUserEntitlements({
+      tokenRecord,
+      plan,
+    });
+    const enforcementMode = parseEntitlementEnforcementMode(process.env.ENTITLEMENT_ENFORCEMENT_MODE);
+    const hasChatEntitlement = entitlements.includes('ai.chat');
+    const reportOnlyDenied = enforcementMode === 'report-only' && !hasChatEntitlement;
+    const entitlementAllowed = enforcementMode !== 'enforce' || hasChatEntitlement;
+
+    if (reportOnlyDenied) {
+      console.warn('[entitlements][report-only] Missing entitlement', {
+        userId,
+        required: 'ai.chat',
+        plan,
+        route: 'web_chat',
+      });
+    }
+
+    if (!entitlementAllowed) {
+      return toErrorResponse({
+        status: 403,
+        code: 'ENTITLEMENT_REQUIRED',
+        message: 'Your current plan does not include web chat AI.',
+        requestId,
+        details: {
+          requiredEntitlement: 'ai.chat',
+          currentPlan: plan,
+          mode: enforcementMode,
+          upgradeHint: getEntitlementUpgradeHint('ai.chat'),
+        },
+      });
+    }
+
     const tier = resolveAiTier({ userId, explicitTier });
 
     const { messages } = await req.json();
