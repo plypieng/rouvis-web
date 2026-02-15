@@ -93,6 +93,7 @@ export default function TodayCommandCenter({
     [tasks],
   );
   const queueTasks = sortedTasks.slice(0, 5);
+  const oneTapTask = recommendedTask || queueTasks[0] || null;
 
   const overdueCount = useMemo(() => {
     const todayStart = new Date();
@@ -240,6 +241,51 @@ export default function TodayCommandCenter({
           </div>
         )}
 
+        <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            {t('command_center.quick_actions_title')}
+          </p>
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <button
+              type="button"
+              onClick={() => {
+                if (!oneTapTask) return;
+                void trackUXEvent('today_command_center_mark_done_clicked', {
+                  mode,
+                  taskId: oneTapTask.id,
+                  surface: 'quick_actions',
+                });
+                void completeTask(oneTapTask, 'primary');
+              }}
+              disabled={!oneTapTask || Boolean(completingTaskId)}
+              data-testid="today-command-center-one-tap-complete"
+              className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {completingTaskId
+                ? t('command_center.completing')
+                : oneTapTask
+                  ? t('command_center.mark_done')
+                  : t('command_center.mark_done_disabled')}
+            </button>
+            <TrackedEventLink
+              href={`/${locale}/records?action=log`}
+              eventName="today_command_center_log_clicked"
+              eventProperties={{ surface: 'today_command_center_quick_actions', mode }}
+              className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50"
+            >
+              {t('command_center.log_activity')}
+            </TrackedEventLink>
+            <TrackedEventLink
+              href={todayChatHref}
+              eventName="today_command_center_ai_clicked"
+              eventProperties={{ surface: 'today_command_center_quick_actions', mode }}
+              className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-50"
+            >
+              {t('command_center.ask_ai')}
+            </TrackedEventLink>
+          </div>
+        </div>
+
         {mode === 'new_farmer' ? (
           <>
             <p className="text-sm text-slate-600">{t('command_center.new.helper')}</p>
@@ -286,25 +332,6 @@ export default function TodayCommandCenter({
                 <p className="mt-1 text-xs text-slate-600">{t('command_center.new.empty_body')}</p>
               </div>
             )}
-
-            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <TrackedEventLink
-                href={`/${locale}/records?action=log`}
-                eventName="today_command_center_new_log_clicked"
-                eventProperties={{ surface: 'today_command_center_new' }}
-                className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100"
-              >
-                {t('command_center.log_activity')}
-              </TrackedEventLink>
-              <TrackedEventLink
-                href={todayChatHref}
-                eventName="today_command_center_new_ai_clicked"
-                eventProperties={{ surface: 'today_command_center_new' }}
-                className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100"
-              >
-                {t('command_center.ask_ai')}
-              </TrackedEventLink>
-            </div>
 
             <details className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
               <summary className="cursor-pointer list-none text-sm font-semibold text-slate-800">
@@ -400,24 +427,6 @@ export default function TodayCommandCenter({
               <p className="mt-4 text-sm text-emerald-700">{t('command_center.veteran.empty')}</p>
             )}
 
-            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <TrackedEventLink
-                href={`/${locale}/records?action=log`}
-                eventName="today_command_center_veteran_log_clicked"
-                eventProperties={{ surface: 'today_command_center_veteran' }}
-                className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100"
-              >
-                {t('command_center.log_activity')}
-              </TrackedEventLink>
-              <TrackedEventLink
-                href={todayChatHref}
-                eventName="today_command_center_veteran_ai_clicked"
-                eventProperties={{ surface: 'today_command_center_veteran' }}
-                className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100"
-              >
-                {t('command_center.ask_ai')}
-              </TrackedEventLink>
-            </div>
           </>
         )}
       </div>

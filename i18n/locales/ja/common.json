@@ -90,6 +90,9 @@
     },
     "command_center": {
       "title": "本日のダンドリ",
+      "quick_actions_title": "ワンタップ操作",
+      "mark_done": "完了にする",
+      "mark_done_disabled": "完了できるタスクなし",
       "log_activity": "活動を記録",
       "ask_ai": "AIに相談",
       "open_project": "プロジェクトを開く",
