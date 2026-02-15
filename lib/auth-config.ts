@@ -23,6 +23,7 @@ const googleClientId = normalizeEnvValue(process.env.GOOGLE_CLIENT_ID);
 const googleClientSecret = normalizeEnvValue(process.env.GOOGLE_CLIENT_SECRET);
 const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true' && process.env.NODE_ENV === 'development';
 const hasGoogleOAuth = !!googleClientId && !!googleClientSecret;
+const useSecureAuthCookies = process.env.NODE_ENV === 'production';
 
 if (!hasGoogleOAuth && !isDemoMode) {
   throw new Error('Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET');
@@ -171,10 +172,8 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
-  // Fix "State cookie was missing" error on localhost.
-  // Next.js 16 App Router + NextAuth v4 requires explicit cookie config
-  // to prevent the state/PKCE cookies from being lost during OAuth callback.
-  useSecureCookies: false,
+  // Keep local OAuth flow stable while preserving secure cookies in production.
+  useSecureCookies: useSecureAuthCookies,
   cookies: {
     state: {
       name: 'next-auth.state',
@@ -182,7 +181,7 @@ export const authOptions: NextAuthOptions = {
         httpOnly: true,
         sameSite: 'lax' as const,
         path: '/',
-        secure: false,
+        secure: useSecureAuthCookies,
       },
     },
     pkceCodeVerifier: {
@@ -191,7 +190,7 @@ export const authOptions: NextAuthOptions = {
         httpOnly: true,
         sameSite: 'lax' as const,
         path: '/',
-        secure: false,
+        secure: useSecureAuthCookies,
       },
     },
   },
