@@ -22,11 +22,38 @@ type LifecycleResponse = {
   queueDepth?: number;
 };
 
+type SchedulerSloSnapshot = {
+  dayKey: string;
+  updatedAt: string;
+  p95ApiLatencyMs: number;
+  p95ApiLatencyByClass: Record<string, number>;
+  p95QueueLatencyMs: number;
+  runSuccessRatio: number;
+  runStates: Record<SchedulerAsyncRunState, number>;
+  authAllowedByClass: Record<string, number>;
+  authDeniedByClass: Record<string, number>;
+};
+
+type RuntimeStatusResponse = {
+  slo?: SchedulerSloSnapshot;
+  generatedAt?: string;
+};
+
 function formatDate(value?: string): string {
   if (!value) return '-';
   const parsed = Date.parse(value);
   if (!Number.isFinite(parsed)) return value;
   return new Date(parsed).toLocaleString();
+}
+
+function formatMs(value?: number): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '-';
+  return `${Math.max(0, Math.round(value)).toLocaleString()} ms`;
+}
+
+function formatRatio(value?: number): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '-';
+  return `${(value * 100).toFixed(1)}%`;
 }
 
 function stateClass(state: SchedulerAsyncRunState): string {
@@ -45,6 +72,26 @@ export function SchedulerRunLifecyclePanel() {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sloSnapshot, setSloSnapshot] = useState<SchedulerSloSnapshot | null>(null);
+  const [sloGeneratedAt, setSloGeneratedAt] = useState<string | null>(null);
+  const [sloError, setSloError] = useState<string | null>(null);
+
+  const refreshSlo = useCallback(async () => {
+    try {
+      const response = await fetch(`${apiBase}/api/v1/agents/scheduler/runtime-status`, {
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to load scheduler SLO (${response.status})`);
+      }
+      const data = await response.json() as RuntimeStatusResponse;
+      setSloSnapshot(data.slo ?? null);
+      setSloGeneratedAt(typeof data.generatedAt === 'string' ? data.generatedAt : null);
+      setSloError(null);
+    } catch (fetchError) {
+      setSloError(fetchError instanceof Error ? fetchError.message : 'Failed to load scheduler SLO');
+    }
+  }, [apiBase]);
 
   const refreshRuns = useCallback(async () => {
     setLoading(true);
@@ -59,12 +106,13 @@ export function SchedulerRunLifecyclePanel() {
       const data = await response.json() as LifecycleResponse;
       setRuns(Array.isArray(data.lifecycleRuns) ? data.lifecycleRuns : []);
       setQueueDepth(typeof data.queueDepth === 'number' ? data.queueDepth : 0);
+      await refreshSlo();
     } catch (fetchError) {
       setError(fetchError instanceof Error ? fetchError.message : 'Failed to load runs');
     } finally {
       setLoading(false);
     }
-  }, [apiBase]);
+  }, [apiBase, refreshSlo]);
 
   useEffect(() => {
     void refreshRuns();
@@ -160,6 +208,69 @@ export function SchedulerRunLifecyclePanel() {
         </div>
         <div className="mt-3 text-sm text-gray-600">Queue depth: {queueDepth}</div>
         {error ? <div className="mt-2 text-sm text-rose-700">{error}</div> : null}
+      </div>
+
+      <div className="rounded-xl border border-gray-200 bg-white p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-gray-900">Scheduler SLO Dashboard</h2>
+          <div className="text-xs text-gray-500">Updated: {formatDate(sloGeneratedAt || sloSnapshot?.updatedAt)}</div>
+        </div>
+        {sloError ? <div className="mb-3 text-sm text-rose-700">{sloError}</div> : null}
+        <div className="grid gap-3 md:grid-cols-4">
+          <div className="rounded-lg border border-gray-200 p-3">
+            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">p95 API latency</div>
+            <div className="mt-2 text-lg font-semibold text-gray-900">{formatMs(sloSnapshot?.p95ApiLatencyMs)}</div>
+          </div>
+          <div className="rounded-lg border border-gray-200 p-3">
+            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">p95 queue latency</div>
+            <div className="mt-2 text-lg font-semibold text-gray-900">{formatMs(sloSnapshot?.p95QueueLatencyMs)}</div>
+          </div>
+          <div className="rounded-lg border border-gray-200 p-3">
+            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">run success ratio</div>
+            <div className="mt-2 text-lg font-semibold text-gray-900">{formatRatio(sloSnapshot?.runSuccessRatio)}</div>
+          </div>
+          <div className="rounded-lg border border-gray-200 p-3">
+            <div className="text-xs font-medium uppercase tracking-wide text-gray-500">queue depth</div>
+            <div className="mt-2 text-lg font-semibold text-gray-900">{queueDepth.toLocaleString()}</div>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <div className="rounded-lg border border-gray-200 p-3">
+            <div className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">Auth denials by class</div>
+            {Object.entries(sloSnapshot?.authDeniedByClass || {}).length === 0 ? (
+              <div className="text-xs text-gray-500">No denied requests recorded.</div>
+            ) : (
+              <div className="space-y-1 text-xs text-gray-700">
+                {Object.entries(sloSnapshot?.authDeniedByClass || {})
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([endpointClass, count]) => (
+                    <div key={endpointClass} className="flex items-center justify-between">
+                      <span>{endpointClass}</span>
+                      <span className="font-mono">{count}</span>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+          <div className="rounded-lg border border-gray-200 p-3">
+            <div className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500">p95 API latency by class</div>
+            {Object.entries(sloSnapshot?.p95ApiLatencyByClass || {}).length === 0 ? (
+              <div className="text-xs text-gray-500">No API latency samples recorded.</div>
+            ) : (
+              <div className="space-y-1 text-xs text-gray-700">
+                {Object.entries(sloSnapshot?.p95ApiLatencyByClass || {})
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([endpointClass, latency]) => (
+                    <div key={endpointClass} className="flex items-center justify-between">
+                      <span>{endpointClass}</span>
+                      <span className="font-mono">{formatMs(latency)}</span>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
