@@ -76,6 +76,16 @@
       "task_complete": "Complete one task",
       "activity": "Log one activity"
     },
+    "checklist_panel": {
+      "title": "First-week checklist",
+      "subtitle": "{percent}% complete",
+      "action": "Continue",
+      "data_warning": "Progress may be incomplete because some dashboard data failed to load.",
+      "retry": "Retry",
+      "all_done_title": "First week completed",
+      "all_done_body": "Great start. Keep momentum with today's top priorities.",
+      "all_done_action": "Open today's AI plan"
+    },
     "command_center": {
       "title": "Today Command Center",
       "quick_actions_title": "One-Tap Actions",

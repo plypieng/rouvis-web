@@ -88,6 +88,16 @@
       "task_complete": "タスクを1件完了",
       "activity": "活動記録を1件残す"
     },
+    "checklist_panel": {
+      "title": "最初の1週間チェックリスト",
+      "subtitle": "進捗 {percent}%",
+      "action": "進める",
+      "data_warning": "一部データの取得に失敗したため、進捗表示が不完全な可能性があります。",
+      "retry": "再試行",
+      "all_done_title": "初週セットアップが完了しました",
+      "all_done_body": "良いスタートです。今日の優先作業を確認して勢いを維持しましょう。",
+      "all_done_action": "今日のAIプランを開く"
+    },
     "command_center": {
       "title": "本日のダンドリ",
       "quick_actions_title": "ワンタップ操作",

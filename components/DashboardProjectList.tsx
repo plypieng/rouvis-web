@@ -497,8 +497,9 @@ export default async function DashboardProjectList({
     ];
 
     const firstIncompleteChecklist = checklistItems.find((item) => !item.done) || null;
-    const showFirstWeekChecklist = Boolean(firstIncompleteChecklist) && (withinFirstWeek || projects.length <= 1);
+    const showFirstWeekChecklist = withinFirstWeek || projects.length <= 1;
     const showResumeSetupBanner = Boolean(profile) && Boolean(firstIncompleteChecklist) && !activationContext?.enabled;
+    const checklistCompletionHref = buildTodayChatHref(locale, t('chat_prompts.today_priority'));
 
     const todayProgressTotal = todayTasks.length;
     const todayProgressDone = todayCompletedTasks.length;
@@ -706,9 +707,13 @@ export default async function DashboardProjectList({
                     </TrackedEventLink>
                 </section>
 
-                {isVeteranMode && <FirstWeekChecklist items={checklistItems} show={showFirstWeekChecklist} />}
-
-                {!isVeteranMode && <FirstWeekChecklist items={checklistItems} show={showFirstWeekChecklist} />}
+                <FirstWeekChecklist
+                    items={checklistItems}
+                    show={showFirstWeekChecklist}
+                    hasDataIssue={hasDataFetchError}
+                    retryHref={retryHref}
+                    completionHref={checklistCompletionHref}
+                />
 
                 <div>
                     <div className="mb-4 flex items-center justify-between">
