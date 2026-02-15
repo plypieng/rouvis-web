@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Activity, Calendar, MapPin, TrendingUp, Clock, Plus } from 'lucide-react';
 import { ActivityFeedCard } from './ActivityFeedCard';
 import { TaskSchedulerCard } from './TaskSchedulerCard';
 import { FieldCard } from './FieldCard';
 import { FieldEditModal } from './FieldEditModal';
 import { toastError, toastSuccess, toastWarning } from '@/lib/feedback';
+import { trackUXEvent } from '@/lib/analytics';
+import InlineFeedbackNotice from './InlineFeedbackNotice';
 
 interface ActivityItem {
   id: string;
@@ -72,7 +74,6 @@ export function ActivityDashboard({
   const [tasks, setTasks] = useState<Task[]>([]);
   const [fields, setFields] = useState<Field[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<{
     type: 'success' | 'error' | 'warning';
     message: string;
@@ -84,8 +85,8 @@ export function ActivityDashboard({
   const [deletingFieldId, setDeletingFieldId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    void fetchDashboardData();
+  }, [fetchDashboardData]);
 
   useEffect(() => {
     if (!actionNotice || actionNotice.onAction) return;
@@ -93,9 +94,8 @@ export function ActivityDashboard({
     return () => clearTimeout(timeout);
   }, [actionNotice]);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async function runFetchDashboardData() {
     setLoading(true);
-    setError(null);
 
     try {
       // 1. Fetch fields first to allow mapping
@@ -141,11 +141,37 @@ export function ActivityDashboard({
 
     } catch (err) {
       console.error('Failed to fetch dashboard data:', err);
-      setError('データの読み込みに失敗しました');
+      const message = 'データの読み込みに失敗しました';
+      setActionNotice({
+        type: 'error',
+        message,
+        actionLabel: '再試行',
+        onAction: () => {
+          void trackUXEvent('records_feedback_retry_clicked', {
+            surface: 'inline',
+            context: 'dashboard_load',
+          });
+          void runFetchDashboardData();
+        },
+      });
+      void trackUXEvent('records_feedback_notice_shown', {
+        variant: 'error',
+        context: 'dashboard_load',
+      });
+      toastError(message, {
+        label: '再試行',
+        onClick: () => {
+          void trackUXEvent('records_feedback_retry_clicked', {
+            surface: 'toast',
+            context: 'dashboard_load',
+          });
+          void runFetchDashboardData();
+        },
+      });
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const updateTaskStatus = async (taskId: string, status: Task['status']) => {
     if (!taskId) return;
@@ -278,20 +304,6 @@ export function ActivityDashboard({
     );
   }
 
-  if (error) {
-    return (
-      <div className="text-center py-8">
-        <div className="text-red-600 mb-4">⚠️ {error}</div>
-        <button
-          onClick={fetchDashboardData}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          再試行
-        </button>
-      </div>
-    );
-  }
-
   const todayActivities = getTodayActivities();
   const upcomingTasks = getUpcomingTasks();
   const fieldStatus = getFieldStatus();
@@ -323,28 +335,16 @@ export function ActivityDashboard({
       </div>
 
       {actionNotice && (
-        <div
-          className={`rounded-lg border px-4 py-3 text-sm ${
-            actionNotice.type === 'success'
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-              : actionNotice.type === 'warning'
-                ? 'border-amber-200 bg-amber-50 text-amber-800'
-                : 'border-red-200 bg-red-50 text-red-700'
-          }`}
-        >
-          <div className="flex items-center justify-between gap-3">
-            <span>{actionNotice.message}</span>
-            {actionNotice.onAction && actionNotice.actionLabel && (
-              <button
-                type="button"
-                onClick={actionNotice.onAction}
-                className="rounded-md border border-current px-2 py-1 text-xs font-semibold hover:bg-white/40"
-              >
-                {actionNotice.actionLabel}
-              </button>
-            )}
-          </div>
-        </div>
+        <InlineFeedbackNotice
+          variant={actionNotice.type}
+          message={actionNotice.message}
+          primaryAction={actionNotice.onAction && actionNotice.actionLabel
+            ? {
+                label: actionNotice.actionLabel,
+                onClick: actionNotice.onAction,
+              }
+            : undefined}
+        />
       )}
 
       {/* Quick Stats */}

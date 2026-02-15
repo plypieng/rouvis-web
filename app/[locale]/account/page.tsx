@@ -5,7 +5,10 @@ import { useTranslations } from 'next-intl';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { Lock, Download, Trash2, Clock3, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { Lock, Download, Trash2, Clock3, Loader2 } from 'lucide-react';
+import InlineFeedbackNotice from '@/components/InlineFeedbackNotice';
+import { trackUXEvent } from '@/lib/analytics';
+import { toastError, toastInfo, toastSuccess, toastWarning } from '@/lib/feedback';
 
 type RequestType = 'EXPORT' | 'DELETE';
 type RequestStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'REJECTED' | 'CANCELED';
@@ -24,6 +27,10 @@ type AccountDataRequest = {
 };
 
 const ACTIVE_STATUSES = new Set<RequestStatus>(['PENDING', 'PROCESSING']);
+
+type RecoverableAction =
+  | { kind: 'load' }
+  | { kind: 'submit'; requestType: RequestType };
 
 function formatStatus(status: RequestStatus): string {
   switch (status) {
@@ -60,10 +67,13 @@ export default function AccountPage() {
   const [submittingType, setSubmittingType] = useState<RequestType | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
+  const [recoverableAction, setRecoverableAction] = useState<RecoverableAction | null>(null);
+  const [pendingDeleteConfirmation, setPendingDeleteConfirmation] = useState(false);
   const pendingIdempotencyKeysRef = useRef<Partial<Record<RequestType, string>>>({});
 
   const loadRequests = useCallback(async () => {
     setLoadingRequests(true);
+    setErrorMessage(null);
     try {
       const res = await fetch('/api/v1/account/data-requests', {
         method: 'GET',
@@ -76,9 +86,25 @@ export default function AccountPage() {
       }
 
       setRequests(Array.isArray(payload.requests) ? payload.requests : []);
+      setRecoverableAction(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to fetch account data requests';
       setErrorMessage(message);
+      setRecoverableAction({ kind: 'load' });
+      void trackUXEvent('account_feedback_notice_shown', {
+        variant: 'error',
+        context: 'load',
+      });
+      toastError(message, {
+        label: 'Retry',
+        onClick: () => {
+          void trackUXEvent('account_feedback_retry_clicked', {
+            surface: 'toast',
+            context: 'load',
+          });
+          void loadRequests();
+        },
+      });
     } finally {
       setLoadingRequests(false);
     }
@@ -104,14 +130,34 @@ export default function AccountPage() {
   const deletePending = Boolean(deleteRequest && ACTIVE_STATUSES.has(deleteRequest.status));
 
   const submitRequest = useCallback(
-    async (type: RequestType) => {
-      if (type === 'DELETE') {
-        const confirmed = window.confirm(
-          'Submit an account deletion request? This starts a compliance review workflow.'
-        );
-        if (!confirmed) {
-          return;
-        }
+    async function runSubmitRequest(
+      type: RequestType,
+      options?: {
+        skipDeleteConfirmation?: boolean;
+        surface?: 'primary' | 'inline' | 'toast';
+      }
+    ) {
+      const surface = options?.surface ?? 'primary';
+
+      if (type === 'DELETE' && !options?.skipDeleteConfirmation) {
+        setPendingDeleteConfirmation(true);
+        setErrorMessage(null);
+        setInfoMessage('Confirm account deletion request to continue.');
+        void trackUXEvent('account_delete_confirmation_shown', { surface });
+        void trackUXEvent('account_feedback_notice_shown', {
+          variant: 'warning',
+          context: 'delete_confirmation',
+        });
+        toastWarning('Confirm account deletion request to continue.', {
+          label: 'Review',
+          onClick: () => {
+            void trackUXEvent('account_delete_confirmation_review_clicked', {
+              surface: 'toast',
+            });
+            setPendingDeleteConfirmation(true);
+          },
+        });
+        return;
       }
 
       setErrorMessage(null);
@@ -119,6 +165,11 @@ export default function AccountPage() {
       setSubmittingType(type);
 
       try {
+        if (type === 'DELETE') {
+          setPendingDeleteConfirmation(false);
+          void trackUXEvent('account_delete_confirmation_confirmed', { surface });
+        }
+
         const requestId = crypto.randomUUID();
         const idempotencyKey = pendingIdempotencyKeysRef.current[type]
           ?? `account:${type.toLowerCase()}:${crypto.randomUUID()}`;
@@ -145,22 +196,87 @@ export default function AccountPage() {
         }
 
         if (payload?.duplicate) {
-          setInfoMessage(`${type === 'EXPORT' ? 'Export' : 'Delete'} request is already active.`);
+          const message = `${type === 'EXPORT' ? 'Export' : 'Delete'} request is already active.`;
+          setInfoMessage(message);
+          toastInfo(message);
         } else {
-          setInfoMessage(`${type === 'EXPORT' ? 'Export' : 'Delete'} request submitted successfully.`);
+          const message = `${type === 'EXPORT' ? 'Export' : 'Delete'} request submitted successfully.`;
+          setInfoMessage(message);
+          toastSuccess(message);
         }
 
+        setRecoverableAction(null);
+        void trackUXEvent('account_request_submitted', {
+          requestType: type,
+          duplicate: Boolean(payload?.duplicate),
+        });
         delete pendingIdempotencyKeysRef.current[type];
         await loadRequests();
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to submit request';
         setErrorMessage(message);
+        setRecoverableAction({ kind: 'submit', requestType: type });
+        void trackUXEvent('account_request_submit_failed', {
+          requestType: type,
+          surface,
+        });
+        void trackUXEvent('account_feedback_notice_shown', {
+          variant: 'error',
+          context: 'submit',
+          requestType: type,
+        });
+        toastError(message, {
+          label: 'Retry',
+          onClick: () => {
+            void trackUXEvent('account_feedback_retry_clicked', {
+              surface: 'toast',
+              context: 'submit',
+              requestType: type,
+            });
+            void runSubmitRequest(type, {
+              skipDeleteConfirmation: true,
+              surface: 'toast',
+            });
+          },
+        });
       } finally {
         setSubmittingType(null);
       }
     },
     [loadRequests]
   );
+
+  const retryRecoverableAction = useCallback(() => {
+    if (!recoverableAction) return;
+    if (recoverableAction.kind === 'load') {
+      void trackUXEvent('account_feedback_retry_clicked', {
+        surface: 'inline',
+        context: 'load',
+      });
+      void loadRequests();
+      return;
+    }
+
+    void trackUXEvent('account_feedback_retry_clicked', {
+      surface: 'inline',
+      context: 'submit',
+      requestType: recoverableAction.requestType,
+    });
+    void submitRequest(recoverableAction.requestType, {
+      skipDeleteConfirmation: true,
+      surface: 'inline',
+    });
+  }, [loadRequests, recoverableAction, submitRequest]);
+
+  const cancelDeleteConfirmation = useCallback(() => {
+    setPendingDeleteConfirmation(false);
+    const message = 'Deletion request was not submitted.';
+    setInfoMessage(message);
+    void trackUXEvent('account_delete_confirmation_cancelled', {
+      surface: 'inline',
+    });
+    toastInfo(message);
+  }, []);
 
   if (!session?.user) {
     return null;
@@ -209,19 +325,28 @@ export default function AccountPage() {
             </div>
           )}
 
-          {infoMessage && (
-            <div className="mb-4 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-              <p>{infoMessage}</p>
-            </div>
-          )}
+          {infoMessage ? (
+            <InlineFeedbackNotice
+              variant="success"
+              message={infoMessage}
+              className="mb-4"
+            />
+          ) : null}
 
-          {errorMessage && (
-            <div className="mb-4 flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-              <p>{errorMessage}</p>
-            </div>
-          )}
+          {errorMessage ? (
+            <InlineFeedbackNotice
+              variant="error"
+              message={errorMessage}
+              className="mb-4"
+              primaryAction={recoverableAction
+                ? {
+                    label: 'Retry',
+                    onClick: retryRecoverableAction,
+                    disabled: submittingType !== null || loadingRequests,
+                  }
+                : undefined}
+            />
+          ) : null}
 
           <div className="flex items-center justify-between">
             <div>
@@ -258,6 +383,29 @@ export default function AccountPage() {
 
         <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 shadow rounded-lg p-6">
           <h2 className="text-lg font-semibold mb-4 text-red-700 dark:text-red-400">Danger Zone</h2>
+          {pendingDeleteConfirmation ? (
+            <InlineFeedbackNotice
+              variant="warning"
+              title="Confirm deletion request"
+              message="This will submit a compliance review request. Account removal is not immediate."
+              className="mb-4"
+              primaryAction={{
+                label: submittingType === 'DELETE' ? 'Submitting...' : 'Submit deletion request',
+                onClick: () => {
+                  void submitRequest('DELETE', {
+                    skipDeleteConfirmation: true,
+                    surface: 'inline',
+                  });
+                },
+                disabled: submittingType !== null || deletePending,
+              }}
+              secondaryAction={{
+                label: 'Cancel',
+                onClick: cancelDeleteConfirmation,
+                disabled: submittingType !== null,
+              }}
+            />
+          ) : null}
           <div className="flex items-center justify-between">
             <div>
               <p className="font-medium text-red-700 dark:text-red-400">Delete Account</p>
