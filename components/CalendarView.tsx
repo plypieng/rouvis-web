@@ -34,6 +34,7 @@ import {
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
+import TrackedEventLink from './TrackedEventLink';
 import { toastError, toastSuccess } from '@/lib/feedback';
 import type { FarmerUiMode } from '@/types/farmer-ui-mode';
 import type {
@@ -802,13 +803,18 @@ export function CalendarView({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Link
+            <TrackedEventLink
               href={buildChatHref}
+              eventName="calendar_context_chat_clicked"
+              eventProperties={{
+                date: selectedDateKey,
+                selectedTaskCount: selectedDayTasks.length,
+              }}
               data-testid="calendar-ai-link"
               className="touch-target inline-flex items-center rounded-lg border border-border bg-secondary px-3 py-2 text-xs font-semibold text-secondary-foreground hover:bg-secondary/75"
             >
               {t('ai_preview')}
-            </Link>
+            </TrackedEventLink>
             <button
               type="button"
               onClick={() => {

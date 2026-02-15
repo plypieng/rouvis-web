@@ -987,10 +987,20 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
                 key={s.label}
                 onClick={() => {
                   if (s.isCancel) {
+                    void trackUXEvent('chat_quick_suggestion_cancelled', {
+                      projectId: projectId || 'none',
+                      source: customSuggestions ? 'context' : 'default',
+                    });
                     setCustomSuggestions(null);
                     setChatModeState('default'); // Also exit mode on cancel
                   } else {
                     const mode = s.mode;
+                    void trackUXEvent('chat_quick_suggestion_clicked', {
+                      projectId: projectId || 'none',
+                      source: customSuggestions ? 'context' : 'default',
+                      mode: mode || 'default',
+                      label: s.label,
+                    });
                     if (mode) setChatModeState(mode);
                     sendMessage(s.message, mode);
                     setCustomSuggestions(null); // Clear after selection

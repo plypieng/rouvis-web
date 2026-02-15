@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useState } from 'react';
+import { trackUXEvent } from '@/lib/analytics';
 import { toastError, toastSuccess, toastWarning } from '@/lib/feedback';
 
 import { use } from 'react';
@@ -273,6 +274,11 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
                         <Link
                             href={emptyProjectsChatHref}
                             data-testid="projects-empty-ai-link"
+                            onClick={() => {
+                                void trackUXEvent('projects_context_chat_clicked', {
+                                    surface: 'empty_state',
+                                });
+                            }}
                             className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100"
                         >
                             AIに相談
@@ -342,7 +348,13 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
                                 <Link
                                     href={projectChatHref}
                                     data-testid={`project-ai-link-${project.id}`}
-                                    onClick={(e) => e.stopPropagation()}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        void trackUXEvent('projects_context_chat_clicked', {
+                                            surface: 'project_card',
+                                            projectId: project.id,
+                                        });
+                                    }}
                                     className="absolute bottom-3 left-3 z-10 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
                                 >
                                     AIに相談

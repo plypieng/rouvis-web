@@ -669,6 +669,9 @@
         "empty_log": "一致するログはありません。",
         "updated_at": "更新: {time}",
         "updated_unknown": "更新時刻なし",
+        "load_failed": "会話ログの読み込みに失敗しました。",
+        "context_start_failed": "文脈チャットの開始に失敗しました。既存ログで続けられます。",
+        "retry_load": "再読み込み",
         "intents": {
           "today": "今日の作業",
           "calendar": "予定調整",

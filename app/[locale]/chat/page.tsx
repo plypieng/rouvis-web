@@ -145,6 +145,8 @@ export default function ChatPage() {
   const [selectedThreadId, setSelectedThreadId] = useState<string | undefined>(undefined);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [threadQuery, setThreadQuery] = useState('');
+  const [threadLoadError, setThreadLoadError] = useState<string | null>(null);
+  const [threadReloadToken, setThreadReloadToken] = useState(0);
   const [diagnosisResult, setDiagnosisResult] = useState<DiagnosisResult | null>(null);
   const [activeHandshake, setActiveHandshake] = useState<CommandHandshake | null>(null);
   const contextThreadSeedRef = useRef<string>('');
@@ -189,6 +191,17 @@ export default function ChatPage() {
     setIsSidebarOpen(false);
   }, []);
 
+  const handleRetryThreadLoad = useCallback(() => {
+    setThreadLoadError(null);
+    setThreadReloadToken((prev) => prev + 1);
+    void trackUXEvent('context_chat_retry_clicked', {
+      intent: contextIntent || 'unknown',
+      hasPrompt: Boolean(contextPrompt),
+      hasDate: Boolean(contextDate),
+      hasProject: Boolean(contextProjectId),
+    });
+  }, [contextDate, contextIntent, contextProjectId, contextPrompt]);
+
   useEffect(() => {
     if (hasContextEntry) {
       setSelectedThreadId(undefined);
@@ -220,11 +233,15 @@ export default function ChatPage() {
 
     const loadThreads = async () => {
       try {
+        setThreadLoadError(null);
         const res = await fetch('/api/chatkit', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'chatkit.list_threads' })
         });
+        if (!res.ok) {
+          throw new Error(`chatkit.list_threads failed (${res.status})`);
+        }
         const data = await res.json();
 
         if (!cancelled && data.threads) {
@@ -262,6 +279,14 @@ export default function ChatPage() {
                 hasProject: Boolean(contextProjectId),
                 fresh: forceFreshThread,
               });
+            } else {
+              setSelectedThreadId(listedThreads[0]?.id);
+              setThreadLoadError(t('cockpit.standalone.context_start_failed'));
+              void trackUXEvent('context_thread_create_failed', {
+                intent: contextIntent || 'unknown',
+                hasProject: Boolean(contextProjectId),
+                status: createRes.status,
+              });
             }
             return;
           }
@@ -271,6 +296,15 @@ export default function ChatPage() {
         }
       } catch (e) {
         console.error('Failed to load threads', e);
+        if (!cancelled) {
+          setThreadLoadError(t('cockpit.standalone.load_failed'));
+          void trackUXEvent('context_thread_load_failed', {
+            intent: contextIntent || 'unknown',
+            hasContextEntry,
+            hasPrompt: Boolean(contextPrompt),
+            hasProject: Boolean(contextProjectId),
+          });
+        }
       }
     };
 
@@ -279,7 +313,16 @@ export default function ChatPage() {
     return () => {
       cancelled = true;
     };
-  }, [contextEntryKey, contextIntent, contextProjectId, forceFreshThread, hasContextEntry, t]);
+  }, [
+    contextEntryKey,
+    contextIntent,
+    contextProjectId,
+    contextPrompt,
+    forceFreshThread,
+    hasContextEntry,
+    t,
+    threadReloadToken,
+  ]);
 
   const handleNewChat = async () => {
     try {
@@ -356,6 +399,24 @@ export default function ChatPage() {
               </div>
             </div>
           </section>
+
+          {threadLoadError ? (
+            <section
+              className="surface-raised mb-3 border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
+              data-testid="chat-thread-load-error"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p>{threadLoadError}</p>
+                <button
+                  type="button"
+                  onClick={handleRetryThreadLoad}
+                  className="touch-target rounded-lg border border-amber-300 bg-white px-3 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+                >
+                  {t('cockpit.standalone.retry_load')}
+                </button>
+              </div>
+            </section>
+          ) : null}
 
           <div className="relative min-h-0 flex-1">
             {isSidebarOpen ? (

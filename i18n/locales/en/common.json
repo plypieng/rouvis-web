@@ -388,6 +388,9 @@
         "empty_log": "No matching logs found.",
         "updated_at": "Updated: {time}",
         "updated_unknown": "No timestamp",
+        "load_failed": "Couldn't load your conversation logs right now.",
+        "context_start_failed": "Couldn't start the context conversation. You can continue in an existing log.",
+        "retry_load": "Retry load",
         "intents": {
           "today": "Today operations",
           "calendar": "Schedule tuning",
