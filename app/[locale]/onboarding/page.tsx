@@ -60,15 +60,38 @@ function getRouteLabel(path: string): string {
   return routeLabels[normalized] || normalized;
 }
 
-function getOnboardingReasonMessage(reason: string | null, from: string | null): string | null {
+type OnboardingGateDetail = {
+  message: string;
+  nextStepLabel: string;
+  fromRouteLabel: string | null;
+};
+
+function getOnboardingReasonDetail(
+  reason: string | null,
+  from: string | null,
+  nextStep: string | null,
+): OnboardingGateDetail | null {
   if (reason !== 'onboarding_required') return null;
   const safeFrom = (from || '').startsWith('/') ? from : '';
+  const fromRouteLabel = safeFrom && safeFrom !== '/' && safeFrom !== '/onboarding'
+    ? getRouteLabel(safeFrom)
+    : null;
 
-  if (safeFrom && safeFrom !== '/' && safeFrom !== '/onboarding') {
-    return `「${getRouteLabel(safeFrom)}」へ進む前に初期設定の完了が必要です。完了後は通常の画面に進めます。`;
-  }
+  const nextStepLabel = nextStep === 'profile'
+    ? '基本情報を入力'
+    : nextStep === 'field'
+      ? '最初の圃場を登録'
+      : '初期設定を完了';
 
-  return '初期設定が未完了のため、この手順を完了してからアプリをご利用ください。';
+  const message = fromRouteLabel
+    ? `「${fromRouteLabel}」へ進む前に初期設定の完了が必要です。`
+    : '初期設定が未完了のため、この手順を完了してからアプリをご利用ください。';
+
+  return {
+    message,
+    nextStepLabel,
+    fromRouteLabel,
+  };
 }
 
 function geometryAreaHa(geometry: GeoJsonPolygon | null | undefined): number | null {
@@ -102,14 +125,17 @@ export default function OnboardingPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fieldEntryMode, setFieldEntryMode] = useState<'quick' | 'detailed'>('quick');
   const [showQuickLocationEditor, setShowQuickLocationEditor] = useState(false);
-  const onboardingReasonMessage = getOnboardingReasonMessage(
+  const onboardingGateDetail = getOnboardingReasonDetail(
     searchParams.get('reason'),
-    searchParams.get('from')
+    searchParams.get('from'),
+    searchParams.get('nextStep'),
   );
+  const onboardingReasonMessage = onboardingGateDetail?.message ?? null;
 
   const hasSeenLoading = useRef(false);
   const hasPrefilledName = useRef(false);
   const hasCheckedExistingProfile = useRef(false);
+  const hasTrackedForcedPathNotice = useRef(false);
   const onboardingComplete = Boolean(
     (session?.user as { onboardingComplete?: boolean } | undefined)?.onboardingComplete
   );
@@ -182,6 +208,18 @@ export default function OnboardingPage() {
 
     void checkProfile();
   }, [status, onboardingComplete, step, session?.user?.name]);
+
+  useEffect(() => {
+    if (!onboardingGateDetail || hasTrackedForcedPathNotice.current) {
+      return;
+    }
+
+    hasTrackedForcedPathNotice.current = true;
+    void trackUXEvent('onboarding_forced_path_notice_shown', {
+      nextStep: onboardingGateDetail.nextStepLabel,
+      from: onboardingGateDetail.fromRouteLabel || 'direct',
+    });
+  }, [onboardingGateDetail]);
 
   if (status === 'loading') {
     return (
@@ -405,7 +443,12 @@ export default function OnboardingPage() {
   // Step 1: Welcome
   if (step === 1) {
     return (
-      <OnboardingLayout step={1} totalSteps={3} reasonMessage={onboardingReasonMessage}>
+      <OnboardingLayout
+        step={1}
+        totalSteps={3}
+        reasonMessage={onboardingReasonMessage}
+        reasonNextStepLabel={onboardingGateDetail?.nextStepLabel || null}
+      >
         <div className="text-center space-y-6">
           <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto">
             <span className="text-3xl">🌾</span>
@@ -443,7 +486,12 @@ export default function OnboardingPage() {
   // Step 2: Profile
   if (step === 2) {
     return (
-      <OnboardingLayout step={2} totalSteps={3} reasonMessage={onboardingReasonMessage}>
+      <OnboardingLayout
+        step={2}
+        totalSteps={3}
+        reasonMessage={onboardingReasonMessage}
+        reasonNextStepLabel={onboardingGateDetail?.nextStepLabel || null}
+      >
         <div className="space-y-6">
           <div className="text-center mb-4">
             <h2 className="text-xl font-bold text-gray-900">基本情報</h2>
@@ -595,7 +643,12 @@ export default function OnboardingPage() {
   // Step 3: Field Creation
   if (step === 3) {
     return (
-      <OnboardingLayout step={3} totalSteps={3} reasonMessage={onboardingReasonMessage}>
+      <OnboardingLayout
+        step={3}
+        totalSteps={3}
+        reasonMessage={onboardingReasonMessage}
+        reasonNextStepLabel={onboardingGateDetail?.nextStepLabel || null}
+      >
         <div className="space-y-6">
           <div className="text-center mb-4">
             <h2 className="text-xl font-bold text-gray-900">最初の畑を登録</h2>
@@ -852,11 +905,13 @@ function OnboardingLayout({
   step,
   totalSteps,
   reasonMessage,
+  reasonNextStepLabel,
   children,
 }: {
   step: number;
   totalSteps: number;
   reasonMessage?: string | null;
+  reasonNextStepLabel?: string | null;
   children: React.ReactNode;
 }) {
   return (
@@ -875,6 +930,9 @@ function OnboardingLayout({
             <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
               <p className="font-semibold">先に初期設定が必要です</p>
               <p className="mt-1">{reasonMessage}</p>
+              {reasonNextStepLabel ? (
+                <p className="mt-1 text-xs font-semibold text-amber-700">次のステップ: {reasonNextStepLabel}</p>
+              ) : null}
               <p className="mt-1 text-xs text-amber-700">必須フロー: 基本情報 {'>'} 圃場登録 {'>'} 最初のプロジェクト作成</p>
             </div>
           )}

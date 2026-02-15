@@ -89,6 +89,7 @@ export default async function middleware(request: NextRequest) {
       const onboardingUrl = new URL(`/${locale}/onboarding`, request.url);
       onboardingUrl.searchParams.set('reason', 'onboarding_required');
       onboardingUrl.searchParams.set('from', pathWithoutLocale);
+      onboardingUrl.searchParams.set('nextStep', 'profile');
       return NextResponse.redirect(onboardingUrl);
     }
 
@@ -96,6 +97,7 @@ export default async function middleware(request: NextRequest) {
       const onboardingUrl = new URL(`/${locale}/onboarding`, request.url);
       onboardingUrl.searchParams.set('reason', 'onboarding_required');
       onboardingUrl.searchParams.set('from', pathWithoutLocale);
+      onboardingUrl.searchParams.set('nextStep', profileComplete ? 'field' : 'profile');
       return NextResponse.redirect(onboardingUrl);
     }
   }
