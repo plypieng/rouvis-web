@@ -261,8 +261,17 @@ export default function OnboardingPage() {
           }
         });
         setErrors(newErrors);
+        void trackUXEvent('onboarding_profile_save_failed', {
+          reason: 'validation',
+          step: 2,
+          fields: Object.keys(newErrors).join(',') || 'unknown',
+        });
       } else {
         const message = getErrorMessage(err, 'プロフィールの保存に失敗しました。時間をおいて再試行してください。');
+        void trackUXEvent('onboarding_profile_save_failed', {
+          reason: 'request',
+          step: 2,
+        });
         setNotice({
           type: 'error',
           message,
@@ -270,6 +279,9 @@ export default function OnboardingPage() {
         toastError(message, {
           label: '再試行',
           onClick: () => {
+            void trackUXEvent('onboarding_profile_retry_clicked', {
+              surface: 'toast',
+            });
             void handleProfileNext();
           },
         });
@@ -331,9 +343,18 @@ export default function OnboardingPage() {
           }
         });
         setErrors(newErrors);
+        void trackUXEvent('onboarding_field_save_failed', {
+          reason: 'validation',
+          step: 3,
+          fields: Object.keys(newErrors).join(',') || 'unknown',
+        });
       } else {
         console.error('Field creation error:', err);
         const message = getErrorMessage(err, '圃場の登録に失敗しました。入力内容を確認して再試行してください。');
+        void trackUXEvent('onboarding_field_save_failed', {
+          reason: 'request',
+          step: 3,
+        });
         setNotice({
           type: 'error',
           message,
@@ -341,6 +362,9 @@ export default function OnboardingPage() {
         toastError(message, {
           label: '再試行',
           onClick: () => {
+            void trackUXEvent('onboarding_field_retry_clicked', {
+              surface: 'toast',
+            });
             void handleFieldSubmit();
           },
         });
@@ -418,9 +442,17 @@ export default function OnboardingPage() {
           </div>
 
           {notice?.type === 'error' && (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {notice.message}
-            </div>
+            <InlineRecoveryNotice
+              message={notice.message}
+              retryLabel="再試行"
+              disabled={isSubmitting}
+              onRetry={() => {
+                void trackUXEvent('onboarding_profile_retry_clicked', {
+                  surface: 'inline',
+                });
+                void handleProfileNext();
+              }}
+            />
           )}
 
           <div className="space-y-4">
@@ -562,9 +594,17 @@ export default function OnboardingPage() {
           </div>
 
           {notice?.type === 'error' && (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {notice.message}
-            </div>
+            <InlineRecoveryNotice
+              message={notice.message}
+              retryLabel="再試行"
+              disabled={isSubmitting}
+              onRetry={() => {
+                void trackUXEvent('onboarding_field_retry_clicked', {
+                  surface: 'inline',
+                });
+                void handleFieldSubmit();
+              }}
+            />
           )}
 
           <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
@@ -794,6 +834,27 @@ function FeatureRow({ icon, text }: { icon: string; text: string }) {
     <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
       <span className="text-xl">{icon}</span>
       <span className="text-sm text-gray-700">{text}</span>
+    </div>
+  );
+}
+
+function InlineRecoveryNotice(props: {
+  message: string;
+  retryLabel: string;
+  disabled?: boolean;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+      <p className="text-sm text-red-700">{props.message}</p>
+      <button
+        type="button"
+        onClick={props.onRetry}
+        disabled={props.disabled}
+        className="mt-2 inline-flex items-center rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {props.retryLabel}
+      </button>
     </div>
   );
 }
