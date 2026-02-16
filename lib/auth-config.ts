@@ -26,7 +26,7 @@ const googleClientId = normalizeEnvValue(process.env.GOOGLE_CLIENT_ID);
 const googleClientSecret = normalizeEnvValue(process.env.GOOGLE_CLIENT_SECRET);
 const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true' && process.env.NODE_ENV === 'development';
 const hasGoogleOAuth = !!googleClientId && !!googleClientSecret;
-const useSecureAuthCookies = process.env.NODE_ENV === 'production';
+const isProduction = process.env.NODE_ENV === 'production';
 
 if (!hasGoogleOAuth && !isDemoMode) {
   throw new Error('Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET');
@@ -79,8 +79,6 @@ export const authOptions: NextAuthOptions = {
           authorization: {
             params: {
               scope: GOOGLE_AUTH_SCOPE,
-              access_type: 'offline',
-              prompt: 'consent',
             },
           },
         })
@@ -174,28 +172,32 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
-  // Keep local OAuth flow stable while preserving secure cookies in production.
-  useSecureCookies: useSecureAuthCookies,
-  cookies: {
-    state: {
-      name: 'next-auth.state',
-      options: {
-        httpOnly: true,
-        sameSite: 'lax' as const,
-        path: '/',
-        secure: useSecureAuthCookies,
+  // Keep localhost OAuth state stable without overriding production cookie defaults.
+  ...(!isProduction
+    ? {
+      useSecureCookies: false,
+      cookies: {
+        state: {
+          name: 'next-auth.state',
+          options: {
+            httpOnly: true,
+            sameSite: 'lax' as const,
+            path: '/',
+            secure: false,
+          },
+        },
+        pkceCodeVerifier: {
+          name: 'next-auth.pkce.code_verifier',
+          options: {
+            httpOnly: true,
+            sameSite: 'lax' as const,
+            path: '/',
+            secure: false,
+          },
+        },
       },
-    },
-    pkceCodeVerifier: {
-      name: 'next-auth.pkce.code_verifier',
-      options: {
-        httpOnly: true,
-        sameSite: 'lax' as const,
-        path: '/',
-        secure: useSecureAuthCookies,
-      },
-    },
-  },
+    }
+    : {}),
   callbacks: {
     /**
      * SignIn Callback: Runs during sign-in process.

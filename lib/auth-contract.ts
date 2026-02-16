@@ -1,6 +1,6 @@
 import type { FarmerUiMode } from './farmerUiMode';
 
-export const GOOGLE_AUTH_SCOPE = 'openid email profile https://www.googleapis.com/auth/calendar';
+export const GOOGLE_AUTH_SCOPE = 'openid email profile';
 
 export const AUTH_CLAIMS_KEYS = [
   'id',
