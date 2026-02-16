@@ -1,21 +1,34 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getBackendAuth } from '../../../../../lib/backend-proxy-auth';
+import {
+  resolveBackendBaseUrl,
+  resolveRequestId,
+  toApiErrorResponse,
+  toProxyJsonResponse,
+} from '../../../../../lib/api-contract';
 
-const BACKEND_URL = process.env.BACKEND_URL
-  || process.env.NEXT_PUBLIC_API_BASE_URL
-  || (process.env.NODE_ENV === 'production'
-    ? 'https://localfarm-backend.vercel.app'
-    : 'http://localhost:4000');
+const BACKEND_URL = resolveBackendBaseUrl();
 
 export async function GET(request: NextRequest) {
+  const requestId = resolveRequestId(request);
   const taskId = extractId(request);
   if (!taskId) {
-    return NextResponse.json({ error: 'Invalid task id' }, { status: 400 });
+    return toApiErrorResponse({
+      status: 400,
+      code: 'VALIDATION_ERROR',
+      message: 'Invalid task id',
+      requestId,
+    });
   }
 
   const auth = await getBackendAuth(request);
   if (!auth.headers) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return toApiErrorResponse({
+      status: 401,
+      code: 'UNAUTHORIZED',
+      message: 'Unauthorized',
+      requestId,
+    });
   }
 
   try {
@@ -23,109 +36,133 @@ export async function GET(request: NextRequest) {
       headers: {
         'Content-Type': 'application/json',
         ...auth.headers,
+        'X-Request-Id': requestId,
       },
     });
 
-    const data = await res.json();
-    const response = NextResponse.json(data, { status: res.status });
-    const requestId = res.headers.get('x-request-id');
-    if (requestId) {
-      response.headers.set('X-Request-Id', requestId);
-    }
-    return response;
+    return toProxyJsonResponse(res, requestId);
   } catch (error) {
     console.error('Tasks proxy GET by id error:', error);
-    return NextResponse.json({ error: 'Failed to fetch task' }, { status: 500 });
+    return toApiErrorResponse({
+      status: 500,
+      code: 'INTERNAL_ERROR',
+      message: 'Failed to fetch task',
+      requestId,
+    });
   }
 }
 
 export async function PATCH(request: NextRequest) {
+  const requestId = resolveRequestId(request);
   const taskId = extractId(request);
   if (!taskId) {
-    return NextResponse.json({ error: 'Invalid task id' }, { status: 400 });
+    return toApiErrorResponse({
+      status: 400,
+      code: 'VALIDATION_ERROR',
+      message: 'Invalid task id',
+      requestId,
+    });
   }
-  return updateTask(request, taskId);
+  return updateTask(request, taskId, requestId);
 }
 
 export async function PUT(request: NextRequest) {
+  const requestId = resolveRequestId(request);
   const taskId = extractId(request);
   if (!taskId) {
-    return NextResponse.json({ error: 'Invalid task id' }, { status: 400 });
+    return toApiErrorResponse({
+      status: 400,
+      code: 'VALIDATION_ERROR',
+      message: 'Invalid task id',
+      requestId,
+    });
   }
-  return updateTask(request, taskId);
+  return updateTask(request, taskId, requestId);
 }
 
 export async function DELETE(request: NextRequest) {
+  const requestId = resolveRequestId(request);
   const taskId = extractId(request);
   if (!taskId) {
-    return NextResponse.json({ error: 'Invalid task id' }, { status: 400 });
+    return toApiErrorResponse({
+      status: 400,
+      code: 'VALIDATION_ERROR',
+      message: 'Invalid task id',
+      requestId,
+    });
   }
 
   const auth = await getBackendAuth(request);
   if (!auth.headers) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return toApiErrorResponse({
+      status: 401,
+      code: 'UNAUTHORIZED',
+      message: 'Unauthorized',
+      requestId,
+    });
   }
 
   try {
     const idempotencyKey = request.headers.get('idempotency-key')
       || request.headers.get('x-idempotency-key');
-    const requestId = request.headers.get('x-request-id');
     const res = await fetch(`${BACKEND_URL}/api/v1/undo`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...auth.headers,
         ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
-        ...(requestId ? { 'X-Request-Id': requestId } : {}),
+        'X-Request-Id': requestId,
       },
       body: JSON.stringify({ type: 'delete_task', taskId }),
     });
 
-    const data = await res.json();
-    const response = NextResponse.json(data, { status: res.status });
-    const backendRequestId = res.headers.get('x-request-id');
-    if (backendRequestId) {
-      response.headers.set('X-Request-Id', backendRequestId);
-    }
-    return response;
+    return toProxyJsonResponse(res, requestId);
   } catch (error) {
     console.error('Tasks proxy DELETE error:', error);
-    return NextResponse.json({ error: 'Failed to delete task' }, { status: 500 });
+    return toApiErrorResponse({
+      status: 500,
+      code: 'INTERNAL_ERROR',
+      message: 'Failed to delete task',
+      requestId,
+    });
   }
 }
 
-async function updateTask(request: NextRequest, taskId: string) {
+async function updateTask(request: NextRequest, taskId: string, requestId: string) {
   const auth = await getBackendAuth(request);
   if (!auth.headers) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return toApiErrorResponse({
+      status: 401,
+      code: 'UNAUTHORIZED',
+      message: 'Unauthorized',
+      requestId,
+    });
   }
 
   try {
     const body = await request.json();
     const idempotencyKey = request.headers.get('idempotency-key')
       || request.headers.get('x-idempotency-key');
-    const requestId = request.headers.get('x-request-id');
     const res = await fetch(`${BACKEND_URL}/api/v1/tasks/${taskId}`, {
       method: request.method,
       headers: {
         'Content-Type': 'application/json',
         ...auth.headers,
         ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
-        ...(requestId ? { 'X-Request-Id': requestId } : {}),
+        'X-Request-Id': requestId,
       },
       body: JSON.stringify(body),
     });
 
-    const data = await res.json();
-    const response = NextResponse.json(data, { status: res.status });
-    const backendRequestId = res.headers.get('x-request-id');
-    if (backendRequestId) {
-      response.headers.set('X-Request-Id', backendRequestId);
-    }
-    return response;
+    return toProxyJsonResponse(res, requestId);
   } catch (error) {
     console.error('Tasks proxy update error:', error);
-    return NextResponse.json({ error: 'Failed to update task' }, { status: 500 });
+    return toApiErrorResponse({
+      status: 500,
+      code: 'INTERNAL_ERROR',
+      message: 'Failed to update task',
+      requestId,
+    });
   }
 }
 

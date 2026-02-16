@@ -1,15 +1,24 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getBackendAuth } from '../../../../lib/backend-proxy-auth';
+import {
+  resolveBackendBaseUrl,
+  resolveRequestId,
+  toApiErrorResponse,
+  toProxyJsonResponse,
+} from '../../../../lib/api-contract';
 
-// Use explicit production URL as fallback
-const BACKEND_URL = process.env.BACKEND_URL
-  || process.env.NEXT_PUBLIC_API_BASE_URL
-  || (process.env.NODE_ENV === 'production' ? 'https://localfarm-backend.vercel.app' : 'http://localhost:4000');
+const BACKEND_URL = resolveBackendBaseUrl();
 
 export async function GET(req: NextRequest) {
+  const requestId = resolveRequestId(req);
   const auth = await getBackendAuth(req);
   if (!auth.headers) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return toApiErrorResponse({
+      status: 401,
+      code: 'UNAUTHORIZED',
+      message: 'Unauthorized',
+      requestId,
+    });
   }
 
   try {
@@ -17,21 +26,32 @@ export async function GET(req: NextRequest) {
       headers: {
         'Content-Type': 'application/json',
         ...auth.headers,
+        'X-Request-Id': requestId,
       },
     });
 
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    return toProxyJsonResponse(res, requestId);
   } catch (error) {
     console.error('Fields proxy GET error:', error);
-    return NextResponse.json({ error: 'Failed to fetch fields' }, { status: 500 });
+    return toApiErrorResponse({
+      status: 500,
+      code: 'INTERNAL_ERROR',
+      message: 'Failed to fetch fields',
+      requestId,
+    });
   }
 }
 
 export async function POST(req: NextRequest) {
+  const requestId = resolveRequestId(req);
   const auth = await getBackendAuth(req);
   if (!auth.headers) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return toApiErrorResponse({
+      status: 401,
+      code: 'UNAUTHORIZED',
+      message: 'Unauthorized',
+      requestId,
+    });
   }
 
   try {
@@ -47,14 +67,19 @@ export async function POST(req: NextRequest) {
       headers: {
         'Content-Type': 'application/json',
         ...auth.headers,
+        'X-Request-Id': requestId,
       },
       body: JSON.stringify(payload),
     });
 
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    return toProxyJsonResponse(res, requestId);
   } catch (error) {
     console.error('Fields proxy POST error:', error);
-    return NextResponse.json({ error: 'Failed to create field' }, { status: 500 });
+    return toApiErrorResponse({
+      status: 500,
+      code: 'INTERNAL_ERROR',
+      message: 'Failed to create field',
+      requestId,
+    });
   }
 }

@@ -1,25 +1,38 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getBackendAuth } from '../../../../../lib/backend-proxy-auth';
+import {
+  resolveBackendBaseUrl,
+  resolveRequestId,
+  toApiErrorResponse,
+  toProxyJsonResponse,
+} from '../../../../../lib/api-contract';
 
-const BACKEND_URL = process.env.BACKEND_URL
-  || process.env.NEXT_PUBLIC_API_BASE_URL
-  || (process.env.NODE_ENV === 'production'
-    ? 'https://localfarm-backend.vercel.app'
-    : 'http://localhost:4000');
+const BACKEND_URL = resolveBackendBaseUrl();
 
 function extractId(request: NextRequest): string | null {
   return request.nextUrl.pathname.split('/').filter(Boolean).pop() || null;
 }
 
 export async function GET(req: NextRequest) {
+  const requestId = resolveRequestId(req);
   const projectId = extractId(req);
   if (!projectId) {
-    return NextResponse.json({ error: 'Invalid project id' }, { status: 400 });
+    return toApiErrorResponse({
+      status: 400,
+      code: 'VALIDATION_ERROR',
+      message: 'Invalid project id',
+      requestId,
+    });
   }
 
   const auth = await getBackendAuth(req);
   if (!auth.headers) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return toApiErrorResponse({
+      status: 401,
+      code: 'UNAUTHORIZED',
+      message: 'Unauthorized',
+      requestId,
+    });
   }
 
   try {
@@ -27,59 +40,68 @@ export async function GET(req: NextRequest) {
       headers: {
         'Content-Type': 'application/json',
         ...auth.headers,
+        'X-Request-Id': requestId,
       },
     });
 
-    const data = await res.json();
-    const response = NextResponse.json(data, { status: res.status });
-    const requestId = res.headers.get('x-request-id');
-    if (requestId) {
-      response.headers.set('X-Request-Id', requestId);
-    }
-    return response;
+    return toProxyJsonResponse(res, requestId);
   } catch (error) {
     console.error('Project proxy GET error:', error);
-    return NextResponse.json({ error: 'Failed to fetch project' }, { status: 500 });
+    return toApiErrorResponse({
+      status: 500,
+      code: 'INTERNAL_ERROR',
+      message: 'Failed to fetch project',
+      requestId,
+    });
   }
 }
 
 async function proxyUpdate(req: NextRequest, method: 'PUT' | 'PATCH') {
+  const requestId = resolveRequestId(req);
   const projectId = extractId(req);
   if (!projectId) {
-    return NextResponse.json({ error: 'Invalid project id' }, { status: 400 });
+    return toApiErrorResponse({
+      status: 400,
+      code: 'VALIDATION_ERROR',
+      message: 'Invalid project id',
+      requestId,
+    });
   }
 
   const auth = await getBackendAuth(req);
   if (!auth.headers) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return toApiErrorResponse({
+      status: 401,
+      code: 'UNAUTHORIZED',
+      message: 'Unauthorized',
+      requestId,
+    });
   }
 
   try {
     const body = await req.json();
     const idempotencyKey = req.headers.get('idempotency-key')
       || req.headers.get('x-idempotency-key');
-    const requestId = req.headers.get('x-request-id');
     const res = await fetch(`${BACKEND_URL}/api/v1/projects/${projectId}`, {
       method,
       headers: {
         'Content-Type': 'application/json',
         ...auth.headers,
         ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
-        ...(requestId ? { 'X-Request-Id': requestId } : {}),
+        'X-Request-Id': requestId,
       },
       body: JSON.stringify(body),
     });
 
-    const data = await res.json();
-    const response = NextResponse.json(data, { status: res.status });
-    const backendRequestId = res.headers.get('x-request-id');
-    if (backendRequestId) {
-      response.headers.set('X-Request-Id', backendRequestId);
-    }
-    return response;
+    return toProxyJsonResponse(res, requestId);
   } catch (error) {
     console.error(`Project proxy ${method} error:`, error);
-    return NextResponse.json({ error: 'Failed to update project' }, { status: 500 });
+    return toApiErrorResponse({
+      status: 500,
+      code: 'INTERNAL_ERROR',
+      message: 'Failed to update project',
+      requestId,
+    });
   }
 }
 
@@ -92,39 +114,48 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const requestId = resolveRequestId(req);
   const projectId = extractId(req);
   if (!projectId) {
-    return NextResponse.json({ error: 'Invalid project id' }, { status: 400 });
+    return toApiErrorResponse({
+      status: 400,
+      code: 'VALIDATION_ERROR',
+      message: 'Invalid project id',
+      requestId,
+    });
   }
 
   const auth = await getBackendAuth(req);
   if (!auth.headers) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return toApiErrorResponse({
+      status: 401,
+      code: 'UNAUTHORIZED',
+      message: 'Unauthorized',
+      requestId,
+    });
   }
 
   try {
     const idempotencyKey = req.headers.get('idempotency-key')
       || req.headers.get('x-idempotency-key');
-    const requestId = req.headers.get('x-request-id');
     const res = await fetch(`${BACKEND_URL}/api/v1/projects/${projectId}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
         ...auth.headers,
         ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
-        ...(requestId ? { 'X-Request-Id': requestId } : {}),
+        'X-Request-Id': requestId,
       },
     });
 
-    const data = await res.json();
-    const response = NextResponse.json(data, { status: res.status });
-    const backendRequestId = res.headers.get('x-request-id');
-    if (backendRequestId) {
-      response.headers.set('X-Request-Id', backendRequestId);
-    }
-    return response;
+    return toProxyJsonResponse(res, requestId);
   } catch (error) {
     console.error('Project proxy DELETE error:', error);
-    return NextResponse.json({ error: 'Failed to delete project' }, { status: 500 });
+    return toApiErrorResponse({
+      status: 500,
+      code: 'INTERNAL_ERROR',
+      message: 'Failed to delete project',
+      requestId,
+    });
   }
 }

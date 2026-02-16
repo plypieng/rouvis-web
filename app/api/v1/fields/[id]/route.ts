@@ -1,21 +1,34 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getBackendAuth } from '../../../../../lib/backend-proxy-auth';
+import {
+  resolveBackendBaseUrl,
+  resolveRequestId,
+  toApiErrorResponse,
+  toProxyJsonResponse,
+} from '../../../../../lib/api-contract';
 
-const BACKEND_URL = process.env.BACKEND_URL
-  || process.env.NEXT_PUBLIC_API_BASE_URL
-  || (process.env.NODE_ENV === 'production'
-    ? 'https://localfarm-backend.vercel.app'
-    : 'http://localhost:4000');
+const BACKEND_URL = resolveBackendBaseUrl();
 
 export async function GET(request: NextRequest) {
+  const requestId = resolveRequestId(request);
   const fieldId = request.nextUrl.pathname.split('/').filter(Boolean).pop();
   if (!fieldId) {
-    return NextResponse.json({ error: 'Invalid field id' }, { status: 400 });
+    return toApiErrorResponse({
+      status: 400,
+      code: 'VALIDATION_ERROR',
+      message: 'Invalid field id',
+      requestId,
+    });
   }
 
   const auth = await getBackendAuth(request);
   if (!auth.headers) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return toApiErrorResponse({
+      status: 401,
+      code: 'UNAUTHORIZED',
+      message: 'Unauthorized',
+      requestId,
+    });
   }
 
   try {
@@ -23,26 +36,42 @@ export async function GET(request: NextRequest) {
       headers: {
         'Content-Type': 'application/json',
         ...auth.headers,
+        'X-Request-Id': requestId,
       },
     });
 
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    return toProxyJsonResponse(res, requestId);
   } catch (error) {
     console.error('Fields proxy GET by id error:', error);
-    return NextResponse.json({ error: 'Failed to fetch field' }, { status: 500 });
+    return toApiErrorResponse({
+      status: 500,
+      code: 'INTERNAL_ERROR',
+      message: 'Failed to fetch field',
+      requestId,
+    });
   }
 }
 
 export async function PUT(request: NextRequest) {
+  const requestId = resolveRequestId(request);
   const fieldId = request.nextUrl.pathname.split('/').filter(Boolean).pop();
   if (!fieldId) {
-    return NextResponse.json({ error: 'Invalid field id' }, { status: 400 });
+    return toApiErrorResponse({
+      status: 400,
+      code: 'VALIDATION_ERROR',
+      message: 'Invalid field id',
+      requestId,
+    });
   }
 
   const auth = await getBackendAuth(request);
   if (!auth.headers) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return toApiErrorResponse({
+      status: 401,
+      code: 'UNAUTHORIZED',
+      message: 'Unauthorized',
+      requestId,
+    });
   }
 
   try {
@@ -54,27 +83,43 @@ export async function PUT(request: NextRequest) {
       headers: {
         'Content-Type': 'application/json',
         ...auth.headers,
+        'X-Request-Id': requestId,
       },
       body: JSON.stringify(payload),
     });
 
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    return toProxyJsonResponse(res, requestId);
   } catch (error) {
     console.error('Fields proxy PUT error:', error);
-    return NextResponse.json({ error: 'Failed to update field' }, { status: 500 });
+    return toApiErrorResponse({
+      status: 500,
+      code: 'INTERNAL_ERROR',
+      message: 'Failed to update field',
+      requestId,
+    });
   }
 }
 
 export async function PATCH(request: NextRequest) {
+  const requestId = resolveRequestId(request);
   const fieldId = request.nextUrl.pathname.split('/').filter(Boolean).pop();
   if (!fieldId) {
-    return NextResponse.json({ error: 'Invalid field id' }, { status: 400 });
+    return toApiErrorResponse({
+      status: 400,
+      code: 'VALIDATION_ERROR',
+      message: 'Invalid field id',
+      requestId,
+    });
   }
 
   const auth = await getBackendAuth(request);
   if (!auth.headers) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return toApiErrorResponse({
+      status: 401,
+      code: 'UNAUTHORIZED',
+      message: 'Unauthorized',
+      requestId,
+    });
   }
 
   try {
@@ -86,27 +131,43 @@ export async function PATCH(request: NextRequest) {
       headers: {
         'Content-Type': 'application/json',
         ...auth.headers,
+        'X-Request-Id': requestId,
       },
       body: JSON.stringify(payload),
     });
 
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    return toProxyJsonResponse(res, requestId);
   } catch (error) {
     console.error('Fields proxy PATCH error:', error);
-    return NextResponse.json({ error: 'Failed to update field' }, { status: 500 });
+    return toApiErrorResponse({
+      status: 500,
+      code: 'INTERNAL_ERROR',
+      message: 'Failed to update field',
+      requestId,
+    });
   }
 }
 
 export async function DELETE(request: NextRequest) {
+  const requestId = resolveRequestId(request);
   const fieldId = request.nextUrl.pathname.split('/').filter(Boolean).pop();
   if (!fieldId) {
-    return NextResponse.json({ error: 'Invalid field id' }, { status: 400 });
+    return toApiErrorResponse({
+      status: 400,
+      code: 'VALIDATION_ERROR',
+      message: 'Invalid field id',
+      requestId,
+    });
   }
 
   const auth = await getBackendAuth(request);
   if (!auth.headers) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return toApiErrorResponse({
+      status: 401,
+      code: 'UNAUTHORIZED',
+      message: 'Unauthorized',
+      requestId,
+    });
   }
 
   try {
@@ -115,14 +176,19 @@ export async function DELETE(request: NextRequest) {
       headers: {
         'Content-Type': 'application/json',
         ...auth.headers,
+        'X-Request-Id': requestId,
       },
     });
 
-    const data = await res.json().catch(() => ({}));
-    return NextResponse.json(data, { status: res.status });
+    return toProxyJsonResponse(res, requestId);
   } catch (error) {
     console.error('Fields proxy DELETE error:', error);
-    return NextResponse.json({ error: 'Failed to delete field' }, { status: 500 });
+    return toApiErrorResponse({
+      status: 500,
+      code: 'INTERNAL_ERROR',
+      message: 'Failed to delete field',
+      requestId,
+    });
   }
 }
 
