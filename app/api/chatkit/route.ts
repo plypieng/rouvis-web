@@ -3,6 +3,44 @@ import { getBackendAuth } from '../../../lib/backend-proxy-auth';
 
 export const runtime = 'edge';
 
+type ChatKitErrorCode =
+  | 'UNAUTHORIZED'
+  | 'VALIDATION_ERROR'
+  | 'UPSTREAM_ERROR'
+  | 'INTERNAL_ERROR'
+  | 'SERVICE_UNAVAILABLE';
+
+function resolveRequestId(req: NextRequest): string {
+  return req.headers.get('x-request-id') || crypto.randomUUID();
+}
+
+function toErrorResponse(params: {
+  status: number;
+  code: ChatKitErrorCode;
+  message: string;
+  requestId: string;
+  details?: unknown;
+}) {
+  const payload: Record<string, unknown> = {
+    code: params.code,
+    message: params.message,
+    requestId: params.requestId,
+    // Backward compatibility with existing error consumers.
+    error: params.message,
+    errorCode: params.code,
+  };
+  if (params.details !== undefined) {
+    payload.details = params.details;
+  }
+  return new Response(JSON.stringify(payload), {
+    status: params.status,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Request-Id': params.requestId,
+    },
+  });
+}
+
 async function readJsonSafe<T = Record<string, unknown>>(response: Response): Promise<T> {
   try {
     return await response.json() as T;
@@ -12,16 +50,26 @@ async function readJsonSafe<T = Record<string, unknown>>(response: Response): Pr
 }
 
 export async function POST(req: NextRequest) {
+  const requestId = resolveRequestId(req);
   try {
     const body = await req.json();
     const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
-    if (!backendUrl) throw new Error('BACKEND_URL or NEXT_PUBLIC_API_BASE_URL is not defined');
+    if (!backendUrl) {
+      return toErrorResponse({
+        status: 503,
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'BACKEND_URL or NEXT_PUBLIC_API_BASE_URL is not defined',
+        requestId,
+      });
+    }
 
     const auth = await getBackendAuth(req);
     if (!auth.headers) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      return toErrorResponse({
         status: 401,
-        headers: { 'Content-Type': 'application/json' },
+        code: 'UNAUTHORIZED',
+        message: 'Unauthorized',
+        requestId,
       });
     }
 
@@ -36,7 +84,10 @@ export async function POST(req: NextRequest) {
       const data = await readJsonSafe<{ threads?: unknown[] }>(res);
       return new Response(JSON.stringify({ threads: data.threads || [] }), {
         status: res.status,
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Request-Id': res.headers.get('x-request-id') || requestId,
+        },
       });
     }
 
@@ -52,16 +103,21 @@ export async function POST(req: NextRequest) {
       const data = await readJsonSafe<{ thread?: unknown }>(res);
       return new Response(JSON.stringify({ thread: data.thread }), {
         status: res.status,
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Request-Id': res.headers.get('x-request-id') || requestId,
+        },
       });
     }
 
     if (body.action === 'chatkit.update_thread') {
       const threadId = typeof body.threadId === 'string' ? body.threadId : '';
       if (!threadId) {
-        return new Response(JSON.stringify({ error: 'threadId is required' }), {
+        return toErrorResponse({
           status: 400,
-          headers: { 'Content-Type': 'application/json' },
+          code: 'VALIDATION_ERROR',
+          message: 'threadId is required',
+          requestId,
         });
       }
       const res = await fetch(`${backendUrl}/api/v1/threads/${threadId}`, {
@@ -78,7 +134,10 @@ export async function POST(req: NextRequest) {
         preferences: data.preferences,
       }), {
         status: res.status,
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Request-Id': res.headers.get('x-request-id') || requestId,
+        },
       });
     }
 
@@ -94,7 +153,10 @@ export async function POST(req: NextRequest) {
       const data = await readJsonSafe<Record<string, unknown>>(res);
       return new Response(JSON.stringify(data), {
         status: res.status,
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Request-Id': res.headers.get('x-request-id') || requestId,
+        },
       });
     }
 
@@ -135,24 +197,34 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       const errorBody = await readJsonSafe<{
+        code?: string;
+        message?: string;
         error?: string;
         errorCode?: string;
         requestId?: string;
       }>(response);
-      return new Response(JSON.stringify({
-        error: errorBody.error || response.statusText || 'Request failed',
-        errorCode: errorBody.errorCode,
-        requestId: errorBody.requestId,
-      }), {
+
+      const upstreamRequestId = errorBody.requestId || response.headers.get('x-request-id') || requestId;
+      const upstreamCode = errorBody.code || errorBody.errorCode || 'UPSTREAM_ERROR';
+      const upstreamMessage = errorBody.message || errorBody.error || response.statusText || 'Request failed';
+      return toErrorResponse({
         status: response.status,
-        headers: { 'Content-Type': 'application/json' },
+        code: upstreamCode === 'UNAUTHORIZED'
+          ? 'UNAUTHORIZED'
+          : upstreamCode === 'VALIDATION_ERROR'
+            ? 'VALIDATION_ERROR'
+            : 'UPSTREAM_ERROR',
+        message: upstreamMessage,
+        requestId: upstreamRequestId,
       });
     }
 
     if (!response.body) {
-      return new Response(JSON.stringify({ error: 'No response body' }), {
+      return toErrorResponse({
         status: 500,
-        headers: { 'Content-Type': 'application/json' },
+        code: 'INTERNAL_ERROR',
+        message: 'No response body',
+        requestId,
       });
     }
 
@@ -227,14 +299,17 @@ export async function POST(req: NextRequest) {
     return new Response(stream, {
       headers: {
         'Content-Type': 'text/plain; charset=utf-8',
+        'X-Request-Id': response.headers.get('x-request-id') || requestId,
       },
     });
   } catch (error) {
     console.error('ChatKit adapter error:', error);
     const message = error instanceof Error ? error.message : 'ChatKit adapter error';
-    return new Response(JSON.stringify({ error: message }), {
+    return toErrorResponse({
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
+      code: 'INTERNAL_ERROR',
+      message,
+      requestId,
     });
   }
 }
