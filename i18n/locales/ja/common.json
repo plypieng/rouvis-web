@@ -79,7 +79,10 @@
     },
     "chat_prompts": {
       "today_priority": "今日やるべき作業を優先順位つきで3つに整理して",
-      "first_project": "まだプロジェクトがありません。最初のプロジェクト候補と今日やることを提案して"
+      "first_project": "まだプロジェクトがありません。最初のプロジェクト候補と今日やることを提案して",
+      "seasonal_memory": "昨シーズンのこの時期は{activity}が多かったです。今週の先回りリマインダーを提案して。",
+      "seasonal_recent": "最近の作業記録では{activity}が目立ちます。今週の先回りリマインダーを作って。",
+      "seasonal_bootstrap": "作業履歴がまだ少ないです。今シーズンから始めるべき先回りリマインダーを提案して。"
     },
     "next_best_action": {
       "badge": "次の最善アクション",
@@ -133,6 +136,39 @@
         "weather_no_alert": "現在、気象アラートはありません。",
         "focus_task": "現在の優先タスク: {task}",
         "empty_queue": "優先キューに未完了タスクはありません。"
+      }
+    },
+    "seasonal_memory": {
+      "title": "季節メモリーと先回りリマインダー",
+      "subtitle": "過去の作業履歴をもとに、今週の先回り行動を組み立てます。",
+      "badge": "先回り",
+      "activity_unknown": "現場作業",
+      "data_warning": "履歴データの一部取得に失敗しました。再取得すると提案精度が回復します。",
+      "retry": "履歴を再取得",
+      "empty": "まだリマインダーがありません。活動を1件記録して季節メモリーを開始しましょう。",
+      "insight": {
+        "last_season_title": "昨季の同時期データあり（{count}件）",
+        "last_season_body": "昨季のこの時期は「{activity}」の記録が多く見られました。",
+        "recent_title": "最近の履歴シグナルあり",
+        "recent_body": "最近の記録から「{activity}」が繰り返し発生しています。",
+        "empty_title": "履歴シグナルがまだありません",
+        "empty_body": "作業記録を残すことで、季節に合わせた提案精度が上がります。",
+        "prompt": "AIに先回りリマインダーを相談"
+      },
+      "reminders": {
+        "seasonal_repeat_title": "昨季パターンの再確認",
+        "seasonal_repeat_body": "この季節ウィンドウで「{activity}」が{count}件記録されました。",
+        "weather_title": "気象リスク対応（アラート{count}件）",
+        "weather_body": "天候アラートを前提に、作業順序と圃場アクセス前提を見直します。",
+        "overdue_title": "滞留回復（期限超過{count}件）",
+        "overdue_body": "新しい作業を積む前に、遅延タスクを先に回収します。",
+        "window_title": "48時間負荷チェック（{count}件）",
+        "window_body": "次の48時間で期限が来る作業の順序とバッファを確認します。",
+        "baseline_title": "基準データの記録を開始",
+        "baseline_body": "今週は活動を最低1件記録して、次回以降の提案を個別最適化します。",
+        "open_calendar": "カレンダーを開く",
+        "recover_now": "今すぐ回復",
+        "log_activity": "活動を記録"
       }
     },
     "checklist": {

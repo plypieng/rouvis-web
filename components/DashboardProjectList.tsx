@@ -8,6 +8,10 @@ import TodayCommandCenter, {
     type TodayNextBestAction,
 } from './TodayCommandCenter';
 import FirstWeekChecklist, { type ChecklistItem } from './FirstWeekChecklist';
+import SeasonalMemoryPanel, {
+    type SeasonalMemoryInsight,
+    type SeasonalMemoryReminder,
+} from './SeasonalMemoryPanel';
 import TrackedEventLink from './TrackedEventLink';
 import { resolveFarmerUiMode } from '@/lib/farmerUiMode';
 import { getServerAppBaseUrl } from '@/lib/server-app-base-url';
@@ -34,6 +38,11 @@ type DashboardTask = {
 
 type DashboardActivity = {
     id: string;
+    type?: string;
+    timestamp?: string;
+    projectId?: string;
+    projectName?: string;
+    note?: string;
 };
 
 type UserProfile = {
@@ -133,6 +142,16 @@ function inferCropStage(startDateRaw: string | undefined): CropStage {
     if (ageDays <= 100) return 'flowering';
     if (ageDays <= 140) return 'ripening';
     return 'harvest';
+}
+
+function normalizeActivityType(raw: string | undefined): string {
+    if (!raw) return '';
+    const normalized = raw
+        .replace(/[_-]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    if (!normalized) return '';
+    return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
 function buildTodayChatHref(locale: string, prompt: string): string {
@@ -725,6 +744,113 @@ export default async function DashboardProjectList({
                             },
                         };
 
+    const lastSeasonStart = new Date(now);
+    lastSeasonStart.setFullYear(lastSeasonStart.getFullYear() - 1);
+    lastSeasonStart.setDate(lastSeasonStart.getDate() - 21);
+    const lastSeasonEnd = new Date(now);
+    lastSeasonEnd.setFullYear(lastSeasonEnd.getFullYear() - 1);
+    lastSeasonEnd.setDate(lastSeasonEnd.getDate() + 21);
+    const lastSeasonStartEpoch = lastSeasonStart.getTime();
+    const lastSeasonEndEpoch = lastSeasonEnd.getTime();
+
+    const seasonalMemoryActivities = activities.filter((activity) => {
+        const activityEpoch = toEpoch(activity.timestamp);
+        return Number.isFinite(activityEpoch) && activityEpoch >= lastSeasonStartEpoch && activityEpoch <= lastSeasonEndEpoch;
+    });
+    const recentActivities = activities.slice(0, 8);
+    const referenceActivities = seasonalMemoryActivities.length > 0 ? seasonalMemoryActivities : recentActivities;
+
+    const activityFrequency = new Map<string, number>();
+    for (const activity of referenceActivities) {
+        const normalizedType = normalizeActivityType(activity.type);
+        if (!normalizedType) continue;
+        activityFrequency.set(normalizedType, (activityFrequency.get(normalizedType) || 0) + 1);
+    }
+    const topActivityType = [...activityFrequency.entries()].sort((left, right) => right[1] - left[1])[0]?.[0]
+        || normalizeActivityType(referenceActivities[0]?.type)
+        || t('seasonal_memory.activity_unknown');
+
+    const seasonalPrompt = seasonalMemoryActivities.length > 0
+        ? t('chat_prompts.seasonal_memory', { activity: topActivityType })
+        : recentActivities.length > 0
+            ? t('chat_prompts.seasonal_recent', { activity: topActivityType })
+            : t('chat_prompts.seasonal_bootstrap');
+    const seasonalMemoryInsight: SeasonalMemoryInsight = seasonalMemoryActivities.length > 0
+        ? {
+            title: t('seasonal_memory.insight.last_season_title', { count: seasonalMemoryActivities.length }),
+            body: t('seasonal_memory.insight.last_season_body', { activity: topActivityType }),
+            promptHref: buildTodayChatHref(locale, seasonalPrompt),
+            promptLabel: t('seasonal_memory.insight.prompt'),
+        }
+        : recentActivities.length > 0
+            ? {
+                title: t('seasonal_memory.insight.recent_title'),
+                body: t('seasonal_memory.insight.recent_body', { activity: topActivityType }),
+                promptHref: buildTodayChatHref(locale, seasonalPrompt),
+                promptLabel: t('seasonal_memory.insight.prompt'),
+            }
+            : {
+                title: t('seasonal_memory.insight.empty_title'),
+                body: t('seasonal_memory.insight.empty_body'),
+                promptHref: buildTodayChatHref(locale, seasonalPrompt),
+                promptLabel: t('seasonal_memory.insight.prompt'),
+            };
+
+    const seasonalReminders: SeasonalMemoryReminder[] = [];
+    if (seasonalMemoryActivities.length > 0) {
+        seasonalReminders.push({
+            id: 'seasonal-repeat',
+            title: t('seasonal_memory.reminders.seasonal_repeat_title'),
+            detail: t('seasonal_memory.reminders.seasonal_repeat_body', {
+                activity: topActivityType,
+                count: seasonalMemoryActivities.length,
+            }),
+            href: `/${locale}/calendar`,
+            ctaLabel: t('seasonal_memory.reminders.open_calendar'),
+            kpi: 'seasonal_readiness',
+        });
+    }
+    if (weatherAlertCount > 0) {
+        seasonalReminders.push({
+            id: 'weather-risk',
+            title: t('seasonal_memory.reminders.weather_title', { count: weatherAlertCount }),
+            detail: t('seasonal_memory.reminders.weather_body'),
+            href: `/${locale}/calendar`,
+            ctaLabel: t('seasonal_memory.reminders.open_calendar'),
+            kpi: 'schedule_reliability',
+        });
+    }
+    if (overdueCount > 0) {
+        seasonalReminders.push({
+            id: 'overdue-recovery',
+            title: t('seasonal_memory.reminders.overdue_title', { count: overdueCount }),
+            detail: t('seasonal_memory.reminders.overdue_body'),
+            href: `/${locale}/calendar`,
+            ctaLabel: t('seasonal_memory.reminders.recover_now'),
+            kpi: 'task_completion',
+        });
+    } else if (dueIn48hCount > 0) {
+        seasonalReminders.push({
+            id: 'window-check',
+            title: t('seasonal_memory.reminders.window_title', { count: dueIn48hCount }),
+            detail: t('seasonal_memory.reminders.window_body'),
+            href: `/${locale}/calendar`,
+            ctaLabel: t('seasonal_memory.reminders.open_calendar'),
+            kpi: 'schedule_reliability',
+        });
+    }
+    if (recentActivities.length === 0) {
+        seasonalReminders.push({
+            id: 'baseline-log',
+            title: t('seasonal_memory.reminders.baseline_title'),
+            detail: t('seasonal_memory.reminders.baseline_body'),
+            href: `/${locale}/records?action=log`,
+            ctaLabel: t('seasonal_memory.reminders.log_activity'),
+            kpi: 'data_quality',
+        });
+    }
+    const seasonalReminderCards = seasonalReminders.slice(0, 3);
+
     const projectOpsById = new Map<string, ProjectOpsSummary>();
     for (const project of projects) {
         const projectPendingTasks = pendingTasks.filter((task) => task.projectId === project.id);
@@ -821,6 +947,16 @@ export default async function DashboardProjectList({
                     todayProgressDone={todayProgressDone}
                     todayProgressTotal={todayProgressTotal}
                     hasCompletedTaskInitially={completedTaskExists}
+                />
+
+                <SeasonalMemoryPanel
+                    mode={resolvedUiMode}
+                    insight={seasonalMemoryInsight}
+                    reminders={seasonalReminderCards}
+                    hasDataIssue={activitiesResult.hasError}
+                    retryHref={retryHref}
+                    seasonalMemoryCount={seasonalMemoryActivities.length}
+                    recentActivityCount={recentActivities.length}
                 />
 
                 {hasDataFetchError && (

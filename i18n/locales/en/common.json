@@ -67,7 +67,10 @@
     },
     "chat_prompts": {
       "today_priority": "Organize the top 3 tasks for today with priorities.",
-      "first_project": "There are no projects yet. Suggest the first project and today's work."
+      "first_project": "There are no projects yet. Suggest the first project and today's work.",
+      "seasonal_memory": "Last season around this period I focused on {activity}. What proactive reminders should I run this week?",
+      "seasonal_recent": "Recent field history includes {activity}. Build proactive reminders for this week.",
+      "seasonal_bootstrap": "I don't have much farm history yet. Propose proactive reminders I should start tracking this season."
     },
     "next_best_action": {
       "badge": "Next best action",
@@ -121,6 +124,39 @@
         "weather_no_alert": "No weather alert is currently active.",
         "focus_task": "Current priority task: {task}.",
         "empty_queue": "No pending priority task is currently assigned."
+      }
+    },
+    "seasonal_memory": {
+      "title": "Seasonal memory and reminders",
+      "subtitle": "Use farm history to trigger proactive planning prompts.",
+      "badge": "Proactive",
+      "activity_unknown": "field operations",
+      "data_warning": "History data could not be fully loaded. Retry to restore reminder quality.",
+      "retry": "Retry history load",
+      "empty": "No reminders available yet. Log one activity to start seasonal memory.",
+      "insight": {
+        "last_season_title": "Last season signal available ({count} records)",
+        "last_season_body": "Around this period last season, you frequently logged {activity}.",
+        "recent_title": "Recent history signal available",
+        "recent_body": "Recent records suggest {activity} is a recurring operation.",
+        "empty_title": "No history signal yet",
+        "empty_body": "Start logging field work to build reliable season-aware reminders.",
+        "prompt": "Ask AI for proactive reminders"
+      },
+      "reminders": {
+        "seasonal_repeat_title": "Reconfirm last-season pattern",
+        "seasonal_repeat_body": "{activity} appeared {count} time(s) around this seasonal window.",
+        "weather_title": "Weather risk coverage ({count} alerts)",
+        "weather_body": "Check task order and field access assumptions against active weather alerts.",
+        "overdue_title": "Backlog recovery ({count} overdue)",
+        "overdue_body": "Clear delayed operations before adding new non-urgent work.",
+        "window_title": "48h load check ({count} due soon)",
+        "window_body": "Reconfirm sequence and buffers for tasks due in the next 48 hours.",
+        "baseline_title": "Start baseline memory capture",
+        "baseline_body": "Log at least one field activity this week so future reminders can personalize.",
+        "open_calendar": "Open calendar",
+        "recover_now": "Recover now",
+        "log_activity": "Log activity"
       }
     },
     "checklist": {
