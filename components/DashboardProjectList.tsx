@@ -175,27 +175,59 @@ function requestTimeoutSignal(ms = 4500): AbortSignal | undefined {
     return undefined;
 }
 
-async function getProjects(appBaseUrl: string, cookieHeader: string): Promise<LoadResult<Project[]>> {
-    try {
-        const res = await fetch(`${appBaseUrl}/api/v1/projects`, {
-            cache: 'no-store',
-            headers: withCookieHeaders(cookieHeader),
-            signal: requestTimeoutSignal(),
-        });
+type RetryableFetchError = Error & { retryable?: boolean };
 
-        if (!res.ok) throw new Error(`Failed to fetch projects (${res.status})`);
-        const data = await res.json();
-        return {
-            data: (data.projects || []) as Project[],
-            hasError: false,
-        };
-    } catch (error) {
-        console.error('Failed to fetch projects:', error);
-        return {
-            data: [],
-            hasError: true,
-        };
+function isRetryableProjectFetchError(error: unknown): boolean {
+    if (typeof error === 'object' && error !== null && (error as RetryableFetchError).retryable === true) {
+        return true;
     }
+    if (!(error instanceof Error)) {
+        return false;
+    }
+
+    const normalizedMessage = error.message.toLowerCase();
+    return normalizedMessage.includes('timeout')
+        || normalizedMessage.includes('aborted')
+        || normalizedMessage.includes('fetch failed')
+        || normalizedMessage.includes('network');
+}
+
+async function getProjects(appBaseUrl: string, cookieHeader: string): Promise<LoadResult<Project[]>> {
+    const requestTimeouts = [8000, 12000];
+    let lastError: unknown = null;
+
+    for (const timeoutMs of requestTimeouts) {
+        try {
+            const res = await fetch(`${appBaseUrl}/api/v1/projects`, {
+                cache: 'no-store',
+                headers: withCookieHeaders(cookieHeader),
+                signal: requestTimeoutSignal(timeoutMs),
+            });
+
+            if (!res.ok) {
+                const error: RetryableFetchError = new Error(`Failed to fetch projects (${res.status})`);
+                error.retryable = res.status >= 500 || res.status === 429;
+                throw error;
+            }
+
+            const data = await res.json();
+            return {
+                data: (data.projects || []) as Project[],
+                hasError: false,
+            };
+        } catch (error) {
+            lastError = error;
+            if (!isRetryableProjectFetchError(error) || timeoutMs === requestTimeouts[requestTimeouts.length - 1]) {
+                break;
+            }
+        }
+    }
+
+    console.error('Failed to fetch projects:', lastError);
+    return {
+        data: [],
+        hasError: true,
+    };
 }
 
 async function getWeather(appBaseUrl: string, cookieHeader: string, copy: WeatherCopy): Promise<LoadResult<WeatherData>> {
