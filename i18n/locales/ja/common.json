@@ -81,6 +81,60 @@
       "today_priority": "今日やるべき作業を優先順位つきで3つに整理して",
       "first_project": "まだプロジェクトがありません。最初のプロジェクト候補と今日やることを提案して"
     },
+    "next_best_action": {
+      "badge": "次の最善アクション",
+      "context_line": "対象: {project} · {crop} · {stage}",
+      "project_unknown": "プロジェクト未設定",
+      "crop_unknown": "作目未設定",
+      "recovery_hint": "データ品質が低下しています。実行前に一度再取得してください。",
+      "scenarios": {
+        "data_recovery": {
+          "title": "実行前にダッシュボードデータを復旧",
+          "summary": "一部データの取得に失敗しています。古い情報で判断しないよう、先に再同期します。",
+          "primary": "データを再取得",
+          "secondary": "カレンダーで確認"
+        },
+        "overdue_recovery": {
+          "title": "期限超過の回復を最優先",
+          "summary": "遅延タスクを先に回収し、その後48時間の順序を組み直します。",
+          "primary": "回復キューを開く",
+          "secondary": "AIで順序を再提案"
+        },
+        "weather_guard": {
+          "title": "気象リスク前提で順序を調整",
+          "summary": "気象アラートと直近タスクが重なっています。現場実行前に順番と時刻を見直します。",
+          "primary": "リスク付きカレンダーを開く",
+          "secondary": "AIに安全順序を相談"
+        },
+        "due_soon": {
+          "title": "次の48時間の作業段取りを固定",
+          "summary": "期限超過はありませんが、直近の負荷が高まっています。今日の順序を先に確定します。",
+          "primary": "48時間の段取りを確認",
+          "secondary": "現場状態を記録"
+        },
+        "setup": {
+          "title": "セットアップ完了で提案精度を向上",
+          "summary": "初期設定が未完了です。プロジェクトとスケジュールを整えて提案品質を安定させます。",
+          "primary": "セットアップを完了",
+          "secondary": "AIにセットアップを相談"
+        },
+        "momentum": {
+          "title": "短い更新で運用の勢いを維持",
+          "summary": "運用は安定しています。活動を1件記録して明日の優先提案精度を維持します。",
+          "primary": "活動を記録",
+          "secondary": "AIに次の一手を相談"
+        }
+      },
+      "reasons": {
+        "data_issue": "少なくとも1つのデータソースがエラーを返しています。",
+        "overdue_count": "期限超過タスクが{count}件あります。",
+        "due_48h_count": "48時間以内のタスクが{count}件あります。",
+        "weather_alert_count": "気象アラート{count}件が作業順序に影響する可能性があります。",
+        "weather_no_alert": "現在、気象アラートはありません。",
+        "focus_task": "現在の優先タスク: {task}",
+        "empty_queue": "優先キューに未完了タスクはありません。"
+      }
+    },
     "checklist": {
       "onboarding": "初期設定を完了",
       "project": "最初のプロジェクトを作成",

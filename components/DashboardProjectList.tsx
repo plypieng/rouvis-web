@@ -3,7 +3,10 @@ import { getTranslations } from 'next-intl/server';
 import { cookies } from 'next/headers';
 
 import DashboardHeader from './DashboardHeader';
-import TodayCommandCenter, { type TodayCommandTask } from './TodayCommandCenter';
+import TodayCommandCenter, {
+    type TodayCommandTask,
+    type TodayNextBestAction,
+} from './TodayCommandCenter';
 import FirstWeekChecklist, { type ChecklistItem } from './FirstWeekChecklist';
 import TrackedEventLink from './TrackedEventLink';
 import { resolveFarmerUiMode } from '@/lib/farmerUiMode';
@@ -70,6 +73,7 @@ type ActivationContext = {
 };
 
 type RiskTone = 'safe' | 'watch' | 'warning' | 'critical';
+type CropStage = 'seedling' | 'vegetative' | 'flowering' | 'ripening' | 'harvest';
 
 type ProjectOpsSummary = {
     nextTask: DashboardTask | null;
@@ -116,6 +120,19 @@ function riskBadgeClass(tone: RiskTone): string {
     if (tone === 'warning') return 'border-amber-200 bg-amber-50 text-amber-700';
     if (tone === 'watch') return 'border-blue-200 bg-blue-50 text-blue-700';
     return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+}
+
+function inferCropStage(startDateRaw: string | undefined): CropStage {
+    if (!startDateRaw) return 'seedling';
+    const startEpoch = new Date(startDateRaw).getTime();
+    if (!Number.isFinite(startEpoch)) return 'seedling';
+
+    const ageDays = Math.max(0, Math.floor((Date.now() - startEpoch) / (1000 * 60 * 60 * 24)));
+    if (ageDays <= 21) return 'seedling';
+    if (ageDays <= 60) return 'vegetative';
+    if (ageDays <= 100) return 'flowering';
+    if (ageDays <= 140) return 'ripening';
+    return 'harvest';
 }
 
 function buildTodayChatHref(locale: string, prompt: string): string {
@@ -526,6 +543,188 @@ export default async function DashboardProjectList({
                 label: t('ops_window.action_plan'),
             };
 
+    const focusTask = activationTask || recommendedTaskSource || pendingTasks[0] || null;
+    const focusProject = focusTask?.projectId
+        ? projects.find((project) => project.id === focusTask.projectId) || null
+        : activationProject || projects[0] || null;
+    const focusStage = inferCropStage(focusProject?.startDate);
+    const nextBestActionContextLine = t('next_best_action.context_line', {
+        project: focusProject?.name || t('next_best_action.project_unknown'),
+        crop: focusProject?.crop || t('next_best_action.crop_unknown'),
+        stage: tw(`stages.${focusStage}`),
+    });
+
+    const dueIn48hCount = dueIn48hPendingTasks.length;
+    const overdueCount = overduePendingTasks.length;
+    const nextBestActionPlan: TodayNextBestAction = hasDataFetchError
+        ? {
+            scenario: 'data_recovery',
+            riskTone: overdueCount > 0 ? 'warning' : 'watch',
+            riskLabel: tw(overdueCount > 0 ? 'risk.warning' : 'risk.watch'),
+            title: t('next_best_action.scenarios.data_recovery.title'),
+            summary: t('next_best_action.scenarios.data_recovery.summary'),
+            reasons: [
+                t('next_best_action.reasons.data_issue'),
+                t('next_best_action.reasons.overdue_count', { count: overdueCount }),
+                t('next_best_action.reasons.due_48h_count', { count: dueIn48hCount }),
+            ],
+            contextLine: nextBestActionContextLine,
+            recoveryHint: t('next_best_action.recovery_hint'),
+            kpi: 'schedule_reliability',
+            overdueCount,
+            dueIn48hCount,
+            weatherAlertCount,
+            hasDataIssue: true,
+            primary: {
+                href: retryHref,
+                label: t('next_best_action.scenarios.data_recovery.primary'),
+            },
+            secondary: {
+                href: `/${locale}/calendar`,
+                label: t('next_best_action.scenarios.data_recovery.secondary'),
+            },
+        }
+        : overdueCount > 0
+            ? {
+                scenario: 'overdue_recovery',
+                riskTone: dashboardRiskTone === 'critical' ? 'critical' : 'warning',
+                riskLabel: tw(dashboardRiskTone === 'critical' ? 'risk.critical' : 'risk.warning'),
+                title: t('next_best_action.scenarios.overdue_recovery.title'),
+                summary: t('next_best_action.scenarios.overdue_recovery.summary'),
+                reasons: [
+                    t('next_best_action.reasons.overdue_count', { count: overdueCount }),
+                    t('next_best_action.reasons.due_48h_count', { count: dueIn48hCount }),
+                    weatherAlertCount > 0
+                        ? t('next_best_action.reasons.weather_alert_count', { count: weatherAlertCount })
+                        : t('next_best_action.reasons.weather_no_alert'),
+                ],
+                contextLine: nextBestActionContextLine,
+                kpi: 'task_completion',
+                overdueCount,
+                dueIn48hCount,
+                weatherAlertCount,
+                hasDataIssue: false,
+                primary: {
+                    href: `/${locale}/calendar`,
+                    label: t('next_best_action.scenarios.overdue_recovery.primary'),
+                },
+                secondary: {
+                    href: buildTodayChatHref(locale, t('chat_prompts.today_priority')),
+                    label: t('next_best_action.scenarios.overdue_recovery.secondary'),
+                },
+            }
+            : weatherAlertCount > 0 && dueIn48hCount > 0
+                ? {
+                    scenario: 'weather_guard',
+                    riskTone: dashboardRiskTone === 'safe' ? 'watch' : dashboardRiskTone,
+                    riskLabel: tw(dashboardRiskTone === 'safe' ? 'risk.watch' : `risk.${dashboardRiskTone}`),
+                    title: t('next_best_action.scenarios.weather_guard.title'),
+                    summary: t('next_best_action.scenarios.weather_guard.summary'),
+                    reasons: [
+                        t('next_best_action.reasons.weather_alert_count', { count: weatherAlertCount }),
+                        t('next_best_action.reasons.due_48h_count', { count: dueIn48hCount }),
+                        focusTask
+                            ? t('next_best_action.reasons.focus_task', { task: focusTask.title })
+                            : t('next_best_action.reasons.empty_queue'),
+                    ],
+                    contextLine: nextBestActionContextLine,
+                    kpi: 'schedule_reliability',
+                    overdueCount,
+                    dueIn48hCount,
+                    weatherAlertCount,
+                    hasDataIssue: false,
+                    primary: {
+                        href: `/${locale}/calendar`,
+                        label: t('next_best_action.scenarios.weather_guard.primary'),
+                    },
+                    secondary: {
+                        href: buildTodayChatHref(locale, t('chat_prompts.today_priority')),
+                        label: t('next_best_action.scenarios.weather_guard.secondary'),
+                    },
+                }
+                : dueIn48hCount > 0
+                    ? {
+                        scenario: 'due_soon',
+                        riskTone: dashboardRiskTone === 'safe' ? 'watch' : dashboardRiskTone,
+                        riskLabel: tw(dashboardRiskTone === 'safe' ? 'risk.watch' : `risk.${dashboardRiskTone}`),
+                        title: t('next_best_action.scenarios.due_soon.title'),
+                        summary: t('next_best_action.scenarios.due_soon.summary'),
+                        reasons: [
+                            t('next_best_action.reasons.due_48h_count', { count: dueIn48hCount }),
+                            t('next_best_action.reasons.weather_no_alert'),
+                            focusTask
+                                ? t('next_best_action.reasons.focus_task', { task: focusTask.title })
+                                : t('next_best_action.reasons.empty_queue'),
+                        ],
+                        contextLine: nextBestActionContextLine,
+                        kpi: 'task_completion',
+                        overdueCount,
+                        dueIn48hCount,
+                        weatherAlertCount,
+                        hasDataIssue: false,
+                        primary: {
+                            href: `/${locale}/calendar`,
+                            label: t('next_best_action.scenarios.due_soon.primary'),
+                        },
+                        secondary: {
+                            href: `/${locale}/records?action=log`,
+                            label: t('next_best_action.scenarios.due_soon.secondary'),
+                        },
+                    }
+                    : projects.length === 0 || !hasGeneratedSchedule
+                        ? {
+                            scenario: 'setup',
+                            riskTone: 'watch',
+                            riskLabel: tw('risk.watch'),
+                            title: t('next_best_action.scenarios.setup.title'),
+                            summary: t('next_best_action.scenarios.setup.summary'),
+                            reasons: [
+                                t('next_best_action.reasons.empty_queue'),
+                                t('next_best_action.reasons.weather_no_alert'),
+                                t('next_best_action.reasons.due_48h_count', { count: dueIn48hCount }),
+                            ],
+                            contextLine: nextBestActionContextLine,
+                            kpi: 'first_week_activation',
+                            overdueCount,
+                            dueIn48hCount,
+                            weatherAlertCount,
+                            hasDataIssue: false,
+                            primary: {
+                                href: `/${locale}/projects/create`,
+                                label: t('next_best_action.scenarios.setup.primary'),
+                            },
+                            secondary: {
+                                href: emptyProjectsChatHref,
+                                label: t('next_best_action.scenarios.setup.secondary'),
+                            },
+                        }
+                        : {
+                            scenario: 'momentum',
+                            riskTone: dashboardRiskTone === 'critical' ? 'warning' : 'safe',
+                            riskLabel: tw(dashboardRiskTone === 'critical' ? 'risk.warning' : 'risk.safe'),
+                            title: t('next_best_action.scenarios.momentum.title'),
+                            summary: t('next_best_action.scenarios.momentum.summary'),
+                            reasons: [
+                                t('next_best_action.reasons.weather_no_alert'),
+                                t('next_best_action.reasons.overdue_count', { count: overdueCount }),
+                                t('next_best_action.reasons.due_48h_count', { count: dueIn48hCount }),
+                            ],
+                            contextLine: nextBestActionContextLine,
+                            kpi: 'task_completion',
+                            overdueCount,
+                            dueIn48hCount,
+                            weatherAlertCount,
+                            hasDataIssue: false,
+                            primary: {
+                                href: `/${locale}/records?action=log`,
+                                label: t('next_best_action.scenarios.momentum.primary'),
+                            },
+                            secondary: {
+                                href: buildTodayChatHref(locale, t('chat_prompts.today_priority')),
+                                label: t('next_best_action.scenarios.momentum.secondary'),
+                            },
+                        };
+
     const projectOpsById = new Map<string, ProjectOpsSummary>();
     for (const project of projects) {
         const projectPendingTasks = pendingTasks.filter((task) => task.projectId === project.id);
@@ -618,6 +817,7 @@ export default async function DashboardProjectList({
                     mode={resolvedUiMode}
                     todayTasks={todayCommandTasks}
                     recommendedTask={recommendedTask}
+                    nextBestAction={nextBestActionPlan}
                     todayProgressDone={todayProgressDone}
                     todayProgressTotal={todayProgressTotal}
                     hasCompletedTaskInitially={completedTaskExists}

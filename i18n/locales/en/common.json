@@ -69,6 +69,60 @@
       "today_priority": "Organize the top 3 tasks for today with priorities.",
       "first_project": "There are no projects yet. Suggest the first project and today's work."
     },
+    "next_best_action": {
+      "badge": "Next best action",
+      "context_line": "Focus: {project} · {crop} · {stage}",
+      "project_unknown": "No project",
+      "crop_unknown": "Crop not set",
+      "recovery_hint": "Data quality is degraded. Retry once before executing this plan.",
+      "scenarios": {
+        "data_recovery": {
+          "title": "Recover dashboard data before execution",
+          "summary": "At least one data source failed to load. Re-sync first to avoid acting on stale guidance.",
+          "primary": "Retry dashboard data",
+          "secondary": "Open calendar fallback"
+        },
+        "overdue_recovery": {
+          "title": "Clear overdue pressure first",
+          "summary": "Recover delayed tasks now, then re-sequence the next 48h window.",
+          "primary": "Open recovery queue",
+          "secondary": "Ask AI to re-order"
+        },
+        "weather_guard": {
+          "title": "Re-sequence around weather risk",
+          "summary": "Weather alerts overlap with near-term tasks. Adjust order and timing before field execution.",
+          "primary": "Open risk-aware calendar",
+          "secondary": "Ask AI for weather-safe order"
+        },
+        "due_soon": {
+          "title": "Stage the next 48h workload",
+          "summary": "No overdue items, but near-term pressure is building. Lock today's sequence now.",
+          "primary": "Review 48h sequence",
+          "secondary": "Log current field state"
+        },
+        "setup": {
+          "title": "Finish setup to unlock guidance quality",
+          "summary": "Core setup is incomplete. Complete project/schedule setup so recommendations become reliable.",
+          "primary": "Complete setup",
+          "secondary": "Ask AI for setup help"
+        },
+        "momentum": {
+          "title": "Maintain momentum with a quick update",
+          "summary": "Operations are stable. Log one field update to keep tomorrow's prioritization accurate.",
+          "primary": "Log field activity",
+          "secondary": "Ask AI for next increment"
+        }
+      },
+      "reasons": {
+        "data_issue": "At least one dashboard source returned an error.",
+        "overdue_count": "{count} overdue task(s) need attention.",
+        "due_48h_count": "{count} task(s) are due within 48 hours.",
+        "weather_alert_count": "{count} weather alert(s) may affect execution order.",
+        "weather_no_alert": "No weather alert is currently active.",
+        "focus_task": "Current priority task: {task}.",
+        "empty_queue": "No pending priority task is currently assigned."
+      }
+    },
     "checklist": {
       "onboarding": "Complete initial setup",
       "project": "Create first project",

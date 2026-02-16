@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
@@ -16,6 +16,32 @@ export type TodayCommandTask = {
   dueAt: string;
   projectId?: string;
   projectName?: string;
+};
+
+type NextBestActionTone = 'safe' | 'watch' | 'warning' | 'critical';
+
+export type TodayNextBestAction = {
+  scenario: 'data_recovery' | 'overdue_recovery' | 'weather_guard' | 'due_soon' | 'setup' | 'momentum';
+  riskTone: NextBestActionTone;
+  riskLabel: string;
+  title: string;
+  summary: string;
+  reasons: string[];
+  contextLine: string;
+  recoveryHint?: string;
+  kpi: 'task_completion' | 'schedule_reliability' | 'first_week_activation';
+  overdueCount: number;
+  dueIn48hCount: number;
+  weatherAlertCount: number;
+  hasDataIssue: boolean;
+  primary: {
+    href: string;
+    label: string;
+  };
+  secondary?: {
+    href: string;
+    label: string;
+  };
 };
 
 type NoticeState = {
@@ -50,6 +76,20 @@ function toDueLabel(task: TodayCommandTask, locale: string, overdueLabel: string
   return new Date(dueEpoch).toLocaleDateString(locale, { month: 'numeric', day: 'numeric' });
 }
 
+function nextBestActionPanelClass(tone: NextBestActionTone): string {
+  if (tone === 'critical') return 'border-red-200 bg-red-50/70';
+  if (tone === 'warning') return 'border-amber-200 bg-amber-50/70';
+  if (tone === 'watch') return 'border-blue-200 bg-blue-50/70';
+  return 'border-emerald-200 bg-emerald-50/70';
+}
+
+function nextBestActionBadgeClass(tone: NextBestActionTone): string {
+  if (tone === 'critical') return 'border-red-300 bg-red-100 text-red-800';
+  if (tone === 'warning') return 'border-amber-300 bg-amber-100 text-amber-800';
+  if (tone === 'watch') return 'border-blue-300 bg-blue-100 text-blue-800';
+  return 'border-emerald-300 bg-emerald-100 text-emerald-800';
+}
+
 export default function TodayCommandCenter({
   locale,
   mode,
@@ -58,6 +98,7 @@ export default function TodayCommandCenter({
   todayProgressDone,
   todayProgressTotal,
   hasCompletedTaskInitially = false,
+  nextBestAction,
 }: {
   locale: string;
   mode: FarmerUiMode;
@@ -66,6 +107,7 @@ export default function TodayCommandCenter({
   todayProgressDone: number;
   todayProgressTotal: number;
   hasCompletedTaskInitially?: boolean;
+  nextBestAction?: TodayNextBestAction | null;
 }) {
   const router = useRouter();
   const t = useTranslations('dashboard');
@@ -74,6 +116,7 @@ export default function TodayCommandCenter({
   const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
   const [hasCompletedTask, setHasCompletedTask] = useState(hasCompletedTaskInitially);
   const [notice, setNotice] = useState<NoticeState | null>(null);
+  const nextBestActionImpressionRef = useRef<string>('');
 
   useEffect(() => {
     setTasks(todayTasks);
@@ -82,6 +125,32 @@ export default function TodayCommandCenter({
   useEffect(() => {
     setRecommendedTask(initialRecommendedTask || null);
   }, [initialRecommendedTask]);
+
+  useEffect(() => {
+    if (!nextBestAction) return;
+
+    const impressionKey = [
+      mode,
+      nextBestAction.scenario,
+      nextBestAction.riskTone,
+      nextBestAction.primary.href,
+      nextBestAction.kpi,
+      nextBestAction.hasDataIssue ? '1' : '0',
+    ].join(':');
+    if (nextBestActionImpressionRef.current === impressionKey) return;
+    nextBestActionImpressionRef.current = impressionKey;
+
+    void trackUXEvent('dashboard_next_best_action_viewed', {
+      mode,
+      scenario: nextBestAction.scenario,
+      riskTone: nextBestAction.riskTone,
+      kpi: nextBestAction.kpi,
+      hasDataIssue: nextBestAction.hasDataIssue,
+      overdueCount: nextBestAction.overdueCount,
+      dueIn48hCount: nextBestAction.dueIn48hCount,
+      weatherAlertCount: nextBestAction.weatherAlertCount,
+    });
+  }, [mode, nextBestAction]);
 
   const todayChatHref = buildTodayChatHref(locale, t('chat_prompts.today_priority'));
   const todayProgressPercent = todayProgressTotal === 0
@@ -237,6 +306,80 @@ export default function TodayCommandCenter({
                   {t('command_center.retry')}
                 </button>
               )}
+            </div>
+          </div>
+        )}
+
+        {nextBestAction && (
+          <div
+            data-testid="dashboard-next-best-action"
+            className={`mb-4 rounded-xl border px-3 py-3 ${nextBestActionPanelClass(nextBestAction.riskTone)}`}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">
+                  {t('next_best_action.badge')}
+                </p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">{nextBestAction.title}</p>
+                <p className="mt-1 text-xs text-slate-700">{nextBestAction.summary}</p>
+              </div>
+              <span className={`rounded-full border px-2 py-1 text-xs font-semibold ${nextBestActionBadgeClass(nextBestAction.riskTone)}`}>
+                {nextBestAction.riskLabel}
+              </span>
+            </div>
+
+            <p className="mt-2 text-xs text-slate-700">{nextBestAction.contextLine}</p>
+
+            {nextBestAction.reasons.length > 0 && (
+              <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-slate-700">
+                {nextBestAction.reasons.map((reason, index) => (
+                  <li key={`${nextBestAction.scenario}-${index.toString()}`}>{reason}</li>
+                ))}
+              </ul>
+            )}
+
+            {nextBestAction.recoveryHint ? (
+              <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-900">
+                {nextBestAction.recoveryHint}
+              </p>
+            ) : null}
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              <TrackedEventLink
+                href={nextBestAction.primary.href}
+                eventName="dashboard_next_best_action_primary_clicked"
+                eventProperties={{
+                  mode,
+                  scenario: nextBestAction.scenario,
+                  riskTone: nextBestAction.riskTone,
+                  kpi: nextBestAction.kpi,
+                  hasDataIssue: nextBestAction.hasDataIssue,
+                  overdueCount: nextBestAction.overdueCount,
+                  dueIn48hCount: nextBestAction.dueIn48hCount,
+                  weatherAlertCount: nextBestAction.weatherAlertCount,
+                }}
+                data-testid="dashboard-next-best-action-primary"
+                className="inline-flex min-h-[40px] items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
+              >
+                {nextBestAction.primary.label}
+              </TrackedEventLink>
+
+              {nextBestAction.secondary ? (
+                <TrackedEventLink
+                  href={nextBestAction.secondary.href}
+                  eventName="dashboard_next_best_action_secondary_clicked"
+                  eventProperties={{
+                    mode,
+                    scenario: nextBestAction.scenario,
+                    riskTone: nextBestAction.riskTone,
+                    kpi: nextBestAction.kpi,
+                  }}
+                  data-testid="dashboard-next-best-action-secondary"
+                  className="inline-flex min-h-[40px] items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                >
+                  {nextBestAction.secondary.label}
+                </TrackedEventLink>
+              ) : null}
             </div>
           </div>
         )}

@@ -166,4 +166,30 @@ test.describe('P1 contextual UX regression', () => {
 
     expect(payload.event).toBe('dashboard_retry_clicked');
   });
+
+  test('shows next-best-action recovery panel and tracks primary action', async ({ page }) => {
+    await page.goto('/ja?debugDataError=1');
+
+    const panel = page.getByTestId('dashboard-next-best-action');
+    await expect(panel).toBeVisible();
+    await expect(panel).toContainText('次の最善アクション');
+
+    const primaryAction = page.getByTestId('dashboard-next-best-action-primary');
+    await expect(primaryAction).toBeVisible();
+
+    const telemetryRequestPromise = page.waitForRequest((request) => {
+      if (!request.url().includes('/api/v1/telemetry/events')) return false;
+      if (request.method() !== 'POST') return false;
+      const rawPayload = request.postData() || request.postDataBuffer()?.toString('utf8') || '{}';
+      return rawPayload.includes('dashboard_next_best_action_primary_clicked');
+    });
+
+    await primaryAction.click();
+    const telemetryRequest = await telemetryRequestPromise;
+    const rawPayload = telemetryRequest.postData() || telemetryRequest.postDataBuffer()?.toString('utf8') || '{}';
+    const payload = JSON.parse(rawPayload) as { event?: string; properties?: { scenario?: string } };
+
+    expect(payload.event).toBe('dashboard_next_best_action_primary_clicked');
+    expect(payload.properties?.scenario).toBe('data_recovery');
+  });
 });
