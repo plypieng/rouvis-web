@@ -3,9 +3,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authPrisma } from '@/lib/prisma';
 import { getServerSessionFromToken } from '@/lib/server-auth';
 import { captureException } from '@/lib/sentry';
-
-type PrimitiveValue = string | number | boolean | null;
-type PropertiesPayload = Record<string, PrimitiveValue>;
+import {
+  type PrimitiveValue,
+  type TelemetryProperties,
+  validateTelemetryEventShape,
+} from '@/lib/telemetry-taxonomy';
 
 function isPrimitive(value: unknown): value is PrimitiveValue {
   return (
@@ -16,10 +18,10 @@ function isPrimitive(value: unknown): value is PrimitiveValue {
   );
 }
 
-function sanitizeProperties(raw: unknown): PropertiesPayload {
+function sanitizeProperties(raw: unknown): TelemetryProperties {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
 
-  const result: PropertiesPayload = {};
+  const result: TelemetryProperties = {};
   for (const [key, value] of Object.entries(raw)) {
     if (!key || key.length > 64) continue;
     if (isPrimitive(value)) {
@@ -51,6 +53,11 @@ export async function POST(req: NextRequest) {
   }
 
   const properties = sanitizeProperties((body as { properties?: unknown })?.properties);
+  const telemetryValidation = validateTelemetryEventShape(event, properties);
+  if (!telemetryValidation.valid) {
+    return NextResponse.json({ error: telemetryValidation.error || 'Invalid telemetry payload' }, { status: 400 });
+  }
+
   const session = await getServerSessionFromToken();
   const userId = session?.user?.id || null;
 

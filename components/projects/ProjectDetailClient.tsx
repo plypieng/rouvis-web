@@ -17,6 +17,14 @@ import type {
 } from '@/types/project-cockpit';
 import { toastError, toastSuccess } from '@/lib/feedback';
 import { trackUXEvent } from '@/lib/analytics';
+import {
+    trackSuggestionAccepted,
+    trackSuggestionCompleted,
+    trackSuggestionEdited,
+    trackSuggestionRejected,
+    trackSuggestionSlipped,
+    trackSuggestionSuggested,
+} from '@/lib/suggestion-lifecycle-telemetry';
 
 type ProjectTask = {
     id: string;
@@ -172,6 +180,15 @@ export default function ProjectDetailClient({
         }
     }, []);
 
+    const buildSuggestionTelemetryBase = useCallback(() => ({
+        suggestionId: activeHandshake?.id || `project-${project.id}-reschedule`,
+        suggestionType: 'reschedule_plan',
+        surface: 'project_detail',
+        projectId: project.id,
+        affectedTasks: activeHandshake?.affectedTasks.length,
+        riskTone: activeHandshake?.riskTone || 'safe',
+    }), [activeHandshake, project.id]);
+
     const handleRescheduleRequest = (message?: string) => {
         if (chatRef.current) {
             // Activate Reschedule Mode with visual banner
@@ -213,6 +230,9 @@ export default function ProjectDetailClient({
             if (!res.ok) throw new Error('Failed to update task');
 
             router.refresh();
+            const affectedByActiveSuggestion = Boolean(
+                activeHandshake?.affectedTasks.some((task) => task.id === taskId)
+            );
             if (status === 'completed') {
                 toastSuccess(t('task_completed_notice'));
                 void trackUXEvent('task_completed', {
@@ -220,6 +240,12 @@ export default function ProjectDetailClient({
                     projectId: project.id,
                     taskId,
                 });
+                if (affectedByActiveSuggestion) {
+                    void trackSuggestionCompleted({
+                        ...buildSuggestionTelemetryBase(),
+                        taskId,
+                    });
+                }
                 if (!hasCompletedTask) {
                     setHasCompletedTask(true);
                     void trackUXEvent('first_task_completed', {
@@ -228,6 +254,12 @@ export default function ProjectDetailClient({
                         taskId,
                     });
                 }
+            } else if (affectedByActiveSuggestion) {
+                void trackSuggestionSlipped({
+                    ...buildSuggestionTelemetryBase(),
+                    taskId,
+                    reason: 'task_marked_pending',
+                });
             }
             setNotice({
                 type: 'success',
@@ -267,6 +299,15 @@ export default function ProjectDetailClient({
         setPanelMode('chat');
         updatePanelQuery('chat');
         setQuickApplyState({ status: 'running' });
+        const suggestionTelemetryBase = buildSuggestionTelemetryBase();
+        const trimmedPrompt = prompt?.trim() || '';
+        const handshakePrompt = activeHandshake?.prompt?.trim() || '';
+        if (trimmedPrompt && handshakePrompt && trimmedPrompt !== handshakePrompt) {
+            void trackSuggestionEdited({
+                ...suggestionTelemetryBase,
+                editKind: 'prompt_adjusted',
+            });
+        }
         void trackUXEvent('command_handshake_apply_clicked', {
             surface: 'project_detail',
             projectId: project.id,
@@ -286,6 +327,7 @@ export default function ProjectDetailClient({
                 projectId: project.id,
                 applied: true,
             });
+            void trackSuggestionAccepted(suggestionTelemetryBase);
             return result;
         }
 
@@ -308,8 +350,20 @@ export default function ProjectDetailClient({
             applied: false,
             reason: result.reason || 'unknown',
         });
+        const rejectionReason = result.reason || 'unknown';
+        void trackSuggestionRejected({
+            ...suggestionTelemetryBase,
+            reason: rejectionReason,
+        });
+        if (rejectionReason === 'no_plan' || rejectionReason === 'proposal_failed') {
+            void trackSuggestionSlipped({
+                ...suggestionTelemetryBase,
+                taskId: activeHandshake?.affectedTasks[0]?.id || 'unknown',
+                reason: rejectionReason,
+            });
+        }
         return result;
-    }, [project.id, router, t, updatePanelQuery]);
+    }, [activeHandshake, buildSuggestionTelemetryBase, project.id, router, t, updatePanelQuery]);
 
     const handleCommandHandshakeChange = useCallback((handshake: CommandHandshake | null) => {
         setActiveHandshake(handshake);
@@ -319,6 +373,14 @@ export default function ProjectDetailClient({
             projectId: project.id,
             affectedTasks: handshake.affectedTasks.length,
             tone: handshake.riskTone || 'safe',
+        });
+        void trackSuggestionSuggested({
+            suggestionId: handshake.id,
+            suggestionType: 'reschedule_plan',
+            surface: 'project_detail',
+            projectId: project.id,
+            affectedTasks: handshake.affectedTasks.length,
+            riskTone: handshake.riskTone || 'safe',
         });
     }, [project.id]);
 
