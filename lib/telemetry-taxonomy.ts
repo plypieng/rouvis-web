@@ -1,3 +1,5 @@
+import { retentionKpiEventRules } from '@/lib/retention-metric-dictionary';
+
 export type PrimitiveValue = string | number | boolean | null;
 export type TelemetryProperties = Record<string, PrimitiveValue>;
 
@@ -12,23 +14,30 @@ export const suggestionLifecycleEventRules = {
 
 export type SuggestionLifecycleEventName = keyof typeof suggestionLifecycleEventRules;
 
+const telemetryEventRules = {
+  ...suggestionLifecycleEventRules,
+  ...retentionKpiEventRules,
+} as const;
+
+type TelemetryEventName = keyof typeof telemetryEventRules;
+
 function isNonEmptyString(value: PrimitiveValue | undefined): boolean {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
-function isSuggestionLifecycleEventName(event: string): event is SuggestionLifecycleEventName {
-  return Object.prototype.hasOwnProperty.call(suggestionLifecycleEventRules, event);
+function isTelemetryEventName(event: string): event is TelemetryEventName {
+  return Object.prototype.hasOwnProperty.call(telemetryEventRules, event);
 }
 
 export function validateTelemetryEventShape(event: string, properties: TelemetryProperties): {
   valid: boolean;
   error?: string;
 } {
-  if (!isSuggestionLifecycleEventName(event)) {
+  if (!isTelemetryEventName(event)) {
     return { valid: true };
   }
 
-  const requiredKeys = suggestionLifecycleEventRules[event];
+  const requiredKeys = telemetryEventRules[event];
   const missingKeys = requiredKeys.filter((key) => !isNonEmptyString(properties[key]));
   if (missingKeys.length > 0) {
     return {

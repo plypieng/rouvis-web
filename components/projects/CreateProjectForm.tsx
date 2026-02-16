@@ -118,7 +118,9 @@ export default function CreateProjectForm({ locale, initialData }: { locale: str
             const successMessage = t('success');
             setNotice({ type: 'success', message: successMessage });
             toastSuccess(successMessage);
+            const createdProjectId = typeof data?.project?.id === 'string' ? data.project.id : '';
             void trackUXEvent('project_created', {
+                projectId: createdProjectId || null,
                 flow: 'manual_form',
                 hasField: formData.fieldIds.length > 0,
             });

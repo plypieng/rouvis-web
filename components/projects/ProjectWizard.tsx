@@ -606,6 +606,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                 }
                 setCreatedProjectId(projectId);
                 void trackUXEvent('project_created', {
+                    projectId,
                     flow: 'wizard',
                     projectType: projectType || 'new',
                     hasField: selectedFieldIds.length > 0,
@@ -616,6 +617,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
             toastInfo('AIが初回スケジュールを作成しています...');
             const { taskCount, usedFallback, firstPendingTaskId } = await generateAndPersistInitialSchedule(projectId, primaryFieldId);
             void trackUXEvent('schedule_generated', {
+                projectId,
                 flow: 'wizard',
                 taskCount,
                 usedFallback,

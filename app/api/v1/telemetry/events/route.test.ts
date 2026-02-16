@@ -127,4 +127,39 @@ describe('/api/v1/telemetry/events POST', () => {
       }),
     });
   });
+
+  it('rejects KPI events when required retention fields are missing', async () => {
+    const response = await POST(makeRequest({
+      event: 'schedule_generated',
+      properties: {
+        flow: 'wizard',
+      },
+    }));
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload).toMatchObject({
+      error: expect.stringContaining('Missing required telemetry properties'),
+    });
+    expect(auditEventCreateMock).not.toHaveBeenCalled();
+  });
+
+  it('accepts KPI events when retention fields are present', async () => {
+    const response = await POST(makeRequest({
+      event: 'schedule_generated',
+      properties: {
+        projectId: 'project_1',
+        flow: 'wizard',
+        taskCount: 12,
+        usedFallback: false,
+      },
+    }));
+
+    expect(response.status).toBe(204);
+    expect(auditEventCreateMock).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: 'ux.schedule_generated',
+      }),
+    });
+  });
 });

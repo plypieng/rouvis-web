@@ -412,6 +412,7 @@ export default function ProjectAgentOnboarding({
 
             await persistGeneratedTasks(tasks);
             void trackUXEvent('schedule_generated', {
+                projectId,
                 flow: 'project_agent_onboarding',
                 taskCount: tasks.length,
                 usedFallback,
