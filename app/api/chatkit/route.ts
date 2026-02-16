@@ -56,6 +56,32 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    if (body.action === 'chatkit.update_thread') {
+      const threadId = typeof body.threadId === 'string' ? body.threadId : '';
+      if (!threadId) {
+        return new Response(JSON.stringify({ error: 'threadId is required' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      const res = await fetch(`${backendUrl}/api/v1/threads/${threadId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...auth.headers,
+        },
+        body: JSON.stringify(body.payload || {}),
+      });
+      const data = await readJsonSafe<{ thread?: unknown; preferences?: unknown }>(res);
+      return new Response(JSON.stringify({
+        thread: data.thread,
+        preferences: data.preferences,
+      }), {
+        status: res.status,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     if (body.action === 'chatkit.undo') {
       const res = await fetch(`${backendUrl}/api/v1/undo`, {
         method: 'POST',
@@ -82,6 +108,7 @@ export async function POST(req: NextRequest) {
         ...auth.headers,
       },
       body: JSON.stringify({
+        message: typeof body.message === 'string' ? body.message : undefined,
         messages,
         threadId,
         projectId,
@@ -99,6 +126,10 @@ export async function POST(req: NextRequest) {
         highRiskScheduleChange: body.highRiskScheduleChange,
         forceConsensus: body.forceConsensus,
         recallScope: body.recallScope ?? body.memoryRecallScope,
+        assistantLanguage: typeof body.assistantLanguage === 'string' ? body.assistantLanguage : undefined,
+        assistantVerbosity: typeof body.assistantVerbosity === 'string' ? body.assistantVerbosity : undefined,
+        mutationApprovalToken: typeof body.mutationApprovalToken === 'string' ? body.mutationApprovalToken : undefined,
+        allowMutations: body.allowMutations === true,
       }),
     });
 
@@ -174,6 +205,7 @@ export async function POST(req: NextRequest) {
                   data.type === 'custom_ui' ||
                   data.type === 'action_confirmation' ||
                   data.type === 'reasoning_trace' ||
+                  data.type === 'intent_policy' ||
                   data.type === 'diagnosis_result' ||
                   data.type === 'error') {
                   controller.enqueue(encoder.encode(`e:${JSON.stringify(data)}\n`));
@@ -211,12 +243,8 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const threadId = searchParams.get('thread_id');
-
-  if (!threadId) {
-    return new Response(JSON.stringify({ messages: [] }), {
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
+  const intentMetrics = searchParams.get('intent_metrics');
+  const metricsWindow = searchParams.get('window');
 
   const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
   if (!backendUrl) {
@@ -226,15 +254,52 @@ export async function GET(req: NextRequest) {
     });
   }
 
+  let auth;
   try {
-    const auth = await getBackendAuth(req);
-    if (!auth.headers) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
+    auth = await getBackendAuth(req);
+  } catch {
+    auth = { headers: null };
+  }
+
+  if (!auth.headers) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  if (intentMetrics === '1' || intentMetrics === 'true') {
+    const windowParam = metricsWindow === '1h' || metricsWindow === '24h' || metricsWindow === '7d'
+      ? metricsWindow
+      : '24h';
+    try {
+      const res = await fetch(`${backendUrl}/api/v1/agents/scheduler/intent-metrics?window=${windowParam}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...auth.headers,
+        },
+      });
+      const data = await readJsonSafe<Record<string, unknown>>(res);
+      return new Response(JSON.stringify(data), {
+        status: res.status,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load intent metrics';
+      return new Response(JSON.stringify({ error: message }), {
+        status: 500,
         headers: { 'Content-Type': 'application/json' },
       });
     }
+  }
 
+  if (!threadId) {
+    return new Response(JSON.stringify({ messages: [] }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  try {
     const res = await fetch(`${backendUrl}/api/v1/threads/${threadId}`, {
       headers: {
         'Content-Type': 'application/json',
@@ -247,9 +312,13 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const data = await readJsonSafe<{ thread?: { messages?: unknown[] } }>(res);
+    const data = await readJsonSafe<{
+      thread?: { messages?: unknown[] };
+      preferences?: unknown;
+    }>(res);
     return new Response(JSON.stringify({
-      messages: data.thread?.messages || []
+      messages: data.thread?.messages || [],
+      preferences: data.preferences,
     }), {
       headers: { 'Content-Type': 'application/json' },
     });

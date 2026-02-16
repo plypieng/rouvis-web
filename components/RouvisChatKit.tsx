@@ -3,7 +3,7 @@
 import { forwardRef, useImperativeHandle, useRef, useEffect, useState, useCallback } from 'react';
 import { Send, Loader2, RefreshCw, Undo2, Paperclip, X, ArrowRight } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { toastError } from '@/lib/feedback';
 import { trackUXEvent } from '@/lib/analytics';
 import {
@@ -38,6 +38,16 @@ interface ActionConfirmation {
   expiresAt: number;
 }
 
+type AssistantLanguage = 'ja' | 'en';
+type AssistantVerbosity = 'short' | 'balanced' | 'detailed';
+
+interface PendingMutationApproval {
+  token: string;
+  summary: string;
+  action?: string;
+  expiresAt?: string;
+}
+
 interface ThinkingStep {
   id: string;
   tool: string;
@@ -55,6 +65,13 @@ interface Message {
   hasError?: boolean;
   createdAt?: string;
 }
+
+type IntentPolicyDebugState = {
+  responsePolicy: 'casual' | 'assistive' | 'workflow' | 'deep';
+  primaryIntent: string;
+  confidence?: number;
+  clarificationRequired: boolean;
+};
 
 type ChatMemoryRecallScope = 'session' | 'project' | 'user';
 
@@ -158,6 +175,10 @@ function getQuickSuggestions(
   return suggestions.slice(0, 3);
 }
 
+function inferAssistantLanguage(locale: string): AssistantLanguage {
+  return locale.toLowerCase().startsWith('ja') ? 'ja' : 'en';
+}
+
 export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   className,
   projectId,
@@ -181,7 +202,9 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   memoryRecallScope = 'session',
   autoCreateThread = true,
 }, ref) => {
+  const locale = useLocale();
   const t = useTranslations('chat');
+  const defaultAssistantLanguage = inferAssistantLanguage(locale);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState(initialInput || '');
   const [isLoading, setIsLoading] = useState(false);
@@ -196,6 +219,10 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
   const [chatMode, setChatModeState] = useState<ChatMode>('default'); // New state
   const [customSuggestions, setCustomSuggestions] = useState<ChatSuggestion[] | null>(initialSuggestions || null);
+  const [intentPolicyDebug, setIntentPolicyDebug] = useState<IntentPolicyDebugState | null>(null);
+  const [assistantLanguage, setAssistantLanguage] = useState<AssistantLanguage>(defaultAssistantLanguage);
+  const [assistantVerbosity, setAssistantVerbosity] = useState<AssistantVerbosity>('balanced');
+  const [pendingMutationApproval, setPendingMutationApproval] = useState<PendingMutationApproval | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -204,6 +231,10 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   const quickApplyInFlightRef = useRef(false);
   const lastActionTypeRef = useRef<ActionConfirmation['type'] | null>(null);
   const createThreadPromiseRef = useRef<Promise<string | null> | null>(null);
+
+  useEffect(() => {
+    setAssistantLanguage(inferAssistantLanguage(locale));
+  }, [locale]);
 
   const pushArtifact = useCallback((artifact: CommandArtifact | null) => {
     if (!artifact || !standoutMode) return;
@@ -275,6 +306,10 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
               content: string;
               createdAt?: string;
             }>;
+            preferences?: {
+              assistantLanguage?: string;
+              assistantVerbosity?: string;
+            };
           };
           const history: Message[] = (data.messages || []).map((m) => ({
             id: m.id,
@@ -283,6 +318,20 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
             createdAt: m.createdAt,
           }));
           setMessages(history);
+
+          const preferenceLanguage = data.preferences?.assistantLanguage;
+          if (preferenceLanguage === 'ja' || preferenceLanguage === 'en') {
+            setAssistantLanguage(preferenceLanguage);
+          }
+
+          const preferenceVerbosity = data.preferences?.assistantVerbosity;
+          if (
+            preferenceVerbosity === 'short'
+            || preferenceVerbosity === 'balanced'
+            || preferenceVerbosity === 'detailed'
+          ) {
+            setAssistantVerbosity(preferenceVerbosity);
+          }
         }
       } catch (e) {
         console.warn('Failed to load history:', e);
@@ -312,7 +361,13 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   useEffect(() => {
     setCommandArtifacts([]);
     publishHandshake(null);
-  }, [threadId, publishHandshake]);
+    setIntentPolicyDebug(null);
+    setPendingMutationApproval(null);
+    if (!threadId) {
+      setAssistantLanguage(inferAssistantLanguage(locale));
+      setAssistantVerbosity('balanced');
+    }
+  }, [locale, threadId, publishHandshake]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -356,8 +411,18 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     if (nearBottom) setHasUnreadMessages(false);
   }, []);
 
-  const sendMessage = useCallback(async (content: string, overrideMode?: ChatMode) => {
-    if ((!content.trim() && !selectedImage) || isLoading) return;
+  const sendMessage = useCallback(async (
+    content: string,
+    overrideMode?: ChatMode,
+    options?: {
+      mutationApprovalToken?: string;
+      allowMutations?: boolean;
+      skipUserMessage?: boolean;
+    }
+  ) => {
+    const trimmedContent = content.trim();
+    const hasApprovalPayload = Boolean(options?.mutationApprovalToken);
+    if ((!trimmedContent && !selectedImage && !hasApprovalPayload) || isLoading) return;
     let assistantRawContent = '';
     let assistantFailed = false;
     lastAssistantRawRef.current = '';
@@ -366,15 +431,18 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     // Capture image before clearing state
     const currentImageUrl = selectedImage;
 
-    const userMessage: Message = {
-      id: `user-${Date.now()}`,
-      role: 'user',
-      content: content.trim(),
-      imageUrl: currentImageUrl || undefined,
-    };
+    const userMessage: Message | null = options?.skipUserMessage
+      ? null
+      : {
+        id: `user-${Date.now()}`,
+        role: 'user',
+        content: trimmedContent,
+        imageUrl: currentImageUrl || undefined,
+      };
 
-    // Build API messages array BEFORE clearing state
-    const apiMessages = [...messages, userMessage].map(m => ({
+    // Build API messages array BEFORE clearing state.
+    const outboundMessages = userMessage ? [...messages, userMessage] : messages;
+    const apiMessages = outboundMessages.map(m => ({
       role: m.role,
       content: m.imageUrl
         ? [
@@ -384,13 +452,20 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
         : m.content
     }));
 
-    setMessages(prev => [...prev, userMessage]);
+    if (userMessage) {
+      setMessages(prev => [...prev, userMessage]);
+    }
     setInput('');
-    setSelectedImage(null);
+    if (!options?.skipUserMessage) {
+      setSelectedImage(null);
+    }
     setIsLoading(true);
     setCurrentStatus('');
     setIsUserNearBottom(true);
     setHasUnreadMessages(false);
+    if (!options?.mutationApprovalToken) {
+      setPendingMutationApproval(null);
+    }
 
     const assistantId = `assistant-${Date.now()}`;
     const newAssistantMessage: Message = {
@@ -406,10 +481,11 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          message: trimmedContent || undefined,
           messages: apiMessages,
           projectId,
           threadId: resolvedThreadId,
-          mode: overrideMode || chatMode, // Send active mode (prefer override if provided)
+          mode: options?.skipUserMessage ? undefined : (overrideMode || chatMode),
           channel,
           channelKind,
           channelActorId,
@@ -417,6 +493,10 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
           pairingCode,
           mentions,
           recallScope: memoryRecallScope,
+          assistantLanguage,
+          assistantVerbosity,
+          mutationApprovalToken: options?.mutationApprovalToken,
+          allowMutations: options?.allowMutations === true,
         }),
       });
 
@@ -467,6 +547,21 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
             const artifact = createArtifactFromStreamEvent(event);
             pushArtifact(artifact);
 
+            if (event.type === 'intent_policy' && event.data?.responsePolicy) {
+              setIntentPolicyDebug({
+                responsePolicy: event.data.responsePolicy,
+                primaryIntent: event.data.primaryIntent || 'unknown',
+                confidence: typeof event.data.confidence === 'number' ? event.data.confidence : undefined,
+                clarificationRequired: Boolean(event.data.clarificationRequired),
+              });
+              void trackUXEvent('chat_intent_policy', {
+                policy: event.data.responsePolicy,
+                confidence: typeof event.data.confidence === 'number' ? event.data.confidence : null,
+                primaryIntent: event.data.primaryIntent || 'unknown',
+                clarificationRequired: Boolean(event.data.clarificationRequired),
+              });
+            }
+
             // Simple status update (no complex thinking UI)
             if (event.type === 'tool_call_delta' && event.delta?.tool) {
               const statusKey = FRIENDLY_STATUS_KEYS[event.delta.tool];
@@ -513,6 +608,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
                 expiresAt: Date.now() + 30000,
               };
               setActionConfirmations(prev => [...prev, confirmation]);
+              setPendingMutationApproval(null);
               window.setTimeout(() => {
                 setActionConfirmations(prev => prev.filter(c => c.id !== confirmation.id));
               }, Math.max(0, confirmation.expiresAt - Date.now()));
@@ -554,6 +650,25 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
                 }));
                 setCustomSuggestions(mappedOptions);
               }
+              if (event.data.type === 'mutation_confirmation_required' && event.data.token) {
+                setPendingMutationApproval({
+                  token: event.data.token,
+                  summary: event.data.summary || t('cockpit.confirmations.task_updated'),
+                  action: event.data.action,
+                  expiresAt: event.data.expiresAt,
+                });
+              }
+              if (event.data.type === 'diagnosis_retake_required') {
+                setCustomSuggestions([
+                  {
+                    label: assistantLanguage === 'ja' ? '撮り直しのコツを見る' : 'Retake photo tips',
+                    message: assistantLanguage === 'ja'
+                      ? '診断の確信度が低いので、撮り直しのコツを教えてください。'
+                      : 'Confidence is low. Please show photo retake tips for diagnosis.',
+                    mode: 'diagnosis',
+                  },
+                ]);
+              }
               if (event.data.type === 'refresh_tasks') {
                 onTaskUpdate?.();
               }
@@ -564,7 +679,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
 
       const handshake = extractCommandHandshakeFromContent({
         content: assistantRawContent,
-        promptFallback: content.trim() || t('cockpit.reschedule.default_prompt'),
+        promptFallback: trimmedContent || t('cockpit.reschedule.default_prompt'),
         source: 'chat',
       });
       if (handshake) {
@@ -610,6 +725,8 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     channel,
     channelActorId,
     channelKind,
+    assistantLanguage,
+    assistantVerbosity,
     ensureThreadId,
     memoryRecallScope,
     messages,
@@ -628,6 +745,36 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     pushArtifact,
     t,
   ]);
+
+  const submitIntentFeedback = useCallback((feedbackType: 'misroute' | 'language' | 'verbosity') => {
+    if (feedbackType === 'misroute') {
+      void sendMessage('/feedback misroute ui-control', undefined, { skipUserMessage: true });
+      return;
+    }
+
+    if (feedbackType === 'language') {
+      const nextLanguage: AssistantLanguage = assistantLanguage === 'ja' ? 'en' : 'ja';
+      setAssistantLanguage(nextLanguage);
+      void sendMessage(`/feedback language ${nextLanguage}`, undefined, { skipUserMessage: true });
+      return;
+    }
+
+    setAssistantVerbosity('short');
+    void sendMessage('/feedback verbosity short', undefined, { skipUserMessage: true });
+  }, [assistantLanguage, sendMessage]);
+
+  const confirmPendingMutation = useCallback(() => {
+    if (!pendingMutationApproval || isLoading) return;
+    void sendMessage('', undefined, {
+      skipUserMessage: true,
+      mutationApprovalToken: pendingMutationApproval.token,
+      allowMutations: true,
+    });
+  }, [isLoading, pendingMutationApproval, sendMessage]);
+
+  const cancelPendingMutation = useCallback(() => {
+    setPendingMutationApproval(null);
+  }, []);
 
   const runRescheduleQuickApply = useCallback(async (
     options: { prompt: string; confirmMessage?: string }
@@ -754,6 +901,8 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
       : activeHandshake?.riskTone === 'watch'
         ? 'status-watch'
         : 'status-safe';
+  const showIntentDebug = process.env.NEXT_PUBLIC_CHAT_INTENT_DEBUG === '1'
+    || process.env.NEXT_PUBLIC_CHAT_INTENT_DEBUG === 'true';
 
   return (
     <div className={`surface-base flex flex-col h-full ${className}`} data-testid="chat-container">
@@ -848,6 +997,44 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
           <p className="text-sm text-muted-foreground animate-pulse pl-1" data-testid="streaming-indicator">
             {currentStatus}
           </p>
+        )}
+
+        {showIntentDebug && intentPolicyDebug && (
+          <div className="pl-1 text-[11px] text-muted-foreground space-y-1" data-testid="intent-policy-debug">
+            <span className="block">
+              policy={intentPolicyDebug.responsePolicy} intent={intentPolicyDebug.primaryIntent}
+              {typeof intentPolicyDebug.confidence === 'number'
+                ? ` confidence=${Math.round(intentPolicyDebug.confidence * 100)}%`
+                : ''}
+              {intentPolicyDebug.clarificationRequired ? ' clarify=true' : ''}
+            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                className="underline hover:no-underline"
+                disabled={isLoading}
+                onClick={() => submitIntentFeedback('misroute')}
+              >
+                wrong intent
+              </button>
+              <button
+                type="button"
+                className="underline hover:no-underline"
+                disabled={isLoading}
+                onClick={() => submitIntentFeedback('language')}
+              >
+                {assistantLanguage === 'ja' ? 'switch to English' : '日本語に切替'}
+              </button>
+              <button
+                type="button"
+                className="underline hover:no-underline"
+                disabled={isLoading}
+                onClick={() => submitIntentFeedback('verbosity')}
+              >
+                too long
+              </button>
+            </div>
+          </div>
         )}
 
         {standoutMode && (activeHandshake || commandArtifacts.length > 0) && (
@@ -955,6 +1142,64 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
 
       {/* Input Area */}
       <div className={`border-t border-border ${chatMode !== 'default' ? modeConfig.bg : ''}`}>
+        {messages.length > 0 && (
+          <div className="px-4 pt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={() => submitIntentFeedback('misroute')}
+              className="rounded-full border border-border/70 px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-50"
+            >
+              {assistantLanguage === 'ja' ? '意図が違う' : 'Wrong intent'}
+            </button>
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={() => submitIntentFeedback('language')}
+              className="rounded-full border border-border/70 px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-50"
+            >
+              {assistantLanguage === 'ja' ? '英語で返答' : 'Reply in Japanese'}
+            </button>
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={() => submitIntentFeedback('verbosity')}
+              className="rounded-full border border-border/70 px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-50"
+            >
+              {assistantLanguage === 'ja' ? '短くして' : 'Too long'}
+            </button>
+          </div>
+        )}
+
+        {pendingMutationApproval && (
+          <div className="px-4 pt-3">
+            <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-sm text-amber-900">
+              <p className="font-semibold">
+                {assistantLanguage === 'ja' ? '変更内容の承認が必要です' : 'Approval required before applying change'}
+              </p>
+              <p className="mt-1 text-xs">{pendingMutationApproval.summary}</p>
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                  disabled={isLoading}
+                  onClick={confirmPendingMutation}
+                >
+                  {assistantLanguage === 'ja' ? '適用する' : 'Apply'}
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md border border-amber-400 px-3 py-1.5 text-xs font-semibold"
+                  disabled={isLoading}
+                  onClick={cancelPendingMutation}
+                >
+                  {assistantLanguage === 'ja' ? 'キャンセル' : 'Cancel'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Action Confirmations (simplified) */}
         {actionConfirmations.length > 0 && (
           <div className="px-4 pt-3 space-y-2">

@@ -4,7 +4,12 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { ErrorBoundary } from '../../../components/ErrorBoundary';
-import { RouvisChatKit, type ChatMode, type ChatSuggestion } from '../../../components/RouvisChatKit';
+import {
+  RouvisChatKit,
+  type ChatMode,
+  type ChatSuggestion,
+  type RouvisChatKitRef,
+} from '../../../components/RouvisChatKit';
 import { DiagnosisReport, type DiagnosisResult } from '../../../components/DiagnosisReport';
 import { trackUXEvent } from '@/lib/analytics';
 import type { CommandHandshake } from '@/types/project-cockpit';
@@ -18,6 +23,25 @@ type Thread = {
 
 type ThreadMode = 'default' | 'reschedule' | 'diagnosis' | 'logging';
 type ThreadTone = 'safe' | 'watch' | 'warning' | 'critical';
+type IntentMetricsWindow = '1h' | '24h' | '7d';
+
+type IntentMetricsSnapshot = {
+  totals?: {
+    detected?: number;
+    clarificationPrompted?: number;
+    recovered?: number;
+    misrouteFeedback?: number;
+  };
+  rates?: {
+    misrouteRate?: number;
+    clarificationRate?: number;
+    recoveryRate?: number;
+  };
+  policyLatency?: {
+    workflow?: { p95LatencyMs?: number | null };
+    deep?: { p95LatencyMs?: number | null };
+  };
+};
 
 const THREAD_MODE_TONE: Record<ThreadMode, ThreadTone> = {
   default: 'safe',
@@ -149,8 +173,11 @@ export default function ChatPage() {
   const [threadReloadToken, setThreadReloadToken] = useState(0);
   const [diagnosisResult, setDiagnosisResult] = useState<DiagnosisResult | null>(null);
   const [activeHandshake, setActiveHandshake] = useState<CommandHandshake | null>(null);
+  const [intentMetrics, setIntentMetrics] = useState<IntentMetricsSnapshot | null>(null);
+  const [metricsWindow, setMetricsWindow] = useState<IntentMetricsWindow>('24h');
   const contextThreadSeedRef = useRef<string>('');
   const contextOpenEventRef = useRef<string>('');
+  const chatKitRef = useRef<RouvisChatKitRef | null>(null);
 
   const contextProjectId = searchParams.get('projectId') || undefined;
   const contextPrompt = searchParams.get('prompt');
@@ -186,6 +213,10 @@ export default function ChatPage() {
     return threads.filter((thread) => (thread.title || '').toLowerCase().includes(query));
   }, [threadQuery, threads]);
 
+  const misrouteRatePercent = Math.round(((intentMetrics?.rates?.misrouteRate || 0) * 1000)) / 10;
+  const clarificationRatePercent = Math.round(((intentMetrics?.rates?.clarificationRate || 0) * 1000)) / 10;
+  const workflowP95Latency = intentMetrics?.policyLatency?.workflow?.p95LatencyMs;
+
   const handleThreadSelect = useCallback((threadId: string) => {
     setSelectedThreadId(threadId);
     setIsSidebarOpen(false);
@@ -201,6 +232,17 @@ export default function ChatPage() {
       hasProject: Boolean(contextProjectId),
     });
   }, [contextDate, contextIntent, contextProjectId, contextPrompt]);
+
+  const handleDiagnosisRetake = useCallback((prompt?: string) => {
+    const retryPrompt = prompt || (
+      locale === 'ja'
+        ? '写真を撮り直したので、もう一度診断してください。'
+        : 'I retook the photo. Please diagnose it again.'
+    );
+    setDiagnosisResult(null);
+    chatKitRef.current?.setChatMode('diagnosis');
+    void chatKitRef.current?.sendMessage(retryPrompt, 'diagnosis');
+  }, [locale]);
 
   useEffect(() => {
     if (hasContextEntry) {
@@ -323,6 +365,32 @@ export default function ChatPage() {
     t,
     threadReloadToken,
   ]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadMetrics = async () => {
+      try {
+        const res = await fetch(`/api/chatkit?intent_metrics=1&window=${metricsWindow}`);
+        if (!res.ok) return;
+        const data = (await res.json()) as IntentMetricsSnapshot;
+        if (!cancelled) {
+          setIntentMetrics(data);
+        }
+      } catch (error) {
+        console.warn('Failed to load intent metrics', error);
+      }
+    };
+
+    void loadMetrics();
+    const interval = window.setInterval(() => {
+      void loadMetrics();
+    }, 60_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [metricsWindow]);
 
   const handleNewChat = async () => {
     try {
@@ -468,6 +536,30 @@ export default function ChatPage() {
                       className="w-full bg-transparent py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none"
                     />
                   </div>
+
+                  <div className="mt-2 rounded-lg border border-border/70 bg-card/60 p-2">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <p className="text-[11px] font-semibold text-foreground">Intent Health</p>
+                      <div className="flex items-center gap-1">
+                        {(['1h', '24h', '7d'] as IntentMetricsWindow[]).map((windowKey) => (
+                          <button
+                            key={windowKey}
+                            type="button"
+                            onClick={() => setMetricsWindow(windowKey)}
+                            className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${metricsWindow === windowKey ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground'}`}
+                          >
+                            {windowKey}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1 text-[10px] text-muted-foreground">
+                      <span>Misroute {misrouteRatePercent}%</span>
+                      <span>Clarify {clarificationRatePercent}%</span>
+                      <span>Detected {intentMetrics?.totals?.detected || 0}</span>
+                      <span>Workflow p95 {typeof workflowP95Latency === 'number' ? `${workflowP95Latency}ms` : '-'}</span>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="mobile-scroll flex-1 space-y-2 overflow-y-auto p-3">
@@ -518,6 +610,7 @@ export default function ChatPage() {
 
               <section className="surface-raised min-h-0 overflow-hidden">
                 <RouvisChatKit
+                  ref={chatKitRef}
                   key={`${selectedThreadId || 'new'}:${contextProjectId || 'none'}:${contextEntryKey}`}
                   initialThreadId={selectedThreadId}
                   projectId={contextProjectId}
@@ -538,6 +631,7 @@ export default function ChatPage() {
                 <DiagnosisReport
                   result={diagnosisResult}
                   onClose={() => setDiagnosisResult(null)}
+                  onRetake={handleDiagnosisRetake}
                 />
               </div>
             ) : null}

@@ -27,7 +27,21 @@ export type ChatkitEvent = {
   toolName?: string;
   error?: { message?: string; code?: string };
   result?: unknown;
-  data?: { type?: string; options?: Array<{ label?: string; value?: string }> };
+  data?: {
+    type?: string;
+    options?: Array<{ label?: string; value?: string }>;
+    token?: string;
+    summary?: string;
+    expiresAt?: string;
+    action?: string;
+    guidance?: string[];
+    severity?: 'low' | 'medium' | 'high';
+    responsePolicy?: 'casual' | 'assistive' | 'workflow' | 'deep';
+    primaryIntent?: string;
+    confidence?: number;
+    clarificationRequired?: boolean;
+    reason?: string;
+  };
 };
 
 function buildId(prefix: string): string {
@@ -187,6 +201,25 @@ export function createArtifactFromStreamEvent(event: ChatkitEvent): CommandArtif
       createdAt: new Date().toISOString(),
       metadata: {
         options: event.data.options || [],
+      },
+    };
+  }
+
+  if (eventType === 'intent_policy' && event.data?.responsePolicy) {
+    const tone: CommandRiskTone = event.data.responsePolicy === 'workflow' || event.data.responsePolicy === 'deep'
+      ? 'watch'
+      : 'safe';
+    return {
+      id: buildId('artifact'),
+      kind: 'status',
+      title: 'Intent Policy',
+      description: event.data.responsePolicy,
+      detail: event.data.primaryIntent || event.data.reason,
+      tone,
+      createdAt: new Date().toISOString(),
+      metadata: {
+        confidence: event.data.confidence,
+        clarificationRequired: event.data.clarificationRequired,
       },
     };
   }

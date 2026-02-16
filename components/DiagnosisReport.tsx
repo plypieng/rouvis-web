@@ -18,14 +18,18 @@ export interface DiagnosisResult {
     description: string;
     actions: DiagnosisAction[];
     timestamp: string;
+    needsRetake?: boolean;
+    retakeGuidance?: string[];
+    retakePrompt?: string;
 }
 
 interface DiagnosisReportProps {
     result: DiagnosisResult;
     onClose: () => void;
+    onRetake?: (prompt?: string) => void;
 }
 
-export function DiagnosisReport({ result, onClose }: DiagnosisReportProps) {
+export function DiagnosisReport({ result, onClose, onRetake }: DiagnosisReportProps) {
     const getSeverityColor = (s: string) => {
         switch (s) {
             case 'high': return 'text-red-600 bg-red-50 border-red-100';
@@ -42,6 +46,8 @@ export function DiagnosisReport({ result, onClose }: DiagnosisReportProps) {
             default: return <Info className="w-5 h-5 text-gray-500" />;
         }
     };
+
+    const needsRetake = Boolean(result.needsRetake) || result.confidence < 65;
 
     return (
         <div className="h-full flex flex-col bg-white border-l border-gray-200 shadow-xl overflow-hidden w-full md:w-[400px] lg:w-[450px]">
@@ -87,6 +93,31 @@ export function DiagnosisReport({ result, onClose }: DiagnosisReportProps) {
                         </div>
                     </div>
                 </div>
+
+                {needsRetake && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                        <p className="text-sm font-semibold text-amber-900">再撮影をおすすめします</p>
+                        <p className="mt-1 text-xs text-amber-800">
+                            判定の確信度が低いため、別角度・近接・葉裏を含む写真を追加すると精度が上がります。
+                        </p>
+                        {result.retakeGuidance && result.retakeGuidance.length > 0 ? (
+                            <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-amber-900">
+                                {result.retakeGuidance.map((tip, idx) => (
+                                    <li key={idx}>{tip}</li>
+                                ))}
+                            </ul>
+                        ) : null}
+                        {onRetake ? (
+                            <button
+                                type="button"
+                                onClick={() => onRetake(result.retakePrompt)}
+                                className="mt-3 rounded-md bg-amber-600 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-700"
+                            >
+                                撮り直して再診断
+                            </button>
+                        ) : null}
+                    </div>
+                )}
 
                 {/* Stats Grid */}
                 <div className="grid grid-cols-2 gap-4">
