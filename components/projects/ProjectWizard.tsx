@@ -64,6 +64,19 @@ type NoticeState = {
     message: string;
 } | null;
 
+type ApiErrorPayload = {
+    code?: string;
+    message?: string;
+    error?: string;
+    details?: unknown;
+};
+
+type ParsedApiError = {
+    message: string;
+    code?: string;
+    upgradeHint?: string;
+};
+
 type PreferenceTemplate = {
     id: string;
     label: string;
@@ -161,9 +174,27 @@ export default function ProjectWizard({ locale }: { locale: string }) {
     const [projectType, setProjectType] = useState<'new' | 'existing' | null>(null);
     const [plantingDate, setPlantingDate] = useState<string | null>(null);
 
+    const extractApiError = async (response: Response, fallback: string): Promise<ParsedApiError> => {
+        const payload = await response.json().catch(() => ({})) as ApiErrorPayload;
+        const details = payload.details && typeof payload.details === 'object' && !Array.isArray(payload.details)
+            ? payload.details as Record<string, unknown>
+            : null;
+        const upgradeHint = typeof details?.upgradeHint === 'string' ? details.upgradeHint : undefined;
+        const code = typeof payload.code === 'string' ? payload.code : undefined;
+        const defaultMessage = code === 'ENTITLEMENT_REQUIRED'
+            ? upgradeHint || payload.message || payload.error || fallback
+            : payload.error || payload.message || (typeof payload.details === 'string' ? payload.details : fallback);
+
+        return {
+            message: defaultMessage,
+            code,
+            upgradeHint,
+        };
+    };
+
     const extractErrorMessage = async (response: Response, fallback: string): Promise<string> => {
-        const payload = await response.json().catch(() => ({}));
-        return payload?.error || payload?.message || payload?.details || fallback;
+        const parsed = await extractApiError(response, fallback);
+        return parsed.message;
     };
 
     const applyTemplateCatalog = (catalog: PreferenceTemplateCatalog): void => {
@@ -596,7 +627,14 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                 });
 
                 if (!createResponse.ok) {
-                    throw new Error(await extractErrorMessage(createResponse, 'プロジェクトの作成に失敗しました'));
+                    const parsedError = await extractApiError(createResponse, 'プロジェクトの作成に失敗しました');
+                    const error = new Error(parsedError.message) as Error & {
+                        apiCode?: string;
+                        upgradeHint?: string;
+                    };
+                    error.apiCode = parsedError.code;
+                    error.upgradeHint = parsedError.upgradeHint;
+                    throw error;
                 }
 
                 const { project } = await createResponse.json();
@@ -659,6 +697,19 @@ export default function ProjectWizard({ locale }: { locale: string }) {
             router.push(`/${locale}?${activationParams.toString()}`);
         } catch (error) {
             console.error('Project creation error:', error);
+            const apiCode = typeof error === 'object'
+                && error !== null
+                && 'apiCode' in error
+                && typeof (error as { apiCode?: unknown }).apiCode === 'string'
+                ? (error as { apiCode: string }).apiCode
+                : undefined;
+            const upgradeHint = typeof error === 'object'
+                && error !== null
+                && 'upgradeHint' in error
+                && typeof (error as { upgradeHint?: unknown }).upgradeHint === 'string'
+                ? (error as { upgradeHint: string }).upgradeHint
+                : undefined;
+            const isUpgradeRequired = apiCode === 'ENTITLEMENT_REQUIRED';
             const message = error instanceof Error
                 ? error.message
                 : 'プロジェクトまたは初回スケジュールの作成に失敗しました';
@@ -671,11 +722,18 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                 step: 'create_or_schedule',
             });
             toastError(message, {
-                label: '再試行',
+                label: isUpgradeRequired ? 'プランを確認' : '再試行',
                 onClick: () => {
+                    if (isUpgradeRequired) {
+                        router.push(`/${locale}/account`);
+                        return;
+                    }
                     void handleCreateProject();
                 },
             });
+            if (isUpgradeRequired && upgradeHint && upgradeHint !== message) {
+                toastInfo(upgradeHint);
+            }
         } finally {
             setLoading(false);
         }

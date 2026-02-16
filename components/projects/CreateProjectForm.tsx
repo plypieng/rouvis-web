@@ -27,6 +27,18 @@ type NoticeState = {
     onAction?: () => void;
 } | null;
 
+type ApiErrorPayload = {
+    code?: string;
+    message?: string;
+    error?: string;
+    details?: unknown;
+};
+
+type ParsedCreateProjectError = {
+    message: string;
+    isUpgradeRequired: boolean;
+};
+
 export default function CreateProjectForm({ locale, initialData }: { locale: string; initialData?: InitialProjectData }) {
     const t = useTranslations('projects.create');
     const router = useRouter();
@@ -45,6 +57,24 @@ export default function CreateProjectForm({ locale, initialData }: { locale: str
             : (initialData?.fieldId ? [initialData.fieldId] : []),
         primaryFieldId: initialData?.primaryFieldId || initialData?.fieldId || '',
     });
+
+    const parseCreateProjectError = async (response: Response): Promise<ParsedCreateProjectError> => {
+        const fallbackMessage = t('error');
+        const payload = await response.json().catch(() => ({})) as ApiErrorPayload;
+        const details = payload.details && typeof payload.details === 'object' && !Array.isArray(payload.details)
+            ? payload.details as Record<string, unknown>
+            : null;
+        const upgradeHint = typeof details?.upgradeHint === 'string' ? details.upgradeHint : null;
+        const isUpgradeRequired = payload.code === 'ENTITLEMENT_REQUIRED';
+        const message = isUpgradeRequired
+            ? (upgradeHint || payload.message || fallbackMessage)
+            : (payload.message || payload.error || fallbackMessage);
+
+        return {
+            message,
+            isUpgradeRequired,
+        };
+    };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -111,7 +141,10 @@ export default function CreateProjectForm({ locale, initialData }: { locale: str
             });
 
             if (!res.ok) {
-                throw new Error('Failed to create project');
+                const parsedError = await parseCreateProjectError(res);
+                const error = new Error(parsedError.message) as Error & { isUpgradeRequired?: boolean };
+                error.isUpgradeRequired = parsedError.isUpgradeRequired;
+                throw error;
             }
 
             const data = await res.json();
@@ -128,19 +161,34 @@ export default function CreateProjectForm({ locale, initialData }: { locale: str
             router.refresh();
         } catch (error) {
             console.error('Error creating project:', error);
-            const message = t('error');
+            const isUpgradeRequired = typeof error === 'object'
+                && error !== null
+                && 'isUpgradeRequired' in error
+                && Boolean((error as { isUpgradeRequired?: boolean }).isUpgradeRequired);
+            const message = error instanceof Error && error.message
+                ? error.message
+                : t('error');
+            const actionLabel = isUpgradeRequired ? 'プランを確認' : '再試行';
             setNotice({
                 type: 'error',
                 message,
-                actionLabel: '再試行',
+                actionLabel,
                 onAction: () => {
+                    if (isUpgradeRequired) {
+                        router.push(`/${locale}/account`);
+                        return;
+                    }
                     const form = document.getElementById('create-project-form') as HTMLFormElement | null;
                     form?.requestSubmit();
                 },
             });
             toastError(message, {
-                label: '再試行',
+                label: actionLabel,
                 onClick: () => {
+                    if (isUpgradeRequired) {
+                        router.push(`/${locale}/account`);
+                        return;
+                    }
                     const form = document.getElementById('create-project-form') as HTMLFormElement | null;
                     form?.requestSubmit();
                 },
