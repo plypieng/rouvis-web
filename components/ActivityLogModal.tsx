@@ -22,7 +22,7 @@ interface ActivityLogModalProps {
     unit?: string;
     note?: string;
     performedAt?: string;
-  }) => Promise<void>;
+  }) => Promise<{ queued?: boolean } | void>;
   initialFieldId?: string;
   autoStartVoice?: boolean;
   locale?: string;
@@ -170,7 +170,7 @@ export function ActivityLogModal({
     setSaving(true);
     setErrorMessage(null);
     try {
-      await onSave({
+      const saveResult = await onSave({
         fieldId: formData.fieldId || undefined,
         type: formData.type,
         quantity: formData.quantity ? parseFloat(formData.quantity) : undefined,
@@ -190,7 +190,13 @@ export function ActivityLogModal({
       });
 
       onClose();
-      toastSuccess('活動を保存しました。');
+      if (saveResult && saveResult.queued) {
+        toastSuccess(locale === 'en'
+          ? 'Saved offline. It will sync automatically when you are back online.'
+          : 'オフラインで保存しました。オンライン復帰時に自動同期します。');
+      } else {
+        toastSuccess('活動を保存しました。');
+      }
       if (voiceTranscript) {
         void trackUXEvent('records_voice_input_submit_from_voice', {
           hasTranscript: true,

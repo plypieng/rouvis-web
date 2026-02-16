@@ -19,8 +19,9 @@ interface TaskSchedulerModalProps {
     dueAt: string;
     fieldId?: string;
     notes?: string;
-  }) => Promise<void>;
+  }) => Promise<{ queued?: boolean } | void>;
   initialFieldId?: string;
+  locale?: string;
 }
 
 const PRIORITY_LEVELS = [
@@ -36,6 +37,7 @@ export function TaskSchedulerModal({
   onClose,
   onSave,
   initialFieldId,
+  locale = 'ja',
 }: TaskSchedulerModalProps) {
   const [fields, setFields] = useState<Field[]>([]);
   const [loading, setLoading] = useState(false);
@@ -111,7 +113,7 @@ export function TaskSchedulerModal({
     setSaving(true);
     setErrorMessage(null);
     try {
-      await onSave({
+      const saveResult = await onSave({
         title: formData.title.trim(),
         dueAt: formData.dueAt,
         fieldId: formData.fieldId || undefined,
@@ -129,7 +131,13 @@ export function TaskSchedulerModal({
       setErrors({});
 
       onClose();
-      toastSuccess('タスクを保存しました。');
+      if (saveResult && saveResult.queued) {
+        toastSuccess(locale === 'en'
+          ? 'Task queued offline. It will sync automatically when online.'
+          : 'タスクをオフラインで保存しました。オンライン復帰時に自動同期します。');
+      } else {
+        toastSuccess('タスクを保存しました。');
+      }
     } catch (error) {
       console.error('Failed to save task:', error);
       const message = error instanceof Error ? error.message : 'タスクの保存に失敗しました';
