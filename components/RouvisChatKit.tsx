@@ -236,6 +236,11 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     setAssistantLanguage(inferAssistantLanguage(locale));
   }, [locale]);
 
+  useEffect(() => {
+    if (!initialThreadId) return;
+    setThreadId(initialThreadId);
+  }, [initialThreadId]);
+
   const pushArtifact = useCallback((artifact: CommandArtifact | null) => {
     if (!artifact || !standoutMode) return;
     setCommandArtifacts(prev => [...prev.slice(-14), artifact]);
@@ -286,15 +291,43 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     return createdThreadId || undefined;
   }, [autoCreateThread, projectId, threadId]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadLatestThread = async () => {
+      if (threadId) return;
+
+      try {
+        const listThreadsPayload = projectId
+          ? { action: 'chatkit.list_threads', payload: { projectId } }
+          : { action: 'chatkit.list_threads' };
+        const res = await fetch('/api/chatkit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(listThreadsPayload),
+        });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => ({})) as { threads?: Array<{ id?: string }> };
+        const latestThreadId = typeof data.threads?.[0]?.id === 'string' ? data.threads[0].id : undefined;
+        if (!cancelled && latestThreadId) {
+          setThreadId(latestThreadId);
+        }
+      } catch (error) {
+        console.warn('Failed to load latest thread:', error);
+      }
+    };
+
+    void loadLatestThread();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, threadId]);
+
   // Load chat history on mount
   useEffect(() => {
     const loadHistory = async () => {
-      if (!threadId) {
-        if (projectId && autoCreateThread) {
-          await ensureThreadId();
-        }
-        return;
-      }
+      if (!threadId) return;
 
       try {
         const res = await fetch(`/api/chatkit?thread_id=${threadId}`);
@@ -338,8 +371,8 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
       }
     };
 
-    loadHistory();
-  }, [autoCreateThread, ensureThreadId, projectId, threadId]);
+    void loadHistory();
+  }, [threadId]);
 
   useEffect(() => {
     if (!initialMode) return;
@@ -348,15 +381,13 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
 
   useEffect(() => {
     if (!initialInput) return;
-    if (messages.length > 0) return;
-    setInput(initialInput);
-  }, [initialInput, messages.length]);
+    setInput(prev => (prev.length > 0 ? prev : initialInput));
+  }, [initialInput]);
 
   useEffect(() => {
     if (!initialSuggestions || initialSuggestions.length === 0) return;
-    if (messages.length > 0) return;
     setCustomSuggestions(initialSuggestions);
-  }, [initialSuggestions, messages.length]);
+  }, [initialSuggestions]);
 
   useEffect(() => {
     setCommandArtifacts([]);

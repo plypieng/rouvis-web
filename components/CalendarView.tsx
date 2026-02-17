@@ -578,7 +578,6 @@ export function CalendarView({
       intent: 'calendar',
       date: selectedDateKey,
       prompt,
-      fresh: '1',
     });
 
     return `/${locale}/chat?${query.toString()}`;

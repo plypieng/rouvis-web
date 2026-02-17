@@ -193,7 +193,6 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
     const emptyProjectsChatHref = `/${locale}/chat?${new URLSearchParams({
         intent: 'project',
         prompt: 'まだプロジェクトがありません。最初のプロジェクト候補と今日の一歩を提案して',
-        fresh: '1',
     }).toString()}`;
 
     if (loading) {
@@ -293,7 +292,6 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
                             intent: 'project',
                             projectId: project.id,
                             prompt: `${project.name}の今週の優先作業を整理して`,
-                            fresh: '1',
                         }).toString()}`;
                         return (
                             <div key={project.id} className="relative h-full">

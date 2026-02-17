@@ -78,6 +78,73 @@ describe('/api/chatkit POST', () => {
     });
   });
 
+  it('forwards chatkit.list_threads project scope with projectId query', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({
+      threads: [{ id: 'thread-proj-1' }],
+    }), {
+      status: 200,
+      headers: {
+        'content-type': 'application/json',
+        'x-request-id': 'upstream-threads-1',
+      },
+    }));
+
+    const response = await POST(makeRequest('req-chatkit-threads-1', {
+      action: 'chatkit.list_threads',
+      payload: { projectId: 'project-123' },
+    }));
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://backend.local/api/v1/threads?projectId=project-123',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer token',
+        }),
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get('x-request-id')).toBe('upstream-threads-1');
+    const payload = await response.json();
+    expect(payload).toMatchObject({
+      threads: [{ id: 'thread-proj-1' }],
+    });
+  });
+
+  it('forwards chatkit.list_threads without payload to global list endpoint', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({
+      threads: [{ id: 'thread-global-1' }],
+    }), {
+      status: 200,
+      headers: {
+        'content-type': 'application/json',
+        'x-request-id': 'upstream-threads-2',
+      },
+    }));
+
+    const response = await POST(makeRequest('req-chatkit-threads-2', {
+      action: 'chatkit.list_threads',
+    }));
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://backend.local/api/v1/threads',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer token',
+        }),
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get('x-request-id')).toBe('upstream-threads-2');
+    const payload = await response.json();
+    expect(payload).toMatchObject({
+      threads: [{ id: 'thread-global-1' }],
+    });
+  });
+
   it('maps upstream structured errors into chatkit standard envelope', async () => {
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({
       code: 'VALIDATION_ERROR',

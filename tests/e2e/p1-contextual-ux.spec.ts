@@ -71,10 +71,11 @@ test.describe('P1 contextual UX regression', () => {
     const aiLink = page.getByTestId('projects-empty-ai-link');
     await expect(aiLink).toBeVisible();
     await expect(aiLink).toHaveAttribute('href', /intent=project/);
-    await expect(aiLink).toHaveAttribute('href', /fresh=1/);
+    const href = await aiLink.getAttribute('href');
+    expect(href || '').not.toContain('fresh=1');
   });
 
-  test('creates a fresh thread for contextual chat entry', async ({ page }) => {
+  test('reuses the latest thread for contextual chat entry by default', async ({ page }) => {
     let threads = [
       {
         id: 'base-thread',
@@ -84,6 +85,7 @@ test.describe('P1 contextual UX regression', () => {
       },
     ];
     let threadCounter = 1;
+    let createThreadCalls = 0;
 
     await page.route('**/api/chatkit', async (route) => {
       const request = route.request();
@@ -97,7 +99,7 @@ test.describe('P1 contextual UX regression', () => {
         return;
       }
 
-      const payload = request.postDataJSON() as { action?: string; payload?: { title?: string } };
+      const payload = request.postDataJSON() as { action?: string; payload?: { title?: string; projectId?: string } };
       if (payload.action === 'chatkit.list_threads') {
         await route.fulfill({
           status: 200,
@@ -108,6 +110,82 @@ test.describe('P1 contextual UX regression', () => {
       }
 
       if (payload.action === 'chatkit.create_thread') {
+        createThreadCalls += 1;
+        const thread = {
+          id: `ctx-thread-${threadCounter++}`,
+          title: payload.payload?.title || 'Context Chat',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        threads = [thread, ...threads];
+
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ thread }),
+        });
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({}),
+      });
+    });
+
+    const contextUrl = `/ja/chat?intent=today&prompt=${encodeURIComponent('今日やるべき作業を優先順位つきで3つに整理して')}`;
+
+    await page.goto(contextUrl);
+    await expect(page.getByText('今日の優先3つ')).toBeVisible();
+
+    const threadItems = page.getByTestId('chat-thread-item');
+    await expect.poll(async () => threadItems.count()).toBe(1);
+    expect(createThreadCalls).toBe(0);
+
+    await page.goto(contextUrl);
+    await expect(page.getByText('今日の優先3つ')).toBeVisible();
+
+    await expect.poll(async () => threadItems.count()).toBe(1);
+    expect(createThreadCalls).toBe(0);
+  });
+
+  test('creates a fresh thread for contextual chat entry when fresh=1 is explicit', async ({ page }) => {
+    let threads = [
+      {
+        id: 'base-thread',
+        title: 'Existing Thread',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ];
+    let threadCounter = 1;
+    let createThreadCalls = 0;
+
+    await page.route('**/api/chatkit', async (route) => {
+      const request = route.request();
+
+      if (request.method() === 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ messages: [] }),
+        });
+        return;
+      }
+
+      const payload = request.postDataJSON() as { action?: string; payload?: { title?: string; projectId?: string } };
+      if (payload.action === 'chatkit.list_threads') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ threads }),
+        });
+        return;
+      }
+
+      if (payload.action === 'chatkit.create_thread') {
+        createThreadCalls += 1;
         const thread = {
           id: `ctx-thread-${threadCounter++}`,
           title: payload.payload?.title || 'Context Chat',
@@ -143,6 +221,7 @@ test.describe('P1 contextual UX regression', () => {
     await expect(page.getByText('今日の優先3つ')).toBeVisible();
 
     await expect.poll(async () => threadItems.count()).toBeGreaterThan(firstVisitCount);
+    expect(createThreadCalls).toBe(2);
   });
 
   test('shows dashboard inline warning and tracks retry click', async ({ page }) => {

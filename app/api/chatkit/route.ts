@@ -75,7 +75,15 @@ export async function POST(req: NextRequest) {
 
     // Handle special chatkit actions
     if (body.action === 'chatkit.list_threads') {
-      const res = await fetch(`${backendUrl}/api/v1/threads`, {
+      const scopedProjectId = typeof body?.payload?.projectId === 'string'
+        ? body.payload.projectId.trim()
+        : '';
+      const threadsUrl = new URL(`${backendUrl}/api/v1/threads`);
+      if (scopedProjectId) {
+        threadsUrl.searchParams.set('projectId', scopedProjectId);
+      }
+
+      const res = await fetch(threadsUrl.toString(), {
         headers: {
           'Content-Type': 'application/json',
           ...auth.headers,

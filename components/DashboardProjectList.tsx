@@ -158,7 +158,6 @@ function buildTodayChatHref(locale: string, prompt: string): string {
     const query = new URLSearchParams({
         intent: 'today',
         prompt,
-        fresh: '1',
     });
     return `/${locale}/chat?${query.toString()}`;
 }
@@ -448,7 +447,6 @@ export default async function DashboardProjectList({
     const emptyProjectsChatHref = `/${locale}/chat?${new URLSearchParams({
         intent: 'project',
         prompt: t('chat_prompts.first_project'),
-        fresh: '1',
     }).toString()}`;
 
     const now = new Date();

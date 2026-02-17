@@ -60,7 +60,6 @@ function buildTodayChatHref(locale: string, prompt: string): string {
   const query = new URLSearchParams({
     intent: 'today',
     prompt,
-    fresh: '1',
   });
   return `/${locale}/chat?${query.toString()}`;
 }

@@ -276,10 +276,16 @@ export default function ChatPage() {
     const loadThreads = async () => {
       try {
         setThreadLoadError(null);
+        const listThreadsBody = contextProjectId
+          ? {
+            action: 'chatkit.list_threads',
+            payload: { projectId: contextProjectId },
+          }
+          : { action: 'chatkit.list_threads' };
         const res = await fetch('/api/chatkit', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'chatkit.list_threads' })
+          body: JSON.stringify(listThreadsBody)
         });
         if (!res.ok) {
           throw new Error(`chatkit.list_threads failed (${res.status})`);
@@ -291,43 +297,57 @@ export default function ChatPage() {
           setThreads(listedThreads);
 
           if (hasContextEntry) {
-            const contextSeedKey = `${contextEntryKey}:fresh`;
+            const contextSeedKey = `${contextEntryKey}:${forceFreshThread ? 'fresh' : 'reuse'}`;
 
             if (contextThreadSeedRef.current === contextSeedKey) {
               return;
             }
             contextThreadSeedRef.current = contextSeedKey;
 
-            const createRes = await fetch('/api/chatkit', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                action: 'chatkit.create_thread',
-                payload: {
-                  title: getContextThreadTitle(contextIntent, t),
-                  ...(contextProjectId ? { projectId: contextProjectId } : {}),
-                },
-              })
-            });
-            const createData = await createRes.json().catch(() => ({}));
-
-            if (cancelled) return;
-
-            if (createRes.ok && createData.thread?.id) {
-              setThreads(prev => [createData.thread as Thread, ...prev.filter((thread) => thread.id !== createData.thread.id)]);
-              setSelectedThreadId(createData.thread.id);
-              void trackUXEvent('context_thread_created', {
-                intent: contextIntent || 'unknown',
-                hasProject: Boolean(contextProjectId),
-                fresh: forceFreshThread,
+            if (forceFreshThread) {
+              const createRes = await fetch('/api/chatkit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  action: 'chatkit.create_thread',
+                  payload: {
+                    title: getContextThreadTitle(contextIntent, t),
+                    ...(contextProjectId ? { projectId: contextProjectId } : {}),
+                  },
+                })
               });
-            } else {
-              setSelectedThreadId(listedThreads[0]?.id);
-              setThreadLoadError(t('cockpit.standalone.context_start_failed'));
-              void trackUXEvent('context_thread_create_failed', {
+              const createData = await createRes.json().catch(() => ({}));
+
+              if (cancelled) return;
+
+              if (createRes.ok && createData.thread?.id) {
+                setThreads(prev => [createData.thread as Thread, ...prev.filter((thread) => thread.id !== createData.thread.id)]);
+                setSelectedThreadId(createData.thread.id);
+                void trackUXEvent('context_thread_created', {
+                  intent: contextIntent || 'unknown',
+                  hasProject: Boolean(contextProjectId),
+                  fresh: forceFreshThread,
+                });
+              } else {
+                setSelectedThreadId(listedThreads[0]?.id);
+                setThreadLoadError(t('cockpit.standalone.context_start_failed'));
+                contextThreadSeedRef.current = '';
+                void trackUXEvent('context_thread_create_failed', {
+                  intent: contextIntent || 'unknown',
+                  hasProject: Boolean(contextProjectId),
+                  status: createRes.status,
+                });
+              }
+              return;
+            }
+
+            const reusedThreadId = listedThreads[0]?.id;
+            setSelectedThreadId(reusedThreadId);
+            if (reusedThreadId) {
+              void trackUXEvent('context_thread_reused', {
                 intent: contextIntent || 'unknown',
                 hasProject: Boolean(contextProjectId),
-                status: createRes.status,
+                fresh: false,
               });
             }
             return;
