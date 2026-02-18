@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import { WorkspaceRole as PrismaWorkspaceRole } from '@prisma/client';
 import { prisma } from './prisma';
 
@@ -67,7 +68,7 @@ async function findWorkspaceMembership(
 async function createPersonalWorkspaceMembership(
   userId: string,
 ): Promise<{ workspaceId: string; role: PrismaWorkspaceRole }> {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const user = await tx.user.findUnique({
       where: { id: userId },
       select: {
