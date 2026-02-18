@@ -315,6 +315,7 @@ export default function FieldStudio() {
             onSelectField={selectField}
             onDraftGeometryChange={updateDraftGeometry}
             onDraftCentroidChange={updateDraftCentroid}
+            onDrawModeChange={setDrawMode}
           />
         )}
       </div>

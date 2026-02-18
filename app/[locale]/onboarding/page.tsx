@@ -134,7 +134,6 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fieldEntryMode, setFieldEntryMode] = useState<'quick' | 'detailed'>('quick');
-  const [showQuickLocationEditor, setShowQuickLocationEditor] = useState(false);
   const onboardingGateDetail = getOnboardingReasonDetail(
     searchParams.get('reason'),
     searchParams.get('from'),
@@ -364,11 +363,24 @@ export default function OnboardingPage() {
     try {
       fieldSchema.parse(fieldData);
       setErrors({});
-      setIsSubmitting(true);
 
       const selectedCrop = COMMON_CROPS.find(c => c.value === fieldData.crop);
       const hasLocation = hasFieldLocation(fieldData);
       const requiresLocation = (fieldData.environmentType || 'open_field') === 'open_field';
+
+      if (requiresLocation && !hasLocation) {
+        const message = '露地圃場では位置情報が必須です。地図でピンまたは境界を設定してください。';
+        setErrors({ location: message });
+        void trackUXEvent('onboarding_field_save_failed', {
+          reason: 'location_required',
+          step: 3,
+        });
+        toastError(message);
+        return;
+      }
+
+      setIsSubmitting(true);
+
       const geoStatus = fieldData.geometry
         ? 'verified'
         : fieldData.centroid
@@ -722,7 +734,6 @@ export default function OnboardingPage() {
                 type="button"
                 onClick={() => {
                   setFieldEntryMode('detailed');
-                  setShowQuickLocationEditor(true);
                   void trackUXEvent('onboarding_field_mode_selected', {
                     mode: 'detailed',
                   });
@@ -738,7 +749,7 @@ export default function OnboardingPage() {
             </div>
             <p className="mt-2 text-xs text-gray-600">
               {fieldEntryMode === 'quick'
-                ? '名前と概算面積だけで先に登録できます。位置情報は後で追加できます。'
+                ? '位置ピンを登録して、名前と概算面積で素早く登録します。'
                 : '地図で境界をタップして面積を自動計算できます。'}
             </p>
           </div>
@@ -783,77 +794,67 @@ export default function OnboardingPage() {
             ) : null}
           </div>
 
-          {fieldEntryMode === 'quick' && !showQuickLocationEditor ? (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-              <p className="text-sm font-medium text-emerald-900">位置情報はスキップ可能です</p>
-              <p className="mt-1 text-xs text-emerald-800">
-                今は名前と面積で進み、必要になった時に地図で位置を追加できます。
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowQuickLocationEditor(true);
-                  void trackUXEvent('onboarding_field_optional_location_opened', {
-                    mode: 'quick',
-                  });
-                }}
-                className="mt-2 inline-flex items-center rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="block text-sm font-medium text-gray-700">
+                圃場の位置
+                <span className="text-gray-400 font-normal ml-2">
+                  {fieldEntryMode === 'quick'
+                    ? (fieldData.environmentType || 'open_field') === 'open_field'
+                      ? '必須: 地図をタップして位置ピンを設定してください'
+                      : '任意: 地図をタップして位置ピンを設定できます'
+                    : (fieldData.environmentType || 'open_field') === 'open_field'
+                      ? '必須: 地図をタップして境界点を追加してください'
+                      : '地図をタップして境界点を追加できます'}
+                </span>
+              </label>
+              <span
+                className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${(fieldData.environmentType || 'open_field') === 'open_field'
+                  ? 'border-amber-300 bg-amber-50 text-amber-700'
+                  : 'border-sky-300 bg-sky-50 text-sky-700'
+                  }`}
               >
-                位置を今すぐ追加する（任意）
-              </button>
+                {(fieldData.environmentType || 'open_field') === 'open_field' ? '必須' : '任意'}
+              </span>
             </div>
-          ) : (
-            <div>
-              <div className="mb-2 flex items-center justify-between">
-                <label className="block text-sm font-medium text-gray-700">
-                  圃場の位置
-                  <span className="text-gray-400 font-normal ml-2">
-                    {fieldEntryMode === 'quick'
-                      ? '任意: 地図をタップしてピンを落としてください'
-                      : '地図をタップして境界点を追加してください'}
-                  </span>
-                </label>
-                {fieldEntryMode === 'quick' ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowQuickLocationEditor(false);
-                      void trackUXEvent('onboarding_field_optional_location_skipped', {
-                        mode: 'quick',
-                      });
-                    }}
-                    className="text-xs font-semibold text-gray-500 underline underline-offset-2"
-                  >
-                    位置入力をスキップ
-                  </button>
-                ) : null}
-              </div>
 
-              <FieldMapCanvas
-                fields={[]}
-                selectedFieldId={null}
-                draftGeometry={fieldData.geometry || null}
-                draftCentroid={fieldData.centroid || null}
-                drawMode={fieldEntryMode === 'quick' ? 'centroid' : 'polygon'}
-                riskByFieldId={{}}
-                onSelectField={() => { }}
-                onDraftGeometryChange={(geometry) => {
-                  const areaHa = geometryAreaHa(geometry);
-                  setFieldData((prev) => ({
-                    ...prev,
-                    geometry,
-                    area: areaHa ?? prev.area,
-                  }));
-                }}
-                onDraftCentroidChange={(centroid) => {
-                  setFieldData((prev) => ({
-                    ...prev,
-                    centroid,
-                  }));
-                }}
-              />
-            </div>
-          )}
+            <FieldMapCanvas
+              fields={[]}
+              selectedFieldId={null}
+              draftGeometry={fieldData.geometry || null}
+              draftCentroid={fieldData.centroid || null}
+              drawMode={fieldEntryMode === 'quick' ? 'centroid' : 'polygon'}
+              riskByFieldId={{}}
+              onSelectField={() => { }}
+              onDraftGeometryChange={(geometry) => {
+                const areaHa = geometryAreaHa(geometry);
+                setFieldData((prev) => ({
+                  ...prev,
+                  geometry,
+                  area: areaHa ?? prev.area,
+                }));
+                setErrors((prev) => {
+                  if (!prev.location) return prev;
+                  const next = { ...prev };
+                  delete next.location;
+                  return next;
+                });
+              }}
+              onDraftCentroidChange={(centroid) => {
+                setFieldData((prev) => ({
+                  ...prev,
+                  centroid,
+                }));
+                setErrors((prev) => {
+                  if (!prev.location) return prev;
+                  const next = { ...prev };
+                  delete next.location;
+                  return next;
+                });
+              }}
+            />
+            {errors.location ? <p className="mt-2 text-sm text-red-600">{errors.location}</p> : null}
+          </div>
 
           {/* Area (Read-only / Manual Override) */}
           <div>
@@ -933,7 +934,7 @@ export default function OnboardingPage() {
           {/* ... buttons ... */}
           <button
             onClick={handleFieldSubmit}
-            disabled={isSubmitting}
+            disabled={isSubmitting || (((fieldData.environmentType || 'open_field') === 'open_field') && !hasFieldLocation(fieldData))}
             className="w-full px-6 py-4 bg-emerald-600 text-white rounded-xl hover:bg-emerald-500 transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {isSubmitting ? (
@@ -957,7 +958,11 @@ export default function OnboardingPage() {
             >
               戻る
             </button>
-            <span className="text-xs text-gray-400">位置情報は後で追加できます</span>
+            <span className="text-xs text-gray-400">
+              {(fieldData.environmentType || 'open_field') === 'open_field'
+                ? '露地栽培では位置情報が必須です'
+                : 'ハウス・ポット栽培は位置情報を省略できます'}
+            </span>
           </div>
         </div>
       </OnboardingLayout>
