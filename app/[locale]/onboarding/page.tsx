@@ -136,6 +136,7 @@ export default function OnboardingPage() {
   const hasPrefilledName = useRef(false);
   const hasCheckedExistingProfile = useRef(false);
   const hasTrackedForcedPathNotice = useRef(false);
+  const hasAttemptedSessionResync = useRef(false);
   const onboardingComplete = Boolean(
     (session?.user as { onboardingComplete?: boolean } | undefined)?.onboardingComplete
   );
@@ -175,6 +176,18 @@ export default function OnboardingPage() {
       router.replace(`/${locale}`);
     }
   }, [status, onboardingComplete, router, locale]);
+
+  // Self-heal stale JWT claims on direct onboarding visits.
+  useEffect(() => {
+    if (status !== 'authenticated' || onboardingComplete || hasAttemptedSessionResync.current) {
+      return;
+    }
+
+    hasAttemptedSessionResync.current = true;
+    void update().catch((error) => {
+      console.warn('Session refresh failed on onboarding page:', error);
+    });
+  }, [status, onboardingComplete, update]);
 
   // Resume onboarding at field step if profile already exists.
   useEffect(() => {
