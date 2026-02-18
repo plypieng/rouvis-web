@@ -26,8 +26,21 @@ function isEnabled(value: string | undefined): boolean {
   return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
 }
 
-const STANDOUT_ENABLED = isEnabled(process.env.FEATURE_CHAT_COCKPIT_STANDOUT)
-  || isEnabled(process.env.NEXT_PUBLIC_FEATURE_CHAT_COCKPIT_STANDOUT);
+function isDisabled(value: string | undefined): boolean {
+  if (!value) return false;
+  const normalized = value.trim().toLowerCase();
+  return normalized === '0' || normalized === 'false' || normalized === 'no' || normalized === 'off';
+}
+
+function resolveStandoutEnabled(): boolean {
+  const raw = process.env.FEATURE_CHAT_COCKPIT_STANDOUT
+    ?? process.env.NEXT_PUBLIC_FEATURE_CHAT_COCKPIT_STANDOUT;
+  if (!raw) return true;
+  if (isDisabled(raw)) return false;
+  return isEnabled(raw);
+}
+
+const STANDOUT_ENABLED = resolveStandoutEnabled();
 
 type ChatMessageContentPart = {
   type?: string;
@@ -214,7 +227,10 @@ async function sendPrompt(page: Page, prompt: string) {
 }
 
 test.describe('Cockpit handshake flow', () => {
-  test.skip(!STANDOUT_ENABLED || !PROJECT_ID, 'Requires standout feature flag and PLAYWRIGHT_PROJECT_ID');
+  test.skip(
+    !STANDOUT_ENABLED || !PROJECT_ID,
+    'Requires PLAYWRIGHT_PROJECT_ID (or keep standout enabled if explicitly overridden).'
+  );
 
   test('syncs handshake from chat to calendar and supports preview/apply', async ({ context, page }) => {
     await attachAuthenticatedSession(context);

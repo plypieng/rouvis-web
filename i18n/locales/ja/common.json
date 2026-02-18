@@ -846,6 +846,13 @@
         "none": "アクティブな変更プランはありません。",
         "summary_detected": "調整候補を{count}件検出しました"
       },
+      "trace": {
+        "title": "推論トレース",
+        "expand": "詳細を表示",
+        "collapse": "詳細を閉じる",
+        "empty": "まだトレースがありません。",
+        "summary": "トレース {count}件"
+      },
       "artifacts": {
         "plan_title": "変更プランを検出しました",
         "plan_detail": "影響タスク {count}件",
@@ -856,6 +863,7 @@
         "choice_detail": "候補 {count}件",
         "queue_title": "キュー更新",
         "memory_title": "メモリ状態",
+        "reasoning_title": "推論ステップ",
         "error_title": "実行エラー"
       },
       "choice": {

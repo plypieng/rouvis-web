@@ -10,10 +10,16 @@ import {
   createArtifactFromStreamEvent,
   extractCommandHandshakeFromContent,
   extractReschedulePlanBlock,
+  extractTraceSummary,
   stripHiddenBlocks,
   type ChatkitEvent,
 } from '@/lib/chat-artifacts';
-import type { CommandArtifact, CommandHandshake, QuickApplyResult } from '@/types/project-cockpit';
+import type {
+  CommandArtifact,
+  CommandHandshake,
+  QuickApplyResult,
+  ReasoningTraceStep,
+} from '@/types/project-cockpit';
 
 export type ChatMode = 'default' | 'reschedule' | 'diagnosis' | 'logging';
 export type ChatSuggestion = {
@@ -212,6 +218,8 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   const [currentStatus, setCurrentStatus] = useState<string>('');
   const [actionConfirmations, setActionConfirmations] = useState<ActionConfirmation[]>([]);
   const [commandArtifacts, setCommandArtifacts] = useState<CommandArtifact[]>([]);
+  const [reasoningTraceSteps, setReasoningTraceSteps] = useState<ReasoningTraceStep[]>([]);
+  const [traceExpanded, setTraceExpanded] = useState(false);
   const [activeHandshake, setActiveHandshake] = useState<CommandHandshake | null>(null);
   const [weather, setWeather] = useState<{ condition?: string } | undefined>();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -244,6 +252,14 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   const pushArtifact = useCallback((artifact: CommandArtifact | null) => {
     if (!artifact || !standoutMode) return;
     setCommandArtifacts(prev => [...prev.slice(-14), artifact]);
+  }, [standoutMode]);
+
+  const pushReasoningTraceStep = useCallback((step: ReasoningTraceStep | null) => {
+    if (!step || !standoutMode) return;
+    setReasoningTraceSteps(prev => {
+      const filtered = prev.filter(existing => existing.stepId !== step.stepId);
+      return [...filtered, step].slice(-12);
+    });
   }, [standoutMode]);
 
   const publishHandshake = useCallback((handshake: CommandHandshake | null) => {
@@ -352,6 +368,15 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
           }));
           setMessages(history);
 
+          const replayTraceSteps = (data.messages || [])
+            .filter((m) => m.role === 'assistant')
+            .flatMap((m) => {
+              const summary = extractTraceSummary(m.content);
+              return summary?.steps || [];
+            })
+            .slice(-12);
+          setReasoningTraceSteps(replayTraceSteps);
+
           const preferenceLanguage = data.preferences?.assistantLanguage;
           if (preferenceLanguage === 'ja' || preferenceLanguage === 'en') {
             setAssistantLanguage(preferenceLanguage);
@@ -391,6 +416,8 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
 
   useEffect(() => {
     setCommandArtifacts([]);
+    setReasoningTraceSteps([]);
+    setTraceExpanded(false);
     publishHandshake(null);
     setIntentPolicyDebug(null);
     setPendingMutationApproval(null);
@@ -575,8 +602,33 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
 
             const event = data as ChatkitEvent;
 
+            if (
+              event.type === 'reasoning_trace'
+              && typeof event.stepId === 'string'
+              && typeof event.phase === 'string'
+              && typeof event.status === 'string'
+              && typeof event.title === 'string'
+              && typeof event.sourceEvent === 'string'
+              && typeof event.timestamp === 'string'
+            ) {
+              pushReasoningTraceStep({
+                stepId: event.stepId,
+                phase: event.phase as ReasoningTraceStep['phase'],
+                status: event.status as ReasoningTraceStep['status'],
+                title: event.title,
+                detail: typeof event.detail === 'string' ? event.detail : undefined,
+                tool: typeof event.tool === 'string' ? event.tool : undefined,
+                confidence: typeof event.confidence === 'number' ? event.confidence : undefined,
+                sourceEvent: event.sourceEvent as ReasoningTraceStep['sourceEvent'],
+                timestamp: event.timestamp,
+              });
+              continue;
+            }
+
             const artifact = createArtifactFromStreamEvent(event);
-            pushArtifact(artifact);
+            if (artifact && artifact.kind !== 'reasoning') {
+              pushArtifact(artifact);
+            }
 
             if (event.type === 'intent_policy' && event.data?.responsePolicy) {
               setIntentPolicyDebug({
@@ -774,6 +826,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     chatMode,
     publishHandshake,
     pushArtifact,
+    pushReasoningTraceStep,
     t,
   ]);
 
@@ -932,6 +985,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
       : activeHandshake?.riskTone === 'watch'
         ? 'status-watch'
         : 'status-safe';
+  const latestTraceStep = reasoningTraceSteps[reasoningTraceSteps.length - 1];
   const showIntentDebug = process.env.NEXT_PUBLIC_CHAT_INTENT_DEBUG === '1'
     || process.env.NEXT_PUBLIC_CHAT_INTENT_DEBUG === 'true';
 
@@ -1068,7 +1122,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
           </div>
         )}
 
-        {standoutMode && (activeHandshake || commandArtifacts.length > 0) && (
+        {standoutMode && (activeHandshake || commandArtifacts.length > 0 || reasoningTraceSteps.length > 0) && (
           <section className="space-y-2" data-testid="command-artifact-timeline">
             {activeHandshake && (
               <article
@@ -1097,6 +1151,56 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
               </article>
             )}
 
+            <article
+              data-testid="inference-trace-panel"
+              className="rounded-lg border border-border/80 bg-secondary/35 px-3 py-2 text-xs"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-semibold">{t('cockpit.trace.title')}</p>
+                <button
+                  type="button"
+                  className="touch-target rounded-md border border-border/80 px-2 py-1 text-[11px] font-semibold hover:bg-secondary/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  onClick={() => setTraceExpanded(prev => !prev)}
+                >
+                  {traceExpanded ? t('cockpit.trace.collapse') : t('cockpit.trace.expand')}
+                </button>
+              </div>
+              <p className="mt-1 text-[11px] text-muted-foreground" data-testid="inference-trace-summary">
+                {reasoningTraceSteps.length === 0
+                  ? t('cockpit.trace.empty')
+                  : t('cockpit.trace.summary', { count: reasoningTraceSteps.length })}
+                {latestTraceStep ? ` · ${latestTraceStep.title}` : ''}
+              </p>
+              {traceExpanded && reasoningTraceSteps.length > 0 && (
+                <div className="mt-2 space-y-1.5" data-testid="inference-trace-steps">
+                  {reasoningTraceSteps.map((step) => {
+                    const toneClass = step.status === 'error'
+                      ? 'status-critical'
+                      : step.status === 'completed'
+                        ? 'status-safe'
+                        : 'status-watch';
+                    return (
+                      <div
+                        key={step.stepId}
+                        className={`rounded-md border px-2 py-1 ${toneClass}`}
+                        data-testid="inference-trace-step"
+                      >
+                        <p className="font-semibold">
+                          {step.title}
+                        </p>
+                        <p className="text-[11px] opacity-80">
+                          {`${step.phase} · ${step.status}`}
+                        </p>
+                        {step.detail ? (
+                          <p className="mt-0.5 text-[11px] text-muted-foreground">{step.detail}</p>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </article>
+
             {commandArtifacts.map((artifact) => {
               const confidence = typeof artifact.metadata?.confidence === 'number'
                 ? Math.round(artifact.metadata.confidence * 100)
@@ -1116,6 +1220,8 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
                         ? t('cockpit.artifacts.queue_title')
                         : artifact.kind === 'memory'
                           ? t('cockpit.artifacts.memory_title')
+                          : artifact.kind === 'reasoning'
+                            ? t('cockpit.artifacts.reasoning_title')
                           : artifact.kind === 'error'
                             ? t('cockpit.artifacts.error_title')
                             : artifact.title;

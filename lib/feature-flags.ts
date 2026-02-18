@@ -27,7 +27,7 @@ export function getWebFeatureFlags(): WebFeatureFlags {
     ),
     chatCockpitStandout: parseBooleanFlag(
       process.env.FEATURE_CHAT_COCKPIT_STANDOUT ?? process.env.NEXT_PUBLIC_FEATURE_CHAT_COCKPIT_STANDOUT,
-      false
+      true
     ),
   };
 }
