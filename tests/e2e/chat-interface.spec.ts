@@ -27,6 +27,7 @@ type ChatMessageContentPart = {
 type ChatRequestBody = {
   action?: string;
   payload?: { title?: string; projectId?: string };
+  threadId?: string;
   messages?: Array<{ role?: string; content?: string | ChatMessageContentPart[] }>;
 };
 
@@ -265,5 +266,156 @@ test.describe('Chat Interface with /api/chatkit', () => {
     const errorMessage = page.getByTestId('chat-error').last();
     await expect(errorMessage).toBeVisible();
     await expect(errorMessage.getByRole('button', { name: /もう一度試す|Try again/ })).toBeVisible();
+  });
+
+  test('shows inference trace collapsed by default and expands ordered steps', async ({ page }) => {
+    await mockChatkit(page, {
+      streamForPrompt: () => createStream([
+        `e:${JSON.stringify({
+          type: 'reasoning_trace',
+          stepId: 'trace-1',
+          phase: 'intent',
+          status: 'completed',
+          title: 'Intent classified: workflow (schedule_update)',
+          sourceEvent: 'intent_policy',
+          timestamp: '2026-02-18T09:00:00.000Z',
+        })}`,
+        `e:${JSON.stringify({
+          type: 'reasoning_trace',
+          stepId: 'trace-2',
+          phase: 'tooling',
+          status: 'update',
+          title: 'Tool: scheduler.plan',
+          sourceEvent: 'tool_call_delta',
+          timestamp: '2026-02-18T09:00:01.000Z',
+        })}`,
+        `0:${JSON.stringify('提案を準備しました。')}`,
+      ]),
+    });
+    await openChat(page);
+    await sendPrompt(page, '予定を最適化して');
+
+    const tracePanel = page.getByTestId('inference-trace-panel');
+    await expect(tracePanel).toBeVisible();
+    await expect(page.getByTestId('inference-trace-summary')).toContainText('2');
+    await expect(page.getByTestId('inference-trace-steps')).toHaveCount(0);
+
+    await tracePanel.getByRole('button', { name: /詳細を表示|Show details/ }).click();
+    const steps = page.getByTestId('inference-trace-step');
+    await expect(steps).toHaveCount(2);
+    await expect(steps.nth(0)).toContainText('Intent classified');
+    await expect(steps.nth(1)).toContainText('Tool: scheduler.plan');
+  });
+
+  test('replays persisted TRACE_SUMMARY after thread reload', async ({ page }) => {
+    let persistedMessages: Array<{ id: string; role: 'assistant' | 'user'; content: string; createdAt: string }> = [];
+    const traceSummaryPayload = {
+      v: 1,
+      steps: [
+        {
+          stepId: 'persist-1',
+          phase: 'synthesis',
+          status: 'completed',
+          title: 'Reasoning summary',
+          detail: 'Weather + workload merged.',
+          sourceEvent: 'response_reasoning_summary',
+          timestamp: '2026-02-18T10:00:00.000Z',
+        },
+      ],
+    };
+
+    await page.route('**/api/chatkit**', async (route) => {
+      const request = route.request();
+
+      if (request.method() === 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ messages: persistedMessages }),
+        });
+        return;
+      }
+
+      let body: ChatRequestBody = {};
+      try {
+        body = JSON.parse(request.postData() || '{}') as ChatRequestBody;
+      } catch {
+        body = {};
+      }
+
+      if (body.action === 'chatkit.list_threads') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            threads: [{
+              id: 'thread-seed',
+              title: 'Seed Thread',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            }],
+          }),
+        });
+        return;
+      }
+
+      if (body.action === 'chatkit.create_thread') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            thread: {
+              id: 'thread-seed',
+              title: 'Seed Thread',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            },
+          }),
+        });
+        return;
+      }
+
+      if (body.action === 'chatkit.undo') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ ok: true }),
+        });
+        return;
+      }
+
+      persistedMessages = [{
+        id: 'assistant-1',
+        role: 'assistant',
+        content: `提案を生成しました。\n[[TRACE_SUMMARY: ${JSON.stringify(traceSummaryPayload)}]]`,
+        createdAt: new Date().toISOString(),
+      }];
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/plain; charset=utf-8',
+        body: createStream([
+          `e:${JSON.stringify({
+            type: 'reasoning_trace',
+            stepId: 'persist-1',
+            phase: 'synthesis',
+            status: 'completed',
+            title: 'Reasoning summary',
+            sourceEvent: 'response_reasoning_summary',
+            timestamp: '2026-02-18T10:00:00.000Z',
+          })}`,
+          `0:${JSON.stringify('提案を生成しました。')}`,
+        ]),
+      });
+    });
+
+    await openChat(page);
+    await sendPrompt(page, '再計画して');
+    await expect(page.getByTestId('inference-trace-summary')).toContainText('1');
+
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await expect(page.getByTestId('inference-trace-panel')).toBeVisible();
+    await expect(page.getByTestId('inference-trace-summary')).toContainText('Reasoning summary');
   });
 });

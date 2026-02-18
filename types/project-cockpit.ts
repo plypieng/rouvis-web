@@ -26,6 +26,32 @@ export type QuickApplyResult = {
 
 export type CommandRiskTone = 'safe' | 'watch' | 'warning' | 'critical';
 
+export type ReasoningTracePhase = 'intent' | 'tooling' | 'synthesis';
+export type ReasoningTraceStatus = 'started' | 'update' | 'completed' | 'error';
+export type ReasoningTraceSourceEvent =
+  | 'intent_policy'
+  | 'tool_call_delta'
+  | 'tool_call_result'
+  | 'error'
+  | 'response_reasoning_summary';
+
+export type ReasoningTraceStep = {
+  stepId: string;
+  phase: ReasoningTracePhase;
+  status: ReasoningTraceStatus;
+  title: string;
+  detail?: string;
+  tool?: string;
+  confidence?: number;
+  sourceEvent: ReasoningTraceSourceEvent;
+  timestamp: string;
+};
+
+export type ReasoningTraceSummary = {
+  v: 1;
+  steps: ReasoningTraceStep[];
+};
+
 export type CommandHandshakeTask = {
   id: string;
   title: string;
@@ -54,6 +80,7 @@ export type CommandArtifactKind =
   | 'plan'
   | 'queue'
   | 'memory'
+  | 'reasoning'
   | 'error';
 
 export type CommandArtifact = {

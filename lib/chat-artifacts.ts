@@ -3,6 +3,11 @@ import type {
   CommandHandshake,
   CommandHandshakeTask,
   CommandRiskTone,
+  ReasoningTracePhase,
+  ReasoningTraceSourceEvent,
+  ReasoningTraceStatus,
+  ReasoningTraceStep,
+  ReasoningTraceSummary,
 } from '@/types/project-cockpit';
 
 type ReschedulePlanItem = {
@@ -19,6 +24,8 @@ type ReschedulePlanPayload = {
   items?: unknown;
 };
 
+const TRACE_SUMMARY_PATTERN = /\[\[TRACE_SUMMARY:\s*([\s\S]*?)\]\]/;
+
 export type ChatkitEvent = {
   type?: string;
   delta?: { tool?: string; status?: string; content?: string; message?: string };
@@ -26,6 +33,11 @@ export type ChatkitEvent = {
   action?: { type?: string; undoData?: unknown };
   toolName?: string;
   error?: { message?: string; code?: string };
+  reasoning?: {
+    input?: string;
+    steps?: string[];
+    conclusion?: string;
+  };
   result?: unknown;
   data?: {
     type?: string;
@@ -42,6 +54,15 @@ export type ChatkitEvent = {
     clarificationRequired?: boolean;
     reason?: string;
   };
+  stepId?: string;
+  phase?: ReasoningTracePhase;
+  status?: ReasoningTraceStatus;
+  title?: string;
+  detail?: string;
+  tool?: string;
+  confidence?: number;
+  sourceEvent?: ReasoningTraceSourceEvent;
+  timestamp?: string;
 };
 
 function buildId(prefix: string): string {
@@ -94,15 +115,130 @@ function parsePlanPayload(raw: string): ReschedulePlanPayload | null {
   }
 }
 
+function isTracePhase(value: unknown): value is ReasoningTracePhase {
+  return value === 'intent' || value === 'tooling' || value === 'synthesis';
+}
+
+function isTraceStatus(value: unknown): value is ReasoningTraceStatus {
+  return value === 'started' || value === 'update' || value === 'completed' || value === 'error';
+}
+
+function isTraceSourceEvent(value: unknown): value is ReasoningTraceSourceEvent {
+  return value === 'intent_policy'
+    || value === 'tool_call_delta'
+    || value === 'tool_call_result'
+    || value === 'error'
+    || value === 'response_reasoning_summary';
+}
+
+function coerceTraceTimestamp(value: unknown): string {
+  if (typeof value === 'string') {
+    const parsed = new Date(value);
+    if (Number.isFinite(parsed.getTime())) return parsed.toISOString();
+  }
+  return new Date().toISOString();
+}
+
+function toReasoningTraceStep(event: ChatkitEvent): ReasoningTraceStep | null {
+  if (event.type !== 'reasoning_trace') return null;
+  if (!isTracePhase(event.phase) || !isTraceStatus(event.status) || !isTraceSourceEvent(event.sourceEvent)) {
+    return null;
+  }
+  if (typeof event.title !== 'string' || !event.title.trim()) return null;
+
+  return {
+    stepId: typeof event.stepId === 'string' && event.stepId.trim()
+      ? event.stepId
+      : buildId('trace'),
+    phase: event.phase,
+    status: event.status,
+    title: event.title,
+    detail: typeof event.detail === 'string' ? event.detail : undefined,
+    tool: typeof event.tool === 'string' ? event.tool : undefined,
+    confidence: typeof event.confidence === 'number' ? event.confidence : undefined,
+    sourceEvent: event.sourceEvent,
+    timestamp: coerceTraceTimestamp(event.timestamp),
+  };
+}
+
+function toTraceTone(step: ReasoningTraceStep): CommandRiskTone {
+  if (step.status === 'error') return 'critical';
+  if (step.status === 'completed') return 'safe';
+  return 'watch';
+}
+
+function dedupeAndCapTraceSteps(steps: ReasoningTraceStep[], maxSteps = 12): ReasoningTraceStep[] {
+  const deduped: ReasoningTraceStep[] = [];
+  const seen = new Set<string>();
+
+  for (const step of steps) {
+    if (!step || typeof step.stepId !== 'string') continue;
+    if (seen.has(step.stepId)) continue;
+    seen.add(step.stepId);
+    deduped.push(step);
+  }
+
+  if (deduped.length <= maxSteps) return deduped;
+  return deduped.slice(deduped.length - maxSteps);
+}
+
 export function stripHiddenBlocks(content: string): string {
   if (!content) return content;
-  return content.replace(/\[\[(RESCHEDULE_PLAN|UPDATE_TASK|CHOICE):[\s\S]*?\]\]/g, '').trim();
+  return content.replace(/\[\[(RESCHEDULE_PLAN|UPDATE_TASK|CHOICE|TRACE_SUMMARY):[\s\S]*?\]\]/g, '').trim();
 }
 
 export function extractReschedulePlanBlock(content: string): string | null {
   if (!content) return null;
   const matched = content.match(/\[\[RESCHEDULE_PLAN:\s*([\s\S]*?)\]\]/);
   return matched?.[0] || null;
+}
+
+export function extractTraceSummary(content: string): ReasoningTraceSummary | null {
+  if (!content) return null;
+  const matched = content.match(TRACE_SUMMARY_PATTERN);
+  if (!matched?.[1]) return null;
+
+  try {
+    const parsed = JSON.parse(matched[1]) as ReasoningTraceSummary;
+    if (!parsed || parsed.v !== 1 || !Array.isArray(parsed.steps)) return null;
+
+    const steps = dedupeAndCapTraceSteps(parsed.steps.filter((step): step is ReasoningTraceStep => (
+      Boolean(step)
+      && typeof step.stepId === 'string'
+      && isTracePhase(step.phase)
+      && isTraceStatus(step.status)
+      && typeof step.title === 'string'
+      && isTraceSourceEvent(step.sourceEvent)
+      && typeof step.timestamp === 'string'
+    )));
+
+    return {
+      v: 1,
+      steps,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function traceSummaryToArtifacts(summary: ReasoningTraceSummary | null): CommandArtifact[] {
+  if (!summary || !Array.isArray(summary.steps) || summary.steps.length === 0) return [];
+  return summary.steps.map((step) => ({
+    id: `artifact-trace-${step.stepId}`,
+    kind: 'reasoning',
+    title: step.title,
+    description: step.phase,
+    detail: step.detail,
+    tone: toTraceTone(step),
+    createdAt: step.timestamp,
+    metadata: {
+      stepId: step.stepId,
+      status: step.status,
+      tool: step.tool,
+      sourceEvent: step.sourceEvent,
+      confidence: step.confidence,
+    },
+  }));
 }
 
 export function extractCommandHandshakeFromContent(params: {
@@ -135,6 +271,27 @@ export function extractCommandHandshakeFromContent(params: {
 
 export function createArtifactFromStreamEvent(event: ChatkitEvent): CommandArtifact | null {
   const eventType = event.type || '';
+
+  if (eventType === 'reasoning_trace') {
+    const step = toReasoningTraceStep(event);
+    if (!step) return null;
+    return {
+      id: `artifact-trace-${step.stepId}`,
+      kind: 'reasoning',
+      title: step.title,
+      description: step.phase,
+      detail: step.detail,
+      tone: toTraceTone(step),
+      createdAt: step.timestamp,
+      metadata: {
+        stepId: step.stepId,
+        status: step.status,
+        tool: step.tool,
+        sourceEvent: step.sourceEvent,
+        confidence: step.confidence,
+      },
+    };
+  }
 
   if (eventType === 'tool_call_delta' && event.delta?.tool) {
     const isQueue = event.delta.tool === 'scheduler.queue';

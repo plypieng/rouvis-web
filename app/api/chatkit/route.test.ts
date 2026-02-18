@@ -195,4 +195,33 @@ describe('/api/chatkit POST', () => {
     expect(body).toContain('0:"Hi"');
     expect(body).toContain('e:{"type":"intent_policy","data":{"responsePolicy":"casual","primaryIntent":"greeting","confidence":0.98,"clarificationRequired":false}}');
   });
+
+  it('propagates reasoning_trace events through transformed chat stream', async () => {
+    const reasoningEvent = {
+      type: 'reasoning_trace',
+      stepId: 'rt_1',
+      phase: 'tooling',
+      status: 'update',
+      title: 'Tool: scheduler.plan',
+      sourceEvent: 'tool_call_delta',
+      timestamp: '2026-02-18T07:00:00.000Z',
+    };
+    const ssePayload = `data: ${JSON.stringify(reasoningEvent)}\n\n`;
+    fetchMock.mockResolvedValueOnce(new Response(ssePayload, {
+      status: 200,
+      headers: {
+        'content-type': 'text/event-stream',
+        'x-request-id': 'upstream-req-stream-2',
+      },
+    }));
+
+    const response = await POST(makeRequest('req-chatkit-stream-2', {
+      messages: [{ role: 'user', content: 'show trace' }],
+    }));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('x-request-id')).toBe('upstream-req-stream-2');
+    const body = await response.text();
+    expect(body).toContain(`e:${JSON.stringify(reasoningEvent)}`);
+  });
 });
