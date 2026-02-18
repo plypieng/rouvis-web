@@ -27,7 +27,17 @@ const fieldSchema = z.object({
   name: z.string().min(1, '畑の名前を入力してください'),
   area: z.number().min(0.01, '面積を入力してください'),
   crop: z.string().min(1, '作物を選択してください'),
+  environmentType: z.enum(['open_field', 'greenhouse', 'home_pot']).default('open_field'),
+  containerCount: z.number().int().min(1).optional(),
   plantingDate: z.string().optional(),
+}).superRefine((value, ctx) => {
+  if (value.environmentType === 'home_pot' && (!value.containerCount || value.containerCount < 1)) {
+    ctx.addIssue({
+      path: ['containerCount'],
+      code: z.ZodIssueCode.custom,
+      message: '家庭ポットの場合はポット数を入力してください',
+    });
+  }
 });
 
 type ProfileData = z.infer<typeof profileSchema>;
@@ -151,7 +161,9 @@ export default function OnboardingPage() {
     farmingType: 'conventional',
     experience: '1_3', // Default to reasonable middle
   });
-  const [fieldData, setFieldData] = useState<Partial<FieldData>>({});
+  const [fieldData, setFieldData] = useState<Partial<FieldData>>({
+    environmentType: 'open_field',
+  });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState<NoticeState>(null);
 
@@ -356,11 +368,12 @@ export default function OnboardingPage() {
 
       const selectedCrop = COMMON_CROPS.find(c => c.value === fieldData.crop);
       const hasLocation = hasFieldLocation(fieldData);
+      const requiresLocation = (fieldData.environmentType || 'open_field') === 'open_field';
       const geoStatus = fieldData.geometry
         ? 'verified'
         : fieldData.centroid
           ? 'approximate'
-          : 'missing';
+          : requiresLocation ? 'missing' : 'approximate';
 
       const response = await fetch('/api/v1/fields', {
         method: 'POST',
@@ -370,6 +383,10 @@ export default function OnboardingPage() {
           areaSqm: (fieldData.area || 0) * 10000, // Convert Ha to SqM for storage
           crop: selectedCrop?.label || fieldData.crop,
           planting_date: fieldData.plantingDate || null,
+          environmentType: fieldData.environmentType || 'open_field',
+          containerCount: fieldData.environmentType === 'home_pot'
+            ? (typeof fieldData.containerCount === 'number' ? fieldData.containerCount : null)
+            : null,
           geometry: fieldData.geometry || null,
           centroid: fieldData.centroid || null,
           geoStatus,
@@ -724,6 +741,46 @@ export default function OnboardingPage() {
                 ? '名前と概算面積だけで先に登録できます。位置情報は後で追加できます。'
                 : '地図で境界をタップして面積を自動計算できます。'}
             </p>
+          </div>
+
+          <div className="rounded-xl border border-gray-200 bg-white p-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">栽培環境</label>
+            <SelectField
+              value={fieldData.environmentType || 'open_field'}
+              onChange={(value) => setFieldData({
+                ...fieldData,
+                environmentType: value as 'open_field' | 'greenhouse' | 'home_pot',
+                containerCount: value === 'home_pot'
+                  ? (fieldData.containerCount && fieldData.containerCount > 0 ? fieldData.containerCount : 1)
+                  : undefined,
+              })}
+              options={[
+                { value: 'open_field', label: '露地' },
+                { value: 'greenhouse', label: 'ハウス' },
+                { value: 'home_pot', label: '家庭ポット' },
+              ]}
+              placeholder="選択してください"
+              error={errors.environmentType}
+            />
+            {(fieldData.environmentType || 'open_field') === 'home_pot' ? (
+              <div className="mt-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">ポット数</label>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={fieldData.containerCount?.toString() || ''}
+                  onChange={(e) => setFieldData({
+                    ...fieldData,
+                    containerCount: Math.max(1, Math.floor(Number(e.target.value) || 0)),
+                  })}
+                  placeholder="例: 12"
+                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent ${errors.containerCount ? 'border-red-500' : 'border-gray-200'
+                    }`}
+                />
+                {errors.containerCount && <p className="mt-1 text-sm text-red-600">{errors.containerCount}</p>}
+              </div>
+            ) : null}
           </div>
 
           {fieldEntryMode === 'quick' && !showQuickLocationEditor ? (

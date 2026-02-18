@@ -15,6 +15,8 @@ type DrawMode = 'none' | 'centroid' | 'polygon';
 const DEFAULT_DRAFT: FieldDraft = {
   name: '',
   crop: '',
+  environmentType: 'open_field',
+  containerCount: null,
   color: '#16a34a',
   geoStatus: 'missing',
   weatherSamplingMode: 'hybrid',
@@ -28,6 +30,8 @@ function parseField(item: any): FieldRecord {
     id: item.id,
     name: item.name,
     crop: item.crop,
+    environmentType: item.environmentType || 'open_field',
+    containerCount: typeof item.containerCount === 'number' ? item.containerCount : null,
     color: item.color,
     areaSqm: typeof item.areaSqm === 'number' ? item.areaSqm : (typeof item.area === 'number' ? item.area : null),
     geometry: item.geometry || item.polygon || null,
@@ -44,6 +48,10 @@ function draftFromField(field: FieldRecord): FieldDraft {
     id: field.id,
     name: field.name,
     crop: field.crop || '',
+    environmentType: field.environmentType === 'greenhouse' || field.environmentType === 'home_pot'
+      ? field.environmentType
+      : 'open_field',
+    containerCount: typeof field.containerCount === 'number' ? field.containerCount : null,
     color: field.color || '#16a34a',
     geoStatus: field.geoStatus === 'verified' || field.geoStatus === 'approximate' ? field.geoStatus : 'missing',
     weatherSamplingMode: field.weatherSamplingMode === 'centroid' ? 'centroid' : 'hybrid',
@@ -190,8 +198,12 @@ export default function FieldStudio() {
       toastError('圃場名を入力してください');
       return;
     }
-    if (!draft.geometry && !draft.centroid) {
+    if (draft.environmentType === 'open_field' && !draft.geometry && !draft.centroid) {
       toastError('地図で位置ピンまたは境界を設定してください');
+      return;
+    }
+    if (draft.environmentType === 'home_pot' && (!draft.containerCount || draft.containerCount < 1)) {
+      toastError('家庭ポットの場合はポット数を入力してください');
       return;
     }
 
@@ -200,6 +212,8 @@ export default function FieldStudio() {
       const payload = {
         name: draft.name.trim(),
         crop: draft.crop.trim() || null,
+        environmentType: draft.environmentType,
+        containerCount: draft.environmentType === 'home_pot' ? draft.containerCount : null,
         color: draft.color,
         geometry: draft.geometry,
         centroid: draft.centroid,

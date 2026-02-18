@@ -14,6 +14,8 @@ export type FieldRecord = {
   id: string;
   name: string;
   crop?: string | null;
+  environmentType?: 'open_field' | 'greenhouse' | 'home_pot' | string;
+  containerCount?: number | null;
   color?: string | null;
   areaSqm?: number | null;
   geometry?: GeoJsonPolygon | null;

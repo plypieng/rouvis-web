@@ -9,6 +9,8 @@ type FieldDraft = {
   id?: string;
   name: string;
   crop: string;
+  environmentType: 'open_field' | 'greenhouse' | 'home_pot';
+  containerCount: number | null;
   color: string;
   geoStatus: 'verified' | 'approximate' | 'missing';
   weatherSamplingMode: 'centroid' | 'hybrid';
@@ -82,6 +84,45 @@ export default function FieldBoundaryEditor({
           />
         </label>
 
+        <label className="block">
+          <span className="mb-1 block text-xs font-semibold text-muted-foreground">栽培環境</span>
+          <select
+            value={draft.environmentType}
+            onChange={(event) => onDraftChange({
+              ...draft,
+              environmentType: event.target.value as 'open_field' | 'greenhouse' | 'home_pot',
+              containerCount: event.target.value === 'home_pot'
+                ? (draft.containerCount && draft.containerCount > 0 ? draft.containerCount : 1)
+                : null,
+            })}
+            className="control-inset w-full rounded-lg border border-border px-3 py-2"
+          >
+            <option value="open_field">露地</option>
+            <option value="greenhouse">ハウス</option>
+            <option value="home_pot">家庭ポット</option>
+          </select>
+        </label>
+
+        {draft.environmentType === 'home_pot' ? (
+          <label className="block">
+            <span className="mb-1 block text-xs font-semibold text-muted-foreground">ポット数</span>
+            <input
+              type="number"
+              min={1}
+              step={1}
+              value={draft.containerCount ?? ''}
+              onChange={(event) => onDraftChange({
+                ...draft,
+                containerCount: Number.isFinite(Number(event.target.value))
+                  ? Math.max(1, Math.floor(Number(event.target.value)))
+                  : null,
+              })}
+              className="control-inset w-full rounded-lg border border-border px-3 py-2"
+              placeholder="例: 12"
+            />
+          </label>
+        ) : null}
+
         <div className="grid grid-cols-2 gap-2">
           <label className="block">
             <span className="mb-1 block text-xs font-semibold text-muted-foreground">色</span>
@@ -152,7 +193,12 @@ export default function FieldBoundaryEditor({
         <button
           type="button"
           onClick={onSave}
-          disabled={saving || !draft.name.trim() || (!draft.centroid && !draft.geometry)}
+          disabled={
+            saving
+            || !draft.name.trim()
+            || (draft.environmentType === 'open_field' && !draft.centroid && !draft.geometry)
+            || (draft.environmentType === 'home_pot' && (!draft.containerCount || draft.containerCount < 1))
+          }
           className="touch-target flex-1 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
         >
           {saving ? '保存中...' : isNew ? '圃場を作成' : '保存'}

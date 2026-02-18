@@ -285,6 +285,8 @@ model Field {
   name      String
   area      Float    // in square meters
   crop      String?
+  environmentType String @default("open_field") // open_field, greenhouse, home_pot
+  containerCount Int?
   polygon   Json?    // GeoJSON or array of coordinates
   location  Json?    // Center point {lat, lng}
   color     String?  // Hex color code for visualization

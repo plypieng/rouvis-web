@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { toastError } from '@/lib/feedback';
+import FieldMapCanvas from '@/components/fields/FieldMapCanvas';
+import type { FieldCentroid, GeoJsonPolygon } from '@/components/fields/types';
 
 type FieldScopeValue = {
   fieldIds: string[];
@@ -12,15 +14,20 @@ type FieldRecord = {
   id: string;
   name: string;
   crop?: string | null;
+  environmentType?: 'open_field' | 'greenhouse' | 'home_pot' | string;
+  containerCount?: number | null;
   areaSqm?: number | null;
   area?: number | null;
   color?: string | null;
-  geoStatus?: string | null;
+  geoStatus?: string;
+  geometry?: GeoJsonPolygon | null;
+  centroid?: FieldCentroid | null;
 };
 
 interface FieldSelectorProps {
   value: FieldScopeValue;
   onChange: (next: FieldScopeValue) => void;
+  onFieldsLoaded?: (fields: FieldRecord[]) => void;
 }
 
 function normalizeField(raw: any): FieldRecord {
@@ -28,6 +35,8 @@ function normalizeField(raw: any): FieldRecord {
     id: String(raw?.id || ''),
     name: String(raw?.name || 'Unnamed field'),
     crop: raw?.crop || null,
+    environmentType: raw?.environmentType || 'open_field',
+    containerCount: typeof raw?.containerCount === 'number' ? raw.containerCount : null,
     areaSqm: typeof raw?.areaSqm === 'number'
       ? raw.areaSqm
       : (typeof raw?.area === 'number' ? raw.area : null),
@@ -35,11 +44,24 @@ function normalizeField(raw: any): FieldRecord {
       ? raw.area
       : (typeof raw?.areaSqm === 'number' ? raw.areaSqm : null),
     color: typeof raw?.color === 'string' ? raw.color : null,
-    geoStatus: typeof raw?.geoStatus === 'string' ? raw.geoStatus : null,
+    geoStatus: typeof raw?.geoStatus === 'string' ? raw.geoStatus : undefined,
+    geometry: raw?.geometry && raw.geometry.type === 'Polygon'
+      ? raw.geometry as GeoJsonPolygon
+      : null,
+    centroid: raw?.centroid
+      && typeof raw.centroid.lat === 'number'
+      && typeof raw.centroid.lon === 'number'
+      ? raw.centroid as FieldCentroid
+      : null,
   };
 }
 
+function requiresGeo(field: FieldRecord): boolean {
+  return (field.environmentType || 'open_field') === 'open_field';
+}
+
 function isSelectable(field: FieldRecord): boolean {
+  if (!requiresGeo(field)) return true;
   return field.geoStatus !== 'missing';
 }
 
@@ -55,6 +77,12 @@ function statusTone(field: FieldRecord): string {
   return 'border-red-200 bg-red-50 text-red-700';
 }
 
+function environmentLabel(field: FieldRecord): string {
+  if (field.environmentType === 'greenhouse') return 'ハウス';
+  if (field.environmentType === 'home_pot') return '家庭ポット';
+  return '露地';
+}
+
 function areaLabel(field: FieldRecord): string {
   const areaSqm = typeof field.areaSqm === 'number'
     ? field.areaSqm
@@ -63,7 +91,7 @@ function areaLabel(field: FieldRecord): string {
   return `${(areaSqm / 10000).toFixed(2)} ha`;
 }
 
-export default function FieldSelector({ value, onChange }: FieldSelectorProps) {
+export default function FieldSelector({ value, onChange, onFieldsLoaded }: FieldSelectorProps) {
   const [fields, setFields] = useState<FieldRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -91,6 +119,7 @@ export default function FieldSelector({ value, onChange }: FieldSelectorProps) {
         ? payload.fields.map((item: any) => normalizeField(item)).filter((item: FieldRecord) => Boolean(item.id))
         : [];
       setFields(nextFields);
+      onFieldsLoaded?.(nextFields);
     } catch (nextError) {
       console.error('Failed to fetch fields', nextError);
       setError(nextError instanceof Error ? nextError.message : '圃場一覧の取得に失敗しました');
@@ -131,7 +160,7 @@ export default function FieldSelector({ value, onChange }: FieldSelectorProps) {
 
   const toggleField = (field: FieldRecord) => {
     if (!isSelectable(field)) {
-      toastError('位置情報が未設定の圃場は選択できません。Mapページでピンまたは境界を設定してください。');
+      toastError('露地圃場は位置情報が必要です。Mapページでピンまたは境界を設定してください。');
       return;
     }
 
@@ -198,7 +227,39 @@ export default function FieldSelector({ value, onChange }: FieldSelectorProps) {
       ) : null}
 
       {!loading && !error && fields.length > 0 ? (
-        <div className="space-y-2">
+        <div className="space-y-3">
+          <div className="[&_[data-testid='field-map-canvas']]:h-64 [&_[data-testid='field-map-canvas']]:min-h-0">
+            <FieldMapCanvas
+              fields={fields}
+              selectedFieldId={primaryFieldId}
+              draftGeometry={null}
+              draftCentroid={null}
+              drawMode="none"
+              riskByFieldId={{}}
+              onSelectField={(fieldId) => {
+                const field = fieldById.get(fieldId);
+                if (!field) return;
+                if (!isSelectable(field)) {
+                  toastError('露地圃場は位置情報が必要です。Mapページでピンまたは境界を設定してください。');
+                  return;
+                }
+
+                if (selectedFieldIds.includes(fieldId)) {
+                  setPrimary(fieldId);
+                  return;
+                }
+
+                onChange({
+                  fieldIds: [...selectedFieldIds, fieldId],
+                  primaryFieldId: fieldId,
+                });
+              }}
+              onDraftGeometryChange={() => {}}
+              onDraftCentroidChange={() => {}}
+            />
+          </div>
+
+          <div className="space-y-2">
           {fields.map((field) => {
             const selected = selectedFieldIds.includes(field.id);
             const primary = primaryFieldId === field.id;
@@ -230,7 +291,7 @@ export default function FieldSelector({ value, onChange }: FieldSelectorProps) {
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-semibold text-foreground">{field.name}</span>
                       <span className="block text-xs text-muted-foreground">
-                        {field.crop || '作物未設定'} · {areaLabel(field)}
+                        {field.crop || '作物未設定'} · {areaLabel(field)} · {environmentLabel(field)}
                       </span>
                     </span>
                   </button>
@@ -250,16 +311,23 @@ export default function FieldSelector({ value, onChange }: FieldSelectorProps) {
                 </div>
 
                 <div className="mt-2 flex items-center gap-2">
-                  <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusTone(field)}`}>
-                    {statusLabel(field)}
-                  </span>
-                  {!selectable ? (
+                  {requiresGeo(field) ? (
+                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusTone(field)}`}>
+                      {statusLabel(field)}
+                    </span>
+                  ) : (
+                    <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700">
+                      位置情報は任意
+                    </span>
+                  )}
+                  {!selectable && requiresGeo(field) ? (
                     <span className="text-[11px] font-medium text-red-700">スケジューリング不可</span>
                   ) : null}
                 </div>
               </div>
             );
           })}
+          </div>
         </div>
       ) : null}
 

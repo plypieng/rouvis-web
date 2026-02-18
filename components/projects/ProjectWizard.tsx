@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useSession } from 'next-auth/react';
@@ -79,6 +79,7 @@ type ParsedApiError = {
 
 type PreferenceTemplate = {
     id: string;
+    status?: 'active' | 'coming_soon';
     label: string;
     description: string;
     preferences: Record<string, unknown>;
@@ -89,13 +90,131 @@ type PreferenceTemplateCatalog = {
     recommendedTemplate?: string;
 };
 
-const FALLBACK_TEMPLATE_ID = 'balanced-new-farmer';
+type FieldEnvironmentType = 'open_field' | 'greenhouse' | 'home_pot';
+type YieldUnit = 't_per_ha' | 'kg_total';
+
+type WizardFieldRecord = {
+    id: string;
+    name: string;
+    environmentType?: FieldEnvironmentType | string;
+    containerCount?: number | null;
+    areaSqm?: number | null;
+    area?: number | null;
+};
+
+type YieldRecommendation = {
+    value: number;
+    unit: YieldUnit;
+    min: number;
+    max: number;
+    environment: FieldEnvironmentType;
+    rationale: string;
+};
+
+const FALLBACK_TEMPLATE_ID = 'conservative-weather';
 const MAX_SCAN_PAYLOAD_BYTES = 3_900_000;
 const MAX_SCAN_DIMENSION = 1800;
 const MIN_SCAN_SCALE = 0.25;
 const SCALE_REDUCTION_FACTOR = 0.82;
 const JPEG_QUALITIES = [0.9, 0.82, 0.74, 0.66, 0.58, 0.5, 0.42] as const;
 const textEncoder = new TextEncoder();
+const BASE_YIELD_T_PER_HA: Record<Exclude<FieldEnvironmentType, 'home_pot'>, number> = {
+    open_field: 5.2,
+    greenhouse: 8.0,
+};
+
+function resolveEnvironmentType(value: unknown): FieldEnvironmentType {
+    if (value === 'greenhouse' || value === 'home_pot' || value === 'open_field') return value;
+    return 'open_field';
+}
+
+function fieldAreaSqm(field: WizardFieldRecord): number {
+    const area = typeof field.areaSqm === 'number' ? field.areaSqm : field.area;
+    if (typeof area !== 'number' || !Number.isFinite(area) || area <= 0) return 0;
+    return area;
+}
+
+function roundYield(value: number, digits = 1): number {
+    const factor = 10 ** digits;
+    return Math.round(value * factor) / factor;
+}
+
+function yieldUnitLabel(unit: YieldUnit): string {
+    return unit === 'kg_total' ? 'kg (合計)' : 't/ha';
+}
+
+function parsePositiveNumber(input: string): number | null {
+    const trimmed = input.trim();
+    if (!trimmed) return null;
+    const parsed = Number(trimmed);
+    if (!Number.isFinite(parsed) || parsed <= 0) return null;
+    return parsed;
+}
+
+function recommendationForFields(
+    fields: WizardFieldRecord[],
+    selectedFieldIds: string[],
+    primaryFieldId: string | null
+): YieldRecommendation | null {
+    if (!selectedFieldIds.length || !fields.length) return null;
+
+    const selected = fields.filter((field) => selectedFieldIds.includes(field.id));
+    if (!selected.length) return null;
+
+    const primaryField = selected.find((field) => field.id === primaryFieldId) || selected[0];
+    const primaryEnvironment = resolveEnvironmentType(primaryField?.environmentType);
+
+    const areaBasedFields = selected
+        .map((field) => ({
+            environment: resolveEnvironmentType(field.environmentType),
+            areaSqm: fieldAreaSqm(field),
+        }))
+        .filter((field) => field.environment !== 'home_pot' && field.areaSqm > 0);
+
+    if (areaBasedFields.length > 0) {
+        const totalAreaSqm = areaBasedFields.reduce((sum, field) => sum + field.areaSqm, 0);
+        const weightedRate = areaBasedFields.reduce(
+            (sum, field) => {
+                const baseRate = field.environment === 'greenhouse'
+                    ? BASE_YIELD_T_PER_HA.greenhouse
+                    : BASE_YIELD_T_PER_HA.open_field;
+                return sum + (baseRate * field.areaSqm);
+            },
+            0
+        ) / totalAreaSqm;
+        const recommendation = roundYield(weightedRate, 1);
+        return {
+            value: recommendation,
+            unit: 't_per_ha',
+            min: Math.max(0.1, roundYield(recommendation * 0.8, 1)),
+            max: roundYield(recommendation * 1.2, 1),
+            environment: primaryEnvironment === 'home_pot' ? 'open_field' : primaryEnvironment,
+            rationale: `選択圃場の面積 ${roundYield(totalAreaSqm / 10000, 2)}ha をもとに推定`,
+        };
+    }
+
+    const totalPots = selected.reduce((sum, field) => {
+        if (resolveEnvironmentType(field.environmentType) !== 'home_pot') return sum;
+        if (typeof field.containerCount === 'number' && field.containerCount > 0) {
+            return sum + field.containerCount;
+        }
+        return sum + 1;
+    }, 0);
+
+    if (totalPots > 0) {
+        const recommendation = roundYield(totalPots * 1.8, 1);
+        return {
+            value: recommendation,
+            unit: 'kg_total',
+            min: Math.max(0.1, roundYield(recommendation * 0.7, 1)),
+            max: roundYield(recommendation * 1.3, 1),
+            environment: 'home_pot',
+            rationale: `家庭ポット ${totalPots}個 をもとに推定`,
+        };
+    }
+
+    return null;
+}
 
 function estimateUtf8Bytes(value: string): number {
     return textEncoder.encode(value).length;
@@ -253,6 +372,84 @@ export default function ProjectWizard({ locale }: { locale: string }) {
     // State for new workflow
     const [projectType, setProjectType] = useState<'new' | 'existing' | null>(null);
     const [plantingDate, setPlantingDate] = useState<string | null>(null);
+    const [availableFields, setAvailableFields] = useState<WizardFieldRecord[]>([]);
+    const [preferredYieldInput, setPreferredYieldInput] = useState('');
+    const [preferredYieldUnit, setPreferredYieldUnit] = useState<YieldUnit>('t_per_ha');
+    const [yieldEdited, setYieldEdited] = useState(false);
+
+    const activeTemplates = useMemo(
+        () => preferenceTemplates.filter((template) => (template.status ?? 'active') === 'active'),
+        [preferenceTemplates]
+    );
+
+    const effectiveTemplateId = useMemo(() => {
+        if (selectedTemplateId && activeTemplates.some((template) => template.id === selectedTemplateId)) {
+            return selectedTemplateId;
+        }
+        if (recommendedTemplateId && activeTemplates.some((template) => template.id === recommendedTemplateId)) {
+            return recommendedTemplateId;
+        }
+        return activeTemplates[0]?.id ?? null;
+    }, [activeTemplates, recommendedTemplateId, selectedTemplateId]);
+
+    const effectiveTemplatePreferences = useMemo<Record<string, unknown>>(() => {
+        const matched = activeTemplates.find((template) => template.id === effectiveTemplateId);
+        if (!matched?.preferences || typeof matched.preferences !== 'object') return {};
+        return { ...matched.preferences };
+    }, [activeTemplates, effectiveTemplateId]);
+
+    const yieldRecommendation = useMemo(
+        () => recommendationForFields(availableFields, selectedFieldIds, primaryFieldId),
+        [availableFields, primaryFieldId, selectedFieldIds]
+    );
+
+    const preferredYieldValue = useMemo(
+        () => parsePositiveNumber(preferredYieldInput),
+        [preferredYieldInput]
+    );
+
+    useEffect(() => {
+        if (!selectedFieldIds.length) {
+            setYieldEdited(false);
+            setPreferredYieldInput('');
+            setPreferredYieldUnit('t_per_ha');
+            return;
+        }
+        if (!yieldEdited && yieldRecommendation) {
+            setPreferredYieldInput(String(yieldRecommendation.value));
+            setPreferredYieldUnit(yieldRecommendation.unit);
+        }
+    }, [selectedFieldIds, yieldEdited, yieldRecommendation]);
+
+    const mergedSchedulingPreferences = useMemo(() => {
+        const merged: Record<string, unknown> = {
+            ...effectiveTemplatePreferences,
+        };
+        const recommendation = yieldRecommendation;
+        const targetYieldValue = preferredYieldValue ?? recommendation?.value;
+        const targetYieldUnit = preferredYieldUnit || recommendation?.unit;
+
+        if (typeof targetYieldValue === 'number' && Number.isFinite(targetYieldValue) && targetYieldValue > 0) {
+            merged.targetYieldValue = roundYield(targetYieldValue, 1);
+            if (targetYieldUnit) {
+                merged.targetYieldUnit = targetYieldUnit;
+            }
+        }
+
+        if (recommendation) {
+            merged.targetYieldRecommended = recommendation.value;
+            merged.targetYieldMin = recommendation.min;
+            merged.targetYieldMax = recommendation.max;
+            merged.targetYieldEnvironment = recommendation.environment;
+            if (!merged.targetYieldUnit) {
+                merged.targetYieldUnit = recommendation.unit;
+            }
+        }
+
+        return Object.keys(merged).length > 0 ? merged : undefined;
+    }, [effectiveTemplatePreferences, preferredYieldUnit, preferredYieldValue, yieldRecommendation]);
+
+    const hasInvalidYieldInput = preferredYieldInput.trim().length > 0 && preferredYieldValue === null;
 
     const extractApiError = async (response: Response, fallback: string): Promise<ParsedApiError> => {
         const payload = await response.json().catch(() => ({})) as ApiErrorPayload;
@@ -279,19 +476,24 @@ export default function ProjectWizard({ locale }: { locale: string }) {
 
     const applyTemplateCatalog = (catalog: PreferenceTemplateCatalog): void => {
         const templates = Array.isArray(catalog.templates) ? catalog.templates : [];
-        const recommendedTemplate = typeof catalog.recommendedTemplate === 'string'
+        const activeTemplateIds = templates
+            .filter((template) => (template.status ?? 'active') === 'active')
+            .map((template) => template.id);
+        const recommendedFromCatalog = typeof catalog.recommendedTemplate === 'string'
             ? catalog.recommendedTemplate
             : null;
-        setRecommendedTemplateId(recommendedTemplate);
-        if (templates.length === 0) return;
-
         setPreferenceTemplates(templates);
+        const resolvedRecommended = recommendedFromCatalog && activeTemplateIds.includes(recommendedFromCatalog)
+            ? recommendedFromCatalog
+            : activeTemplateIds.includes(FALLBACK_TEMPLATE_ID)
+                ? FALLBACK_TEMPLATE_ID
+                : activeTemplateIds[0] || null;
+
+        setRecommendedTemplateId(resolvedRecommended);
         setSelectedTemplateId((current) => {
-            if (templates.some((template) => template.id === current)) return current;
-            if (recommendedTemplate && templates.some((template) => template.id === recommendedTemplate)) {
-                return recommendedTemplate;
-            }
-            return templates[0].id;
+            if (activeTemplateIds.includes(current)) return current;
+            if (resolvedRecommended) return resolvedRecommended;
+            return current;
         });
     };
 
@@ -373,16 +575,17 @@ export default function ProjectWizard({ locale }: { locale: string }) {
         );
     };
 
-    const persistGeneratedTasks = async (projectId: string, tasks: TaskPayload[]): Promise<PersistedTask[]> => {
-        const selectedTemplatePreferences = preferenceTemplates.find(
-            (template) => template.id === selectedTemplateId
-        )?.preferences;
+    const persistGeneratedTasks = async (
+        projectId: string,
+        tasks: TaskPayload[],
+        schedulingPreferences?: Record<string, unknown>
+    ): Promise<PersistedTask[]> => {
         const saveResponse = await fetch(`/api/v1/projects/${projectId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 tasks,
-                ...(selectedTemplatePreferences ? { schedulingPreferences: selectedTemplatePreferences } : {}),
+                ...(schedulingPreferences ? { schedulingPreferences } : {}),
             }),
         });
 
@@ -407,7 +610,9 @@ export default function ProjectWizard({ locale }: { locale: string }) {
 
     const generateAndPersistInitialSchedule = async (
         projectId: string,
-        defaultFieldId: string
+        defaultFieldId: string,
+        schedulingPreferences?: Record<string, unknown>,
+        preferenceTemplateId?: string | null
     ): Promise<{ taskCount: number; usedFallback: boolean; firstPendingTaskId: string | null }> => {
         if (!cropAnalysis) throw new Error('作物情報が見つかりません');
 
@@ -416,42 +621,44 @@ export default function ProjectWizard({ locale }: { locale: string }) {
         const endpoint = isBackfilled
             ? '/api/v1/agents/generate-backfilled-schedule'
             : '/api/v1/agents/generate-schedule';
-        const preferenceTemplate = selectedTemplateId || FALLBACK_TEMPLATE_ID;
+        const preferenceTemplate = preferenceTemplateId || undefined;
         let usedFallback = false;
         let tasks: TaskPayload[] = [];
 
         try {
+            const generationPayload = isBackfilled
+                ? {
+                    projectId,
+                    ...(preferenceTemplate ? { preferenceTemplate } : {}),
+                    ...(schedulingPreferences ? { schedulingPreferences } : {}),
+                    cropAnalysis: {
+                        crop: cropAnalysis.crop,
+                        variety: cropAnalysis.variety,
+                        startDate: effectivePlantingDate,
+                        targetHarvestDate: cropAnalysis.targetHarvestDate || '',
+                        notes: cropAnalysis.notes,
+                    },
+                    plantingDate: effectivePlantingDate,
+                    currentDate: new Date().toISOString().split('T')[0],
+                }
+                : {
+                    projectId,
+                    ...(preferenceTemplate ? { preferenceTemplate } : {}),
+                    ...(schedulingPreferences ? { schedulingPreferences } : {}),
+                    cropAnalysis: {
+                        crop: cropAnalysis.crop,
+                        variety: cropAnalysis.variety,
+                        startDate: cropAnalysis.startDate || new Date().toISOString().split('T')[0],
+                        targetHarvestDate: cropAnalysis.targetHarvestDate || '',
+                        notes: cropAnalysis.notes,
+                    },
+                    currentDate: new Date().toISOString().split('T')[0],
+                };
+
             const scheduleResponse = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(
-                    isBackfilled
-                        ? {
-                            projectId,
-                            preferenceTemplate,
-                            cropAnalysis: {
-                                crop: cropAnalysis.crop,
-                                variety: cropAnalysis.variety,
-                                startDate: effectivePlantingDate,
-                                targetHarvestDate: cropAnalysis.targetHarvestDate || '',
-                                notes: cropAnalysis.notes,
-                            },
-                            plantingDate: effectivePlantingDate,
-                            currentDate: new Date().toISOString().split('T')[0],
-                        }
-                        : {
-                            projectId,
-                            preferenceTemplate,
-                            cropAnalysis: {
-                                crop: cropAnalysis.crop,
-                                variety: cropAnalysis.variety,
-                                startDate: cropAnalysis.startDate || new Date().toISOString().split('T')[0],
-                                targetHarvestDate: cropAnalysis.targetHarvestDate || '',
-                                notes: cropAnalysis.notes,
-                            },
-                            currentDate: new Date().toISOString().split('T')[0],
-                        }
-                ),
+                body: JSON.stringify(generationPayload),
             });
 
             const generatedData = await scheduleResponse.json().catch(() => ({}));
@@ -499,7 +706,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
             throw new Error('初回タスクの作成に失敗しました');
         }
 
-        const persistedTasks = await persistGeneratedTasks(projectId, tasks);
+        const persistedTasks = await persistGeneratedTasks(projectId, tasks, schedulingPreferences);
         const firstPendingTask = persistedTasks
             .filter((task) => task.status === 'pending')
             .sort((left, right) => {
@@ -670,11 +877,21 @@ export default function ProjectWizard({ locale }: { locale: string }) {
             toastError(message);
             return;
         }
+        if (preferredYieldInput.trim() && preferredYieldValue === null) {
+            const message = '目標収量は0より大きい数値で入力してください。';
+            setNotice({
+                type: 'error',
+                message,
+            });
+            toastError(message);
+            return;
+        }
         setNotice(null);
         setLoading(true);
 
         try {
             let projectId = createdProjectId;
+            const schedulingPreferences = mergedSchedulingPreferences;
 
             if (!projectId) {
                 setNotice({ type: 'info', message: 'プロジェクトを作成しています...' });
@@ -689,9 +906,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                     fieldId: primaryFieldId,
                     notes: cropAnalysis.notes,
                     tasks: [],
-                    schedulingPreferences: preferenceTemplates.find(
-                        (template) => template.id === selectedTemplateId
-                    )?.preferences,
+                    schedulingPreferences,
                 };
                 console.log('Creating project with payload:', payload);
 
@@ -729,7 +944,12 @@ export default function ProjectWizard({ locale }: { locale: string }) {
 
             setNotice({ type: 'info', message: 'AIが初回スケジュールを作成しています...' });
             toastInfo('AIが初回スケジュールを作成しています...');
-            const { taskCount, usedFallback, firstPendingTaskId } = await generateAndPersistInitialSchedule(projectId, primaryFieldId);
+            const { taskCount, usedFallback, firstPendingTaskId } = await generateAndPersistInitialSchedule(
+                projectId,
+                primaryFieldId,
+                schedulingPreferences,
+                effectiveTemplateId
+            );
             void trackUXEvent('schedule_generated', {
                 projectId,
                 flow: 'wizard',
@@ -1001,54 +1221,6 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                         </div>
                     </div>
                 )}
-                <CropAnalysisCard analysis={cropAnalysis} />
-                <div className="surface-base p-4">
-                    <div className="mb-3">
-                        <h3 className="text-sm font-semibold text-foreground">初回ドラフトの作業スタイル</h3>
-                        <p className="text-xs text-muted-foreground">
-                            テンプレートを選ぶと、最初のスケジュールの優先度と作業量が調整されます。
-                        </p>
-                    </div>
-                    {templatesLoading && (
-                        <p className="text-xs text-muted-foreground">テンプレートを読み込み中...</p>
-                    )}
-                    {!templatesLoading && templatesError && (
-                        <p className="text-xs text-orange-700 dark:text-orange-200">
-                            {templatesError} 標準テンプレートで続行します。
-                        </p>
-                    )}
-                    {!templatesLoading && preferenceTemplates.length > 0 && (
-                        <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-                            {preferenceTemplates.map((template) => {
-                                const selected = template.id === selectedTemplateId;
-                                const recommended = template.id === recommendedTemplateId;
-                                return (
-                                    <button
-                                        key={template.id}
-                                        type="button"
-                                        onClick={() => setSelectedTemplateId(template.id)}
-                                        className={`rounded-lg border px-3 py-3 text-left transition ${selected
-                                            ? 'border-brand-seedling/70 bg-secondary/30'
-                                            : 'border-border bg-card hover:border-brand-seedling/50'
-                                            }`}
-                                    >
-                                        <div className="mb-1 flex items-center justify-between gap-2">
-                                            <span className="text-sm font-semibold text-foreground">
-                                                {template.label}
-                                            </span>
-                                            {recommended && (
-                                                <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold text-secondary-foreground">
-                                                    推奨
-                                                </span>
-                                            )}
-                                        </div>
-                                        <p className="text-xs text-muted-foreground">{template.description}</p>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
                 <FieldSelector
                     value={{
                         fieldIds: selectedFieldIds,
@@ -1058,7 +1230,147 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                         setSelectedFieldIds(scope.fieldIds);
                         setPrimaryFieldId(scope.primaryFieldId);
                     }}
+                    onFieldsLoaded={(fields) => {
+                        setAvailableFields(fields);
+                    }}
                 />
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    <div className="surface-base p-4">
+                        <div className="mb-3">
+                            <h3 className="text-sm font-semibold text-foreground">初回ドラフトの作業スタイル</h3>
+                            <p className="text-xs text-muted-foreground">
+                                現在は天候重視テンプレートのみ利用可能です。他テンプレートは実装予定として表示します。
+                            </p>
+                        </div>
+                        {templatesLoading && (
+                            <p className="text-xs text-muted-foreground">テンプレートを読み込み中...</p>
+                        )}
+                        {!templatesLoading && templatesError && (
+                            <p className="text-xs text-orange-700 dark:text-orange-200">
+                                {templatesError} 天候重視設定で続行します。
+                            </p>
+                        )}
+                        {!templatesLoading && preferenceTemplates.length > 0 && (
+                            <div className="space-y-2">
+                                {preferenceTemplates.map((template) => {
+                                    const isActive = (template.status ?? 'active') === 'active';
+                                    const selected = isActive && template.id === effectiveTemplateId;
+                                    const recommended = isActive && template.id === recommendedTemplateId;
+                                    return (
+                                        <button
+                                            key={template.id}
+                                            type="button"
+                                            disabled={!isActive}
+                                            onClick={() => {
+                                                if (!isActive) return;
+                                                setSelectedTemplateId(template.id);
+                                            }}
+                                            className={`w-full rounded-lg border px-3 py-3 text-left transition ${isActive
+                                                ? selected
+                                                    ? 'border-brand-seedling/75 bg-brand-seedling/10'
+                                                    : 'border-border bg-card hover:border-brand-seedling/50'
+                                                : 'border-border/60 bg-secondary/20 opacity-55'
+                                                }`}
+                                        >
+                                            <div className="mb-1 flex items-center justify-between gap-2">
+                                                <span className="text-sm font-semibold text-foreground">
+                                                    {template.label}
+                                                </span>
+                                                <div className="flex items-center gap-1.5">
+                                                    {recommended && (
+                                                        <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold text-secondary-foreground">
+                                                            推奨
+                                                        </span>
+                                                    )}
+                                                    {!isActive && (
+                                                        <span className="rounded-full border border-border bg-card px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                                                            To be implemented
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">{template.description}</p>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="surface-base p-4">
+                        <div className="mb-3">
+                            <h3 className="text-sm font-semibold text-foreground">目標収量</h3>
+                            <p className="text-xs text-muted-foreground">
+                                選択した圃場条件から推奨値を算出しています。必要に応じて好みの値に上書きできます。
+                            </p>
+                        </div>
+
+                        {yieldRecommendation ? (
+                            <div className="rounded-lg border border-brand-waterline/35 bg-brand-waterline/10 px-3 py-2">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">Recommended</p>
+                                <p className="text-lg font-semibold text-foreground">
+                                    {yieldRecommendation.value} {yieldUnitLabel(yieldRecommendation.unit)}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    目安レンジ: {yieldRecommendation.min} - {yieldRecommendation.max} {yieldUnitLabel(yieldRecommendation.unit)}
+                                </p>
+                                <p className="text-xs text-muted-foreground">{yieldRecommendation.rationale}</p>
+                            </div>
+                        ) : (
+                            <div className="rounded-lg border border-dashed border-border bg-secondary/20 px-3 py-3 text-xs text-muted-foreground">
+                                圃場を選択すると推奨収量を表示します。
+                            </div>
+                        )}
+
+                        <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-[1fr_160px]">
+                            <input
+                                type="number"
+                                min={0}
+                                step={0.1}
+                                inputMode="decimal"
+                                value={preferredYieldInput}
+                                onChange={(event) => {
+                                    setYieldEdited(true);
+                                    setPreferredYieldInput(event.target.value);
+                                }}
+                                placeholder={yieldRecommendation ? String(yieldRecommendation.value) : '例: 5.0'}
+                                className="control-inset w-full px-3 py-2 text-sm"
+                            />
+                            <select
+                                value={preferredYieldUnit}
+                                onChange={(event) => {
+                                    setYieldEdited(true);
+                                    setPreferredYieldUnit(event.target.value as YieldUnit);
+                                }}
+                                className="control-inset w-full px-3 py-2 text-sm"
+                            >
+                                <option value="t_per_ha">t/ha</option>
+                                <option value="kg_total">kg (合計)</option>
+                            </select>
+                        </div>
+
+                        {hasInvalidYieldInput && (
+                            <p className="mt-2 text-xs font-medium text-red-700">
+                                目標収量は0より大きい数値を入力してください。
+                            </p>
+                        )}
+
+                        {yieldRecommendation && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setPreferredYieldInput(String(yieldRecommendation.value));
+                                    setPreferredYieldUnit(yieldRecommendation.unit);
+                                    setYieldEdited(false);
+                                }}
+                                className="mt-2 rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary/60"
+                            >
+                                推奨値を反映する
+                            </button>
+                        )}
+                    </div>
+                </div>
+                <CropAnalysisCard analysis={cropAnalysis} />
                 <div className="flex justify-end gap-4">
                     <button
                         onClick={() => setStep(projectType === 'existing' ? 'planting-history' : 'crop-analysis')}
@@ -1068,14 +1380,10 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                     </button>
                     <button
                         onClick={handleCreateProject}
-                        disabled={loading || templatesLoading || !selectedFieldIds.length || !primaryFieldId}
+                        disabled={loading || !selectedFieldIds.length || !primaryFieldId || hasInvalidYieldInput}
                         className="rounded-lg bg-primary px-8 py-3 text-lg font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
                     >
-                        {loading
-                            ? '作成中...'
-                            : templatesLoading
-                                ? 'テンプレート読込中...'
-                                : 'プロジェクトを作成'}
+                        {loading ? '作成中...' : 'プロジェクトを作成'}
                     </button>
                 </div>
             </div>
