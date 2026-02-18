@@ -90,6 +90,86 @@ type PreferenceTemplateCatalog = {
 };
 
 const FALLBACK_TEMPLATE_ID = 'balanced-new-farmer';
+const MAX_SCAN_PAYLOAD_BYTES = 3_900_000;
+const MAX_SCAN_DIMENSION = 1800;
+const MIN_SCAN_SCALE = 0.25;
+const SCALE_REDUCTION_FACTOR = 0.82;
+const JPEG_QUALITIES = [0.9, 0.82, 0.74, 0.66, 0.58, 0.5, 0.42] as const;
+const textEncoder = new TextEncoder();
+
+function estimateUtf8Bytes(value: string): number {
+    return textEncoder.encode(value).length;
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            if (typeof reader.result === 'string') {
+                resolve(reader.result);
+                return;
+            }
+            reject(new Error('画像の読み込みに失敗しました'));
+        };
+        reader.onerror = () => reject(new Error('画像の読み込みに失敗しました'));
+        reader.readAsDataURL(file);
+    });
+}
+
+function loadImageFromFile(file: File): Promise<HTMLImageElement> {
+    return new Promise((resolve, reject) => {
+        const objectUrl = URL.createObjectURL(file);
+        const image = new Image();
+        image.onload = () => {
+            URL.revokeObjectURL(objectUrl);
+            resolve(image);
+        };
+        image.onerror = () => {
+            URL.revokeObjectURL(objectUrl);
+            reject(new Error('画像の読み込みに失敗しました'));
+        };
+        image.src = objectUrl;
+    });
+}
+
+async function prepareSeedBagImagePayload(file: File): Promise<string> {
+    if (!file.type.startsWith('image/')) {
+        throw new Error('画像ファイルを選択してください');
+    }
+
+    const originalDataUrl = await readFileAsDataUrl(file);
+    if (estimateUtf8Bytes(originalDataUrl) <= MAX_SCAN_PAYLOAD_BYTES) {
+        return originalDataUrl;
+    }
+
+    const image = await loadImageFromFile(file);
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    if (!context) {
+        throw new Error('画像の処理に失敗しました');
+    }
+
+    const longestSide = Math.max(image.naturalWidth, image.naturalHeight);
+    let scale = longestSide > MAX_SCAN_DIMENSION ? MAX_SCAN_DIMENSION / longestSide : 1;
+
+    while (scale >= MIN_SCAN_SCALE) {
+        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+        for (const quality of JPEG_QUALITIES) {
+            const candidate = canvas.toDataURL('image/jpeg', quality);
+            if (estimateUtf8Bytes(candidate) <= MAX_SCAN_PAYLOAD_BYTES) {
+                return candidate;
+            }
+        }
+
+        scale *= SCALE_REDUCTION_FACTOR;
+    }
+
+    throw new Error('画像サイズが大きすぎます。より小さい画像を選択してください');
+}
 
 // Visual step progress indicator
 const WIZARD_STEPS = [
@@ -455,58 +535,54 @@ export default function ProjectWizard({ locale }: { locale: string }) {
         setNotice(null);
         setLoading(true);
         setLoadingMode('scan');
-        const reader = new FileReader();
+        try {
+            const imagePayload = await prepareSeedBagImagePayload(file);
 
-        reader.onloadend = async () => {
-            try {
-                // 1. First get recommendation/analysis from image
-                const res = await fetch('/api/v1/agents/recommend', {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image: reader.result }),
-                });
+            // 1. First get recommendation/analysis from image
+            const res = await fetch('/api/v1/agents/recommend', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: imagePayload }),
+            });
 
-                if (!res.ok) {
-                    throw new Error(`Server responded with ${res.status}: ${res.statusText}`);
-                }
-
-                if (res.ok) {
-                    const data = await res.json() as CropAnalysis;
-
-                    // Extract variety if available, otherwise empty string
-                    const variety = data.variety || "";
-                    const region = "Niigata"; // Default for now, could be dynamic later
-
-                    // 2. Then fetch/research knowledge base for this crop
-                    const knowledgeRes = await fetch(`/api/v1/knowledge/crops?crop=${encodeURIComponent(data.crop)}&variety=${encodeURIComponent(variety)}&region=${encodeURIComponent(region)}`, {
-                        credentials: 'include',
-                    });
-                    if (knowledgeRes.ok) {
-                        const knowledgeData = await knowledgeRes.json();
-                        // Merge knowledge into analysis
-                        setCropAnalysis({ ...data, knowledge: knowledgeData.knowledge });
-                    } else {
-                        setCropAnalysis(data);
-                    }
-
-                    setStep('crop-analysis');
-                }
-            } catch (error) {
-                console.error('Scan error:', error);
-                const message = `画像の読み込みに失敗しました: ${error instanceof Error ? error.message : 'Unknown error'}`;
-                setNotice({
-                    type: 'error',
-                    message,
-                });
-                toastError(message);
-            } finally {
-                setLoading(false);
-                setLoadingMode(null);
+            if (!res.ok) {
+                throw new Error(await extractErrorMessage(res, '画像の読み込みに失敗しました'));
             }
-        };
 
-        reader.readAsDataURL(file);
+            const data = await res.json() as CropAnalysis;
+
+            // Extract variety if available, otherwise empty string
+            const variety = data.variety || "";
+            const region = "Niigata"; // Default for now, could be dynamic later
+
+            // 2. Then fetch/research knowledge base for this crop
+            const knowledgeRes = await fetch(`/api/v1/knowledge/crops?crop=${encodeURIComponent(data.crop)}&variety=${encodeURIComponent(variety)}&region=${encodeURIComponent(region)}`, {
+                credentials: 'include',
+            });
+            if (knowledgeRes.ok) {
+                const knowledgeData = await knowledgeRes.json();
+                // Merge knowledge into analysis
+                setCropAnalysis({ ...data, knowledge: knowledgeData.knowledge });
+            } else {
+                setCropAnalysis(data);
+            }
+
+            setStep('crop-analysis');
+        } catch (error) {
+            console.error('Scan error:', error);
+            const message = error instanceof Error
+                ? error.message
+                : '画像の読み込みに失敗しました';
+            setNotice({
+                type: 'error',
+                message,
+            });
+            toastError(message);
+        } finally {
+            setLoading(false);
+            setLoadingMode(null);
+        }
     };
 
     const handleManualCropInput = async (cropName: string) => {
@@ -777,7 +853,13 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                             <input
                                 type="file"
                                 accept="image/*"
-                                onChange={(e) => e.target.files?.[0] && handleScanImage(e.target.files[0])}
+                                onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                        void handleScanImage(file);
+                                    }
+                                    e.target.value = '';
+                                }}
                                 className="hidden"
                                 id="seed-bag-input"
                             />

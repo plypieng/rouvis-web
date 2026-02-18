@@ -84,16 +84,6 @@ export function ActivityDashboard({
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
   const [deletingFieldId, setDeletingFieldId] = useState<string | null>(null);
 
-  useEffect(() => {
-    void fetchDashboardData();
-  }, [fetchDashboardData]);
-
-  useEffect(() => {
-    if (!actionNotice || actionNotice.onAction) return;
-    const timeout = setTimeout(() => setActionNotice(null), 4000);
-    return () => clearTimeout(timeout);
-  }, [actionNotice]);
-
   const fetchDashboardData = useCallback(async function runFetchDashboardData() {
     setLoading(true);
 
@@ -172,6 +162,16 @@ export function ActivityDashboard({
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    void fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  useEffect(() => {
+    if (!actionNotice || actionNotice.onAction) return;
+    const timeout = setTimeout(() => setActionNotice(null), 4000);
+    return () => clearTimeout(timeout);
+  }, [actionNotice]);
 
   const updateTaskStatus = async (taskId: string, status: Task['status']) => {
     if (!taskId) return;
