@@ -174,6 +174,13 @@ function requestTimeoutSignal(ms = 4500): AbortSignal | undefined {
     return undefined;
 }
 
+async function applyDebugDelay(ms: number | undefined): Promise<void> {
+    if (process.env.NODE_ENV === 'production' || typeof ms !== 'number' || ms <= 0) {
+        return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 type RetryableFetchError = Error & { retryable?: boolean };
 
 function isRetryableProjectFetchError(error: unknown): boolean {
@@ -389,11 +396,13 @@ async function persistInferredUiMode(appBaseUrl: string, cookieHeader: string, u
 export default async function DashboardProjectList({
     locale,
     forceDataError = false,
+    debugDelayMs,
     activationContext,
     sessionUiMode,
 }: {
     locale: string;
     forceDataError?: boolean;
+    debugDelayMs?: number;
     activationContext?: ActivationContext;
     sessionUiMode?: FarmerUiMode;
 }) {
@@ -404,6 +413,8 @@ export default async function DashboardProjectList({
     const cookieStore = await cookies();
     const cookieHeader = cookieStore.getAll().map((cookie) => `${cookie.name}=${cookie.value}`).join('; ');
     const appBaseUrl = await getServerAppBaseUrl();
+
+    await applyDebugDelay(debugDelayMs);
 
     const [projectsResult, weatherResult, tasksResult, activitiesResult, profileResult] = await Promise.all([
         getProjects(appBaseUrl, cookieHeader),

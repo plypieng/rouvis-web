@@ -224,6 +224,17 @@ test.describe('P1 contextual UX regression', () => {
     expect(createThreadCalls).toBe(2);
   });
 
+  test('shows dashboard inference indicator while dashboard data streams', async ({ page }) => {
+    await page.goto('/ja?debugDashboardDelayMs=1200', { waitUntil: 'commit' });
+
+    const loader = page.getByTestId('dashboard-inference-loading');
+    await expect(loader).toBeVisible();
+    await expect(loader).toContainText('AIが今日の優先作業を推論しています');
+
+    await expect(loader).not.toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('today-command-center')).toBeVisible();
+  });
+
   test('shows dashboard inline warning and tracks retry click', async ({ page }) => {
     await page.goto('/ja?debugDataError=1');
 

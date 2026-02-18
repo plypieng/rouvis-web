@@ -65,6 +65,10 @@
       "unknown_condition": "Unknown",
       "fetch_failed_condition": "Unavailable"
     },
+    "loading": {
+      "inference_title": "AI is inferring today's priorities...",
+      "inference_body": "Preparing due pressure, weather risk, and next actions for today."
+    },
     "chat_prompts": {
       "today_priority": "Organize the top 3 tasks for today with priorities.",
       "first_project": "There are no projects yet. Suggest the first project and today's work.",

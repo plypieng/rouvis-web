@@ -77,6 +77,10 @@
       "unknown_condition": "不明",
       "fetch_failed_condition": "取得失敗"
     },
+    "loading": {
+      "inference_title": "AIが今日の優先作業を推論しています...",
+      "inference_body": "期限の圧力、気象リスク、次のアクションを整理しています。"
+    },
     "chat_prompts": {
       "today_priority": "今日やるべき作業を優先順位つきで3つに整理して",
       "first_project": "まだプロジェクトがありません。最初のプロジェクト候補と今日やることを提案して",
