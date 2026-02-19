@@ -397,7 +397,7 @@ test.describe('Async schedule generation UX (wizard handoff + trace panel)', () 
     expect(state.capturedGenerateBody?.projectId).toBe('project-1');
   });
 
-  test('trace panel renders progress and reaches succeeded with polling fallback', async ({ page }) => {
+  test('generation card renders in calendar area and auto-dismisses after success', async ({ page }) => {
     const state = {
       project: makeProject([]),
       runStatusCalls: 0,
@@ -420,23 +420,12 @@ test.describe('Async schedule generation UX (wizard handoff + trace panel)', () 
 
     await page.goto('/ja/projects/project-1?debugMockProject=empty&generationRunId=run-async-1');
 
-    const runningStatus = page.getByText('Status: Running');
-    const succeededStatus = page.getByText('Status: Succeeded');
+    const panel = page.getByTestId('schedule-generation-trace-panel');
 
-    await expect(page.getByTestId('schedule-generation-trace-panel')).toBeVisible();
-    await expect
-      .poll(async () => {
-        if (await succeededStatus.isVisible()) {
-          return 'succeeded';
-        }
-        if (await runningStatus.isVisible()) {
-          return 'running';
-        }
-        return 'pending';
-      })
-      .not.toBe('pending');
+    await expect(panel).toBeVisible();
+    await expect(page.getByText('スケジュールを生成しています')).toBeVisible();
     await expect(page.getByText('Collecting weather and project context')).toBeVisible();
-    await expect(succeededStatus).toBeVisible({ timeout: 15_000 });
+    await expect(panel).toBeHidden({ timeout: 15_000 });
 
     expect(state.project.tasks.length).toBeGreaterThan(0);
   });

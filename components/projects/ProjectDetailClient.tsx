@@ -433,6 +433,19 @@ export default function ProjectDetailClient({
     }, [project.id]);
 
     const hasTasks = Boolean(project.tasks?.length);
+    const handleGenerationSucceeded = useCallback(() => {
+        updateGenerationRunQuery(null);
+        router.refresh();
+    }, [router, updateGenerationRunQuery]);
+
+    const generationProgressPanel = generationRunId ? (
+        <ScheduleGenerationTracePanel
+            runId={generationRunId}
+            variant={hasTasks ? 'banner' : 'card'}
+            onRunIdChange={updateGenerationRunQuery}
+            onSucceeded={handleGenerationSucceeded}
+        />
+    ) : null;
 
     const chatPane = (
         <div id="project-chat-kit" className="flex h-full min-h-0 flex-col">
@@ -452,20 +465,29 @@ export default function ProjectDetailClient({
     );
 
     const planningPane = hasTasks ? (
-        <div className="surface-base h-full min-h-0 overflow-hidden">
-            <ProjectCalendar
-                startDate={project.startDate}
-                targetHarvestDate={project.targetHarvestDate}
-                tasks={project.tasks || []}
-                project={project}
-                onRescheduleRequest={handleRescheduleRequest}
-                onTaskComplete={handleTaskComplete}
-                onTaskCreate={handleTaskCreate}
-                onQuickApplyRequest={handleQuickApplyRequest}
-                quickApplyState={quickApplyState}
-                externalHandshake={chatCockpitStandoutEnabled ? activeHandshake : null}
-                onOpenHistory={() => setShowScheduleHistory(true)}
-            />
+        <div className="flex h-full min-h-0 flex-col gap-3">
+            {generationProgressPanel}
+            <div className="surface-base h-full min-h-0 overflow-hidden">
+                <ProjectCalendar
+                    startDate={project.startDate}
+                    targetHarvestDate={project.targetHarvestDate}
+                    tasks={project.tasks || []}
+                    project={project}
+                    onRescheduleRequest={handleRescheduleRequest}
+                    onTaskComplete={handleTaskComplete}
+                    onTaskCreate={handleTaskCreate}
+                    onQuickApplyRequest={handleQuickApplyRequest}
+                    quickApplyState={quickApplyState}
+                    externalHandshake={chatCockpitStandoutEnabled ? activeHandshake : null}
+                    onOpenHistory={() => setShowScheduleHistory(true)}
+                />
+            </div>
+        </div>
+    ) : generationRunId ? (
+        <div className="surface-base flex h-full min-h-0 items-center justify-center px-6 py-8">
+            <div className="w-full max-w-2xl">
+                {generationProgressPanel}
+            </div>
         </div>
     ) : (
         <div className="surface-base flex h-full min-h-0 flex-col items-center justify-center px-6 py-8 text-center">
@@ -541,16 +563,6 @@ export default function ProjectDetailClient({
                         </div>
                     </div>
                 )}
-
-                {generationRunId ? (
-                    <ScheduleGenerationTracePanel
-                        runId={generationRunId}
-                        onRunIdChange={updateGenerationRunQuery}
-                        onSucceeded={() => {
-                            router.refresh();
-                        }}
-                    />
-                ) : null}
 
                 <div className="mb-2 lg:hidden">
                     <div className="surface-base mb-3 p-1">
