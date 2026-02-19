@@ -4,9 +4,14 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
+import AIProcessingOverlay from './AIProcessingOverlay';
 import FieldSelector from './FieldSelector';
 import { toastError, toastSuccess } from '@/lib/feedback';
 import { trackUXEvent } from '@/lib/analytics';
+import {
+    statusForScheduleStage,
+    type ScheduleProcessingStatus,
+} from './scheduleProgress';
 
 interface InitialProjectData {
     name?: string;
@@ -43,6 +48,7 @@ export default function CreateProjectForm({ locale, initialData }: { locale: str
     const t = useTranslations('projects.create');
     const router = useRouter();
     const [loading, setLoading] = useState(false);
+    const [processingStatus, setProcessingStatus] = useState<ScheduleProcessingStatus | null>(null);
     const [suggesting, setSuggesting] = useState(false);
     const [notice, setNotice] = useState<NoticeState>(null);
     const [formData, setFormData] = useState({
@@ -127,8 +133,10 @@ export default function CreateProjectForm({ locale, initialData }: { locale: str
         }
 
         setLoading(true);
+        setProcessingStatus(statusForScheduleStage('prepare'));
 
         try {
+            setProcessingStatus(statusForScheduleStage('create_project'));
             const res = await fetch('/api/v1/projects', {
                 method: 'POST',
                 headers: {
@@ -157,6 +165,7 @@ export default function CreateProjectForm({ locale, initialData }: { locale: str
                 flow: 'manual_form',
                 hasField: formData.fieldIds.length > 0,
             });
+            setProcessingStatus(statusForScheduleStage('redirect'));
             router.push(`/${locale}/projects/${data.project.id}`);
             router.refresh();
         } catch (error) {
@@ -195,11 +204,25 @@ export default function CreateProjectForm({ locale, initialData }: { locale: str
             });
         } finally {
             setLoading(false);
+            setProcessingStatus(null);
         }
     };
 
     return (
-        <form id="create-project-form" onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+        <form
+            id="create-project-form"
+            onSubmit={handleSubmit}
+            className="relative space-y-6 bg-white p-6 rounded-xl border border-gray-200 shadow-sm"
+        >
+            {loading && (
+                <AIProcessingOverlay
+                    mode="schedule"
+                    statusMessage={processingStatus?.message}
+                    statusDetail={processingStatus?.detail}
+                    progress={processingStatus?.progress}
+                    testId="create-form-processing-overlay"
+                />
+            )}
             {notice && (
                 <div
                     className={`rounded-lg border px-4 py-3 text-sm ${
@@ -334,6 +357,7 @@ export default function CreateProjectForm({ locale, initialData }: { locale: str
                     type="button"
                     onClick={() => router.back()}
                     className="mr-4 px-4 py-2 text-gray-600 hover:text-gray-800 font-medium"
+                    disabled={loading}
                 >
                     {t('cancel')}
                 </button>

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import AIProcessingOverlay from './AIProcessingOverlay';
 import ScheduleConstraintForm, {
   advancedConstraintsFromTemplate,
   buildSchedulingPreferencesPayload,
@@ -15,6 +16,10 @@ import ScheduleConstraintForm, {
 import { buildStarterTasks } from '@/lib/starter-tasks';
 import { toastError, toastInfo, toastSuccess, toastWarning } from '@/lib/feedback';
 import { trackUXEvent } from '@/lib/analytics';
+import {
+  statusForScheduleStage,
+  type ScheduleProcessingStatus,
+} from './scheduleProgress';
 
 type GeneratedTask = {
   title: string;
@@ -174,6 +179,7 @@ export default function ReplanScheduleDialog({
   const [mode, setMode] = useState<'replace_open' | 'replace_all'>('replace_open');
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState<ScheduleProcessingStatus | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const activeTemplates = useMemo(
@@ -216,6 +222,7 @@ export default function ReplanScheduleDialog({
 
     setMode(hasTasks ? 'replace_open' : 'replace_all');
     setErrorMessage(null);
+    setProcessingStatus(null);
     setNote('');
 
     const preferences = project.schedulingPreferences || null;
@@ -313,6 +320,7 @@ export default function ReplanScheduleDialog({
 
     setSubmitting(true);
     setErrorMessage(null);
+    setProcessingStatus(statusForScheduleStage('prepare'));
 
     void trackUXEvent('replan_started', {
       projectId: project.id,
@@ -326,6 +334,7 @@ export default function ReplanScheduleDialog({
       let taskPayloads: TaskPayload[] = [];
 
       try {
+        setProcessingStatus(statusForScheduleStage('generate_schedule'));
         const generationPayload = useBackfilled
           ? {
             projectId: project.id,
@@ -373,6 +382,7 @@ export default function ReplanScheduleDialog({
         const schedule: GeneratedSchedule = (generatedData as Record<string, unknown>)?.schedule as GeneratedSchedule
           || generatedData as GeneratedSchedule;
         taskPayloads = buildTaskPayloads(schedule, useBackfilled, project.primaryFieldId);
+        setProcessingStatus(statusForScheduleStage('validate_schedule'));
 
         if (!taskPayloads.length) {
           throw new Error('Generated schedule did not include tasks');
@@ -380,6 +390,7 @@ export default function ReplanScheduleDialog({
       } catch (generationError) {
         console.warn('Replan generation failed, using starter fallback.', generationError);
         usedFallback = true;
+        setProcessingStatus(statusForScheduleStage('fallback_tasks'));
         taskPayloads = buildStarterTasks({
           crop: project.crop,
           startDate,
@@ -400,6 +411,7 @@ export default function ReplanScheduleDialog({
         throw new Error('No tasks available for replan');
       }
 
+      setProcessingStatus(statusForScheduleStage('persist_tasks'));
       const commitResponse = await fetch(`/api/v1/projects/${project.id}/replan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -421,6 +433,7 @@ export default function ReplanScheduleDialog({
           || 'Failed to commit replan'
         );
       }
+      setProcessingStatus(statusForScheduleStage('finalize'));
 
       const taskCount = Array.isArray((commitPayload as Record<string, unknown>)?.tasks)
         ? ((commitPayload as Record<string, unknown>).tasks as unknown[]).length
@@ -460,18 +473,34 @@ export default function ReplanScheduleDialog({
       });
     } finally {
       setSubmitting(false);
+      setProcessingStatus(null);
     }
   };
 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm"
+      onClick={() => {
+        if (submitting) return;
+        onClose();
+      }}
+    >
       <div
-        className="surface-overlay w-full max-w-4xl overflow-hidden"
+        className="surface-overlay relative w-full max-w-4xl overflow-hidden"
         onClick={(event) => event.stopPropagation()}
         data-testid="replan-dialog"
       >
+        {submitting && (
+          <AIProcessingOverlay
+            mode="schedule"
+            statusMessage={processingStatus?.message}
+            statusDetail={processingStatus?.detail}
+            progress={processingStatus?.progress}
+            testId="replan-schedule-processing-overlay"
+          />
+        )}
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <div>
             <h2 className="text-base font-semibold text-foreground">{t('replan_dialog.title')}</h2>
@@ -482,6 +511,7 @@ export default function ReplanScheduleDialog({
             onClick={onClose}
             className="touch-target rounded-full p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
             aria-label="Close"
+            disabled={submitting}
           >
             <span className="material-symbols-outlined text-[18px]">close</span>
           </button>

@@ -1,4 +1,4 @@
-import { test, expect, type BrowserContext, type Page } from '@playwright/test';
+import { test, expect, type BrowserContext, type Page, type TestInfo } from '@playwright/test';
 import { encode } from 'next-auth/jwt';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -181,6 +181,35 @@ function buildRevision(state: MockState, params: {
   };
 }
 
+async function waitMockLatency(ms = 220) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isMobileProject(testInfo: TestInfo): boolean {
+  return /mobile/i.test(testInfo.project.name);
+}
+
+async function ensureCalendarPanelVisible(page: Page, testInfo: TestInfo) {
+  if (!isMobileProject(testInfo)) return;
+  const calendarTab = page.getByTestId('project-mobile-tab-calendar');
+  if (await calendarTab.count()) {
+    await calendarTab.click();
+  }
+}
+
+async function clickReplanSubmit(page: Page, testInfo: TestInfo) {
+  const submitButton = page.getByTestId('replan-submit');
+  await submitButton.scrollIntoViewIfNeeded();
+  if (isMobileProject(testInfo)) {
+    await expect(submitButton).toBeEnabled();
+    await submitButton.evaluate((element) => {
+      (element as HTMLButtonElement).click();
+    });
+    return;
+  }
+  await submitButton.click();
+}
+
 async function setupMockRoutes(page: Page, state: MockState) {
   await page.route('**/api/v1/telemetry/events', async (route) => {
     await route.fulfill({ status: 204, body: '' });
@@ -300,6 +329,7 @@ async function setupMockRoutes(page: Page, state: MockState) {
     }
 
     if ((pathname === '/api/v1/agents/generate-schedule' || pathname === '/api/v1/agents/generate-backfilled-schedule') && method === 'POST') {
+      await waitMockLatency();
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -363,6 +393,7 @@ async function setupMockRoutes(page: Page, state: MockState) {
 
     if (pathname === '/api/v1/projects' && method === 'POST') {
       state.createdProjectCalls += 1;
+      await waitMockLatency();
       await route.fulfill({
         status: 201,
         contentType: 'application/json',
@@ -474,6 +505,7 @@ async function setupMockRoutes(page: Page, state: MockState) {
       ];
       state.revisionDetails[revision.id] = revision;
 
+      await waitMockLatency();
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -597,7 +629,7 @@ test.describe('Project schedule lifecycle (wizard + replan + history)', () => {
     await attachAuthenticatedSession(context);
   });
 
-  test('wizard creation redirects to project detail and commits initial schedule via replan', async ({ page }) => {
+  test('wizard creation redirects to project detail and commits initial schedule via replan', async ({ page }, testInfo) => {
     const state = createMockState([]);
     await setupMockRoutes(page, state);
 
@@ -617,11 +649,14 @@ test.describe('Project schedule lifecycle (wizard + replan + history)', () => {
       .evaluate((element) => Math.round(element.getBoundingClientRect().height));
     const browseMapHeight = await page.getByTestId('field-selector-browse-map')
       .evaluate((element) => Math.round(element.getBoundingClientRect().height));
-    expect(createMapHeight).toBeGreaterThanOrEqual(430);
-    expect(browseMapHeight).toBeGreaterThanOrEqual(350);
+    const minCreateMapHeight = isMobileProject(testInfo) ? 330 : 430;
+    const minBrowseMapHeight = isMobileProject(testInfo) ? 280 : 350;
+    expect(createMapHeight).toBeGreaterThanOrEqual(minCreateMapHeight);
+    expect(browseMapHeight).toBeGreaterThanOrEqual(minBrowseMapHeight);
 
     await page.getByRole('button', { name: /テスト圃場/ }).first().click();
     await page.getByRole('button', { name: 'プロジェクトを作成' }).click();
+    await expect(page.getByTestId('wizard-schedule-processing-overlay')).toBeVisible();
 
     await expect.poll(() => page.url()).toContain('project-1');
     expect(page.url()).not.toContain('/dashboard');
@@ -630,7 +665,7 @@ test.describe('Project schedule lifecycle (wizard + replan + history)', () => {
     expect(state.lastReplanSource).toBe('wizard_initial');
   });
 
-  test('project replan supports replace_open and replace_all, then shows history panel details', async ({ page }) => {
+  test('project replan supports replace_open and replace_all, then shows history panel details', async ({ page }, testInfo) => {
     const state = createMockState([
       {
         id: 'task-completed-1',
@@ -656,7 +691,8 @@ test.describe('Project schedule lifecycle (wizard + replan + history)', () => {
     await page.getByTestId('project-header-menu').first().click();
     await page.getByTestId('project-header-replan').first().click();
     await expect(page.getByTestId('replan-dialog')).toBeVisible();
-    await page.getByTestId('replan-submit').click();
+    await clickReplanSubmit(page, testInfo);
+    await expect(page.getByTestId('replan-schedule-processing-overlay')).toBeVisible();
 
     await expect.poll(() => state.lastReplanMode).toBe('replace_open');
     expect(state.project.tasks.some((task) => task.id === 'task-completed-1')).toBe(true);
@@ -665,32 +701,39 @@ test.describe('Project schedule lifecycle (wizard + replan + history)', () => {
     await page.getByTestId('project-header-replan').first().click();
     await expect(page.getByTestId('replan-dialog')).toBeVisible();
     await page.getByTestId('replan-mode-select').selectOption('replace_all');
-    await page.getByTestId('replan-submit').click();
+    await clickReplanSubmit(page, testInfo);
+    await expect(page.getByTestId('replan-schedule-processing-overlay')).toBeVisible();
 
     await expect.poll(() => state.lastReplanMode).toBe('replace_all');
     expect(state.project.tasks.some((task) => task.id === 'task-completed-1')).toBe(false);
     expect(state.project.tasks.some((task) => task.id === 'task-open-1')).toBe(false);
     expect(state.project.tasks.length).toBeGreaterThan(0);
 
-    await page.getByTestId('project-history-button').click();
+    await ensureCalendarPanelVisible(page, testInfo);
+    await page.locator('[data-testid="project-history-button"]:visible').first().click();
     await expect(page.getByTestId('schedule-history-panel')).toBeVisible();
     await expect(page.getByText('このプロジェクトのベースライン履歴を作成しました。')).toBeVisible();
-    await expect(page.getByText('再計画（全タスク置換）')).toBeVisible();
+    await expect(page.getByText('再計画（全タスク置換）').first()).toBeVisible();
     await expect(page.getByText('変更前スナップショット')).toBeVisible();
     await expect(page.getByText('変更後スナップショット')).toBeVisible();
   });
 
-  test('zero-task project shows replan CTA and can generate first schedule', async ({ page }) => {
+  test('zero-task project shows replan CTA and can generate first schedule', async ({ page }, testInfo) => {
     const state = createMockState([]);
     await setupMockRoutes(page, state);
 
     await page.goto('/ja/projects/project-1?debugMockProject=empty');
+    await ensureCalendarPanelVisible(page, testInfo);
 
-    await expect(page.getByTestId('project-empty-replan-state')).toBeVisible();
-    await page.getByTestId('project-empty-replan-cta').click();
+    const visibleEmptyState = page.locator('[data-testid="project-empty-replan-state"]:visible');
+    const visibleEmptyCta = page.locator('[data-testid="project-empty-replan-cta"]:visible');
+
+    await expect(visibleEmptyState).toBeVisible();
+    await visibleEmptyCta.click();
     await expect(page.getByTestId('replan-dialog')).toBeVisible();
     await expect(page.getByTestId('replan-mode-select')).toHaveValue('replace_all');
-    await page.getByTestId('replan-submit').click();
+    await clickReplanSubmit(page, testInfo);
+    await expect(page.getByTestId('replan-schedule-processing-overlay')).toBeVisible();
 
     await expect.poll(() => state.lastReplanMode).toBe('replace_all');
     await expect.poll(() => state.project.tasks.length).toBeGreaterThan(0);

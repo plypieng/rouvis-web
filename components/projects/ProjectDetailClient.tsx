@@ -518,6 +518,7 @@ export default function ProjectDetailClient({
                                     setPanelMode('chat');
                                     updatePanelQuery('chat');
                                 }}
+                                data-testid="project-mobile-tab-chat"
                                 className={`touch-target rounded-lg px-3 py-2 text-sm font-semibold transition ${panelMode === 'chat'
                                     ? 'bg-primary text-primary-foreground'
                                     : 'bg-secondary text-secondary-foreground hover:bg-secondary/75'
@@ -533,6 +534,7 @@ export default function ProjectDetailClient({
                                     setPanelMode('calendar');
                                     updatePanelQuery('calendar');
                                 }}
+                                data-testid="project-mobile-tab-calendar"
                                 className={`touch-target rounded-lg px-3 py-2 text-sm font-semibold transition ${panelMode === 'calendar'
                                     ? 'bg-primary text-primary-foreground'
                                     : 'bg-secondary text-secondary-foreground hover:bg-secondary/75'

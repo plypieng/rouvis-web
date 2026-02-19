@@ -8,7 +8,7 @@ import CropAnalysisCard from './CropAnalysisCard';
 import FieldSelector from './FieldSelector';
 import ProjectTypeSelector from './ProjectTypeSelector';
 import PlantingHistoryInput from './PlantingHistoryInput';
-import AIProcessingOverlay from './AIProcessingOverlay';
+import AIProcessingOverlay, { type AIProcessingMode } from './AIProcessingOverlay';
 import ScheduleConstraintForm, {
     advancedConstraintsFromTemplate,
     buildSchedulingPreferencesPayload,
@@ -22,6 +22,10 @@ import ScheduleConstraintForm, {
 import { toastError, toastInfo, toastSuccess, toastWarning } from '@/lib/feedback';
 import { buildStarterTasks } from '@/lib/starter-tasks';
 import { trackUXEvent } from '@/lib/analytics';
+import {
+    statusForScheduleStage,
+    type ScheduleProcessingStatus,
+} from './scheduleProgress';
 
 type WizardStep = 'project-type' | 'selection' | 'crop-analysis' | 'planting-history' | 'field-context';
 
@@ -348,7 +352,8 @@ export default function ProjectWizard({ locale }: { locale: string }) {
     const [selectedFieldIds, setSelectedFieldIds] = useState<string[]>([]);
     const [primaryFieldId, setPrimaryFieldId] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
-    const [loadingMode, setLoadingMode] = useState<'scan' | 'manual' | null>(null);
+    const [loadingMode, setLoadingMode] = useState<AIProcessingMode | null>(null);
+    const [processingStatus, setProcessingStatus] = useState<ScheduleProcessingStatus | null>(null);
     const [notice, setNotice] = useState<NoticeState>(null);
     const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
     const [preferenceTemplates, setPreferenceTemplates] = useState<PreferenceTemplate[]>([]);
@@ -592,7 +597,8 @@ export default function ProjectWizard({ locale }: { locale: string }) {
         projectId: string,
         defaultFieldId: string,
         schedulingPreferences?: Record<string, unknown>,
-        preferenceTemplateId?: string | null
+        preferenceTemplateId?: string | null,
+        onProgress?: (status: ScheduleProcessingStatus) => void,
     ): Promise<{ taskCount: number; usedFallback: boolean; firstPendingTaskId: string | null }> => {
         if (!cropAnalysis) throw new Error('作物情報が見つかりません');
 
@@ -606,6 +612,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
         let tasks: TaskPayload[] = [];
 
         try {
+            onProgress?.(statusForScheduleStage('generate_schedule'));
             const generationPayload = isBackfilled
                 ? {
                     projectId,
@@ -660,12 +667,14 @@ export default function ProjectWizard({ locale }: { locale: string }) {
 
             const schedule: GeneratedSchedule = generatedData?.schedule || generatedData;
             tasks = buildTaskPayloads(schedule, isBackfilled, defaultFieldId);
+            onProgress?.(statusForScheduleStage('validate_schedule'));
             if (!tasks.length) {
                 throw new Error('初回スケジュールにタスクが含まれていませんでした');
             }
         } catch (generationError) {
             console.warn('Schedule generation failed. Falling back to starter tasks.', generationError);
             usedFallback = true;
+            onProgress?.(statusForScheduleStage('fallback_tasks'));
             tasks = buildStarterTasks({
                 crop: cropAnalysis.crop,
                 startDate: effectivePlantingDate,
@@ -686,12 +695,14 @@ export default function ProjectWizard({ locale }: { locale: string }) {
             throw new Error('初回タスクの作成に失敗しました');
         }
 
+        onProgress?.(statusForScheduleStage('persist_tasks'));
         const persistedTasks = await commitInitialScheduleRevision(
             projectId,
             tasks,
             schedulingPreferences,
             preferenceTemplateId,
         );
+        onProgress?.(statusForScheduleStage('finalize'));
         const firstPendingTask = persistedTasks
             .filter((task) => task.status === 'pending')
             .sort((left, right) => {
@@ -873,6 +884,8 @@ export default function ProjectWizard({ locale }: { locale: string }) {
         }
         setNotice(null);
         setLoading(true);
+        setLoadingMode('schedule');
+        setProcessingStatus(statusForScheduleStage('prepare'));
 
         try {
             let projectId = createdProjectId;
@@ -881,6 +894,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
             if (!projectId) {
                 setNotice({ type: 'info', message: 'プロジェクトを作成しています...' });
                 toastInfo('プロジェクトを作成しています...');
+                setProcessingStatus(statusForScheduleStage('create_project'));
                 const payload = {
                     name: `${cropAnalysis.crop} ${new Date().getFullYear()}`,
                     crop: cropAnalysis.crop,
@@ -929,11 +943,13 @@ export default function ProjectWizard({ locale }: { locale: string }) {
 
             setNotice({ type: 'info', message: 'AIが初回スケジュールを作成しています...' });
             toastInfo('AIが初回スケジュールを作成しています...');
+            setProcessingStatus(statusForScheduleStage('generate_schedule'));
             const { taskCount, usedFallback, firstPendingTaskId } = await generateAndPersistInitialSchedule(
                 projectId,
                 primaryFieldId,
                 schedulingPreferences,
-                effectiveTemplateId
+                effectiveTemplateId,
+                (status) => setProcessingStatus(status),
             );
             void trackUXEvent('schedule_generated', {
                 projectId,
@@ -955,6 +971,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                 setNotice({ type: 'success', message: successMessage });
                 toastSuccess(successMessage);
             }
+            setProcessingStatus(statusForScheduleStage('redirect'));
 
             // Refresh session so onboarding guard sees the new project immediately.
             try {
@@ -1009,6 +1026,8 @@ export default function ProjectWizard({ locale }: { locale: string }) {
             }
         } finally {
             setLoading(false);
+            setLoadingMode(null);
+            setProcessingStatus(null);
         }
     };
 
@@ -1017,8 +1036,8 @@ export default function ProjectWizard({ locale }: { locale: string }) {
         return (
             <div className="space-y-6 relative min-h-[400px]">
                 <WizardProgress currentStep={step} showPlantingHistory={projectType === 'existing'} />
-                {loading && loadingMode && (
-                    <AIProcessingOverlay mode={loadingMode} />
+                {loading && loadingMode && loadingMode !== 'schedule' && (
+                    <AIProcessingOverlay mode={loadingMode} testId="wizard-analysis-processing-overlay" />
                 )}
                 <div className="flex items-center justify-between mb-4">
                     <button
@@ -1170,8 +1189,17 @@ export default function ProjectWizard({ locale }: { locale: string }) {
 
     if (step === 'field-context') {
         return (
-            <div className="space-y-6">
+            <div className="space-y-6 relative">
                 <WizardProgress currentStep={step} showPlantingHistory={projectType === 'existing'} />
+                {loading && loadingMode === 'schedule' && (
+                    <AIProcessingOverlay
+                        mode="schedule"
+                        statusMessage={processingStatus?.message}
+                        statusDetail={processingStatus?.detail}
+                        progress={processingStatus?.progress}
+                        testId="wizard-schedule-processing-overlay"
+                    />
+                )}
                 {notice && (
                     <div className={`rounded-xl border px-4 py-3 text-sm ${noticeClassName(notice.type)}`}>
                         <div className="flex items-center justify-between gap-3">
