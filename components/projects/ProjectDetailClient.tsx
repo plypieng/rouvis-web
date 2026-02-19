@@ -7,7 +7,8 @@ import { useTranslations } from 'next-intl';
 import { RouvisChatKit, RouvisChatKitRef } from '@/components/RouvisChatKit';
 import ProjectHeader from '@/components/projects/ProjectHeader';
 import ProjectCalendar from '@/components/projects/ProjectCalendar';
-import ProjectAgentOnboarding from '@/components/projects/ProjectAgentOnboarding';
+import ReplanScheduleDialog from '@/components/projects/ReplanScheduleDialog';
+import ScheduleHistoryPanel from '@/components/projects/ScheduleHistoryPanel';
 import TaskCreateModal from './TaskCreateModal';
 import type {
     CockpitPanelMode,
@@ -52,6 +53,7 @@ type Project = {
     targetHarvestDate?: string;
     status: string;
     notes?: string;
+    primaryFieldId?: string | null;
     tasks?: ProjectTask[];
     currentStage?: string;
     schedulingPreferences?: ProjectSchedulingPreferences;
@@ -101,6 +103,8 @@ export default function ProjectDetailClient({
     const [hasCompletedTask, setHasCompletedTask] = useState(
         () => (project.tasks || []).some((task) => task.status === 'completed')
     );
+    const [showReplanDialog, setShowReplanDialog] = useState(false);
+    const [showScheduleHistory, setShowScheduleHistory] = useState(false);
     const chatRef = useRef<RouvisChatKitRef>(null);
     const splitContainerRef = useRef<HTMLDivElement>(null);
     const resizeStateRef = useRef<{ startX: number; startRatio: number } | null>(null);
@@ -290,6 +294,17 @@ export default function ProjectDetailClient({
         setShowTaskCreateModal(true);
     };
 
+    const handleReplanCompleted = useCallback((result: { taskCount: number; mode: 'replace_open' | 'replace_all' }) => {
+        setNotice({
+            type: 'success',
+            message: t('replan_completed_notice', {
+                count: result.taskCount,
+                mode: result.mode === 'replace_all' ? t('replan_mode_replace_all') : t('replan_mode_replace_open'),
+            }),
+        });
+        router.refresh();
+    }, [router, t]);
+
     const handleQuickApplyRequest = useCallback(async (prompt: string): Promise<QuickApplyResult> => {
         if (!chatRef.current) {
             setQuickApplyState({ status: 'error', reason: t('calendar.quick_apply_chat_unavailable') });
@@ -416,15 +431,34 @@ export default function ProjectDetailClient({
                 onQuickApplyRequest={handleQuickApplyRequest}
                 quickApplyState={quickApplyState}
                 externalHandshake={chatCockpitStandoutEnabled ? activeHandshake : null}
+                onOpenHistory={() => setShowScheduleHistory(true)}
             />
         </div>
     ) : (
-        <ProjectAgentOnboarding
-            projectId={project.id}
-            crop={project.crop}
-            startDate={project.startDate}
-            initialPreferences={project.schedulingPreferences || null}
-        />
+        <div className="surface-base flex h-full min-h-0 flex-col items-center justify-center px-6 py-8 text-center">
+            <div className="max-w-md space-y-3" data-testid="project-empty-replan-state">
+                <p className="text-sm font-semibold uppercase tracking-[0.08em] text-muted-foreground">{t('schedule_empty_badge')}</p>
+                <h3 className="text-xl font-semibold text-foreground">{t('schedule_empty_title')}</h3>
+                <p className="text-sm text-muted-foreground">{t('schedule_empty_description')}</p>
+                <div className="flex flex-wrap justify-center gap-2 pt-1">
+                    <button
+                        type="button"
+                        onClick={() => setShowReplanDialog(true)}
+                        className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+                        data-testid="project-empty-replan-cta"
+                    >
+                        {t('replan_schedule')}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setShowScheduleHistory(true)}
+                        className="rounded-md border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-secondary"
+                    >
+                        {t('calendar.history_button')}
+                    </button>
+                </div>
+            </div>
+        </div>
     );
 
     return (
@@ -442,7 +476,11 @@ export default function ProjectDetailClient({
 
                     {/* Compact Status Bar (Grow) */}
                     <div className="flex-1">
-                        <ProjectHeader project={project} compact={true} />
+                        <ProjectHeader
+                            project={project}
+                            compact={true}
+                            onReplanSchedule={() => setShowReplanDialog(true)}
+                        />
                     </div>
                 </div>
 
@@ -559,6 +597,29 @@ export default function ProjectDetailClient({
                 onClose={() => setShowTaskCreateModal(false)}
                 initialDate={selectedDateForTask}
                 initialData={taskInitialData}
+            />
+
+            <ReplanScheduleDialog
+                open={showReplanDialog}
+                onClose={() => setShowReplanDialog(false)}
+                hasTasks={hasTasks}
+                project={{
+                    id: project.id,
+                    crop: project.crop,
+                    variety: project.variety,
+                    startDate: project.startDate,
+                    targetHarvestDate: project.targetHarvestDate,
+                    notes: project.notes,
+                    primaryFieldId: project.primaryFieldId ?? null,
+                    schedulingPreferences: project.schedulingPreferences || null,
+                }}
+                onReplanned={handleReplanCompleted}
+            />
+
+            <ScheduleHistoryPanel
+                open={showScheduleHistory}
+                onClose={() => setShowScheduleHistory(false)}
+                projectId={project.id}
             />
         </div>
     );

@@ -49,9 +49,10 @@ interface ProjectHeaderProps {
         notes?: string;
     };
     compact?: boolean;
+    onReplanSchedule?: () => void;
 }
 
-export default function ProjectHeader({ project, compact }: ProjectHeaderProps) {
+export default function ProjectHeader({ project, compact, onReplanSchedule }: ProjectHeaderProps) {
     const t = useTranslations('projects');
     const router = useRouter();
     const params = useParams<{ locale: string }>();
@@ -253,11 +254,21 @@ export default function ProjectHeader({ project, compact }: ProjectHeaderProps) 
                                 <button
                                     onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
                                     className="p-1 text-gray-400 hover:text-gray-900 rounded-full hover:bg-gray-100 transition-colors"
+                                    data-testid="project-header-menu"
                                 >
                                     <span className="material-symbols-outlined text-[20px]">more_vert</span>
                                 </button>
                                 {showMenu && (
                                     <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-lg border border-gray-200 shadow-lg py-1 z-50">
+                                        {onReplanSchedule && (
+                                            <button
+                                                onClick={() => { setShowMenu(false); onReplanSchedule(); }}
+                                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                                data-testid="project-header-replan"
+                                            >
+                                                {t('replan_schedule')}
+                                            </button>
+                                        )}
                                         <button
                                             onClick={() => { setShowMenu(false); setShowEditModal(true); }}
                                             className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -347,12 +358,22 @@ export default function ProjectHeader({ project, compact }: ProjectHeaderProps) 
                         <button
                             onClick={() => setShowMenu(!showMenu)}
                             className="p-1.5 text-gray-400 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition-colors flex items-center justify-center"
+                            data-testid="project-header-menu"
                         >
                             <span className="material-symbols-outlined text-xl">more_vert</span>
                         </button>
 
                         {showMenu && (
                             <div className="absolute right-0 bottom-full mb-1 w-40 bg-white rounded-lg border border-gray-200 shadow-lg py-1 z-30">
+                                {onReplanSchedule && (
+                                    <button
+                                        onClick={() => { setShowMenu(false); onReplanSchedule(); }}
+                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                        data-testid="project-header-replan"
+                                    >
+                                        {t('replan_schedule')}
+                                    </button>
+                                )}
                                 <button
                                     onClick={() => { setShowMenu(false); setShowEditModal(true); }}
                                     className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"

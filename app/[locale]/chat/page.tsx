@@ -634,6 +634,7 @@ export default function ChatPage() {
                   key={`${selectedThreadId || 'new'}:${contextProjectId || 'none'}:${contextEntryKey}`}
                   initialThreadId={selectedThreadId}
                   projectId={contextProjectId}
+                  memoryRecallScope={contextProjectId ? 'project' : 'user'}
                   initialInput={contextPrompt || undefined}
                   initialMode={contextMode}
                   initialSuggestions={contextSuggestions.length > 0 ? contextSuggestions : undefined}

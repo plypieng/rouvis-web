@@ -9,6 +9,16 @@ import FieldSelector from './FieldSelector';
 import ProjectTypeSelector from './ProjectTypeSelector';
 import PlantingHistoryInput from './PlantingHistoryInput';
 import AIProcessingOverlay from './AIProcessingOverlay';
+import ScheduleConstraintForm, {
+    advancedConstraintsFromTemplate,
+    buildSchedulingPreferencesPayload,
+    normalizeAdvancedConstraints,
+    parsePositiveNumber,
+    type ScheduleConstraintAdvanced,
+    type ScheduleConstraintTemplate,
+    type YieldRecommendation,
+    type YieldUnit,
+} from './ScheduleConstraintForm';
 import { toastError, toastInfo, toastSuccess, toastWarning } from '@/lib/feedback';
 import { buildStarterTasks } from '@/lib/starter-tasks';
 import { trackUXEvent } from '@/lib/analytics';
@@ -78,11 +88,11 @@ type ParsedApiError = {
 };
 
 type PreferenceTemplate = {
-    id: string;
-    status?: 'active' | 'coming_soon';
-    label: string;
-    description: string;
-    preferences: Record<string, unknown>;
+    id: ScheduleConstraintTemplate['id'];
+    status?: ScheduleConstraintTemplate['status'];
+    label: ScheduleConstraintTemplate['label'];
+    description: ScheduleConstraintTemplate['description'];
+    preferences: ScheduleConstraintTemplate['preferences'];
 };
 
 type PreferenceTemplateCatalog = {
@@ -91,7 +101,6 @@ type PreferenceTemplateCatalog = {
 };
 
 type FieldEnvironmentType = 'open_field' | 'greenhouse' | 'home_pot';
-type YieldUnit = 't_per_ha' | 'kg_total';
 
 type WizardFieldRecord = {
     id: string;
@@ -100,15 +109,6 @@ type WizardFieldRecord = {
     containerCount?: number | null;
     areaSqm?: number | null;
     area?: number | null;
-};
-
-type YieldRecommendation = {
-    value: number;
-    unit: YieldUnit;
-    min: number;
-    max: number;
-    environment: FieldEnvironmentType;
-    rationale: string;
 };
 
 const FALLBACK_TEMPLATE_ID = 'conservative-weather';
@@ -137,18 +137,6 @@ function fieldAreaSqm(field: WizardFieldRecord): number {
 function roundYield(value: number, digits = 1): number {
     const factor = 10 ** digits;
     return Math.round(value * factor) / factor;
-}
-
-function yieldUnitLabel(unit: YieldUnit): string {
-    return unit === 'kg_total' ? 'kg (合計)' : 't/ha';
-}
-
-function parsePositiveNumber(input: string): number | null {
-    const trimmed = input.trim();
-    if (!trimmed) return null;
-    const parsed = Number(trimmed);
-    if (!Number.isFinite(parsed) || parsed <= 0) return null;
-    return parsed;
 }
 
 function recommendationForFields(
@@ -376,6 +364,10 @@ export default function ProjectWizard({ locale }: { locale: string }) {
     const [preferredYieldInput, setPreferredYieldInput] = useState('');
     const [preferredYieldUnit, setPreferredYieldUnit] = useState<YieldUnit>('t_per_ha');
     const [yieldEdited, setYieldEdited] = useState(false);
+    const [advancedConstraints, setAdvancedConstraints] = useState<ScheduleConstraintAdvanced>(
+        () => normalizeAdvancedConstraints()
+    );
+    const [showAdvancedConstraints, setShowAdvancedConstraints] = useState(false);
 
     const activeTemplates = useMemo(
         () => preferenceTemplates.filter((template) => (template.status ?? 'active') === 'active'),
@@ -392,11 +384,10 @@ export default function ProjectWizard({ locale }: { locale: string }) {
         return activeTemplates[0]?.id ?? null;
     }, [activeTemplates, recommendedTemplateId, selectedTemplateId]);
 
-    const effectiveTemplatePreferences = useMemo<Record<string, unknown>>(() => {
-        const matched = activeTemplates.find((template) => template.id === effectiveTemplateId);
-        if (!matched?.preferences || typeof matched.preferences !== 'object') return {};
-        return { ...matched.preferences };
-    }, [activeTemplates, effectiveTemplateId]);
+    const effectiveTemplate = useMemo(
+        () => activeTemplates.find((template) => template.id === effectiveTemplateId) ?? null,
+        [activeTemplates, effectiveTemplateId]
+    );
 
     const yieldRecommendation = useMemo(
         () => recommendationForFields(availableFields, selectedFieldIds, primaryFieldId),
@@ -421,33 +412,18 @@ export default function ProjectWizard({ locale }: { locale: string }) {
         }
     }, [selectedFieldIds, yieldEdited, yieldRecommendation]);
 
-    const mergedSchedulingPreferences = useMemo(() => {
-        const merged: Record<string, unknown> = {
-            ...effectiveTemplatePreferences,
-        };
-        const recommendation = yieldRecommendation;
-        const targetYieldValue = preferredYieldValue ?? recommendation?.value;
-        const targetYieldUnit = preferredYieldUnit || recommendation?.unit;
+    useEffect(() => {
+        if (!effectiveTemplate) return;
+        setAdvancedConstraints(advancedConstraintsFromTemplate(effectiveTemplate));
+    }, [effectiveTemplate]);
 
-        if (typeof targetYieldValue === 'number' && Number.isFinite(targetYieldValue) && targetYieldValue > 0) {
-            merged.targetYieldValue = roundYield(targetYieldValue, 1);
-            if (targetYieldUnit) {
-                merged.targetYieldUnit = targetYieldUnit;
-            }
-        }
-
-        if (recommendation) {
-            merged.targetYieldRecommended = recommendation.value;
-            merged.targetYieldMin = recommendation.min;
-            merged.targetYieldMax = recommendation.max;
-            merged.targetYieldEnvironment = recommendation.environment;
-            if (!merged.targetYieldUnit) {
-                merged.targetYieldUnit = recommendation.unit;
-            }
-        }
-
-        return Object.keys(merged).length > 0 ? merged : undefined;
-    }, [effectiveTemplatePreferences, preferredYieldUnit, preferredYieldValue, yieldRecommendation]);
+    const mergedSchedulingPreferences = useMemo(() => buildSchedulingPreferencesPayload({
+        template: effectiveTemplate,
+        advanced: advancedConstraints,
+        preferredYieldInput,
+        preferredYieldUnit,
+        yieldRecommendation,
+    }), [advancedConstraints, effectiveTemplate, preferredYieldInput, preferredYieldUnit, yieldRecommendation]);
 
     const hasInvalidYieldInput = preferredYieldInput.trim().length > 0 && preferredYieldValue === null;
 
@@ -575,27 +551,31 @@ export default function ProjectWizard({ locale }: { locale: string }) {
         );
     };
 
-    const persistGeneratedTasks = async (
+    const commitInitialScheduleRevision = async (
         projectId: string,
         tasks: TaskPayload[],
-        schedulingPreferences?: Record<string, unknown>
+        schedulingPreferences?: Record<string, unknown>,
+        preferenceTemplateId?: string | null
     ): Promise<PersistedTask[]> => {
-        const saveResponse = await fetch(`/api/v1/projects/${projectId}`, {
-            method: 'PUT',
+        const saveResponse = await fetch(`/api/v1/projects/${projectId}/replan`, {
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+                mode: 'replace_all',
+                source: 'wizard_initial',
                 tasks,
+                ...(preferenceTemplateId ? { preferenceTemplate: preferenceTemplateId } : {}),
                 ...(schedulingPreferences ? { schedulingPreferences } : {}),
             }),
         });
 
         if (!saveResponse.ok) {
-            throw new Error(await extractErrorMessage(saveResponse, '生成したタスクの保存に失敗しました'));
+            throw new Error(await extractErrorMessage(saveResponse, '初回スケジュールの確定に失敗しました'));
         }
 
         const payload = await saveResponse.json().catch(() => ({}));
-        const persistedTasks = Array.isArray(payload?.project?.tasks)
-            ? (payload.project.tasks as Array<{ id?: string; title?: string; dueDate?: string; status?: string }>)
+        const persistedTasks = Array.isArray(payload?.tasks)
+            ? (payload.tasks as Array<{ id?: string; title?: string; dueDate?: string; status?: string }>)
             : [];
 
         return persistedTasks
@@ -706,7 +686,12 @@ export default function ProjectWizard({ locale }: { locale: string }) {
             throw new Error('初回タスクの作成に失敗しました');
         }
 
-        const persistedTasks = await persistGeneratedTasks(projectId, tasks, schedulingPreferences);
+        const persistedTasks = await commitInitialScheduleRevision(
+            projectId,
+            tasks,
+            schedulingPreferences,
+            preferenceTemplateId,
+        );
         const firstPendingTask = persistedTasks
             .filter((task) => task.status === 'pending')
             .sort((left, right) => {
@@ -978,19 +963,11 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                 console.warn('Session update failed after project creation:', error);
             }
             router.refresh(); // Ensure list is updated
-            const activationParams = new URLSearchParams({
-                activation: '1',
-                projectId,
-            });
-            if (firstPendingTaskId) {
-                activationParams.set('taskId', firstPendingTaskId);
-            }
-
             void trackUXEvent('activation_flow_redirected', {
-                destination: 'dashboard',
+                destination: 'project_page',
                 hasFirstTask: Boolean(firstPendingTaskId),
             });
-            router.push(`/${locale}?${activationParams.toString()}`);
+            router.push(`/${locale}/projects/${projectId}`);
         } catch (error) {
             console.error('Project creation error:', error);
             const apiCode = typeof error === 'object'
@@ -1234,142 +1211,42 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                         setAvailableFields(fields);
                     }}
                 />
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                    <div className="surface-base p-4">
-                        <div className="mb-3">
-                            <h3 className="text-sm font-semibold text-foreground">初回ドラフトの作業スタイル</h3>
-                            <p className="text-xs text-muted-foreground">
-                                現在は天候重視テンプレートのみ利用可能です。他テンプレートは実装予定として表示します。
-                            </p>
-                        </div>
-                        {templatesLoading && (
-                            <p className="text-xs text-muted-foreground">テンプレートを読み込み中...</p>
-                        )}
-                        {!templatesLoading && templatesError && (
-                            <p className="text-xs text-orange-700 dark:text-orange-200">
-                                {templatesError} 天候重視設定で続行します。
-                            </p>
-                        )}
-                        {!templatesLoading && preferenceTemplates.length > 0 && (
-                            <div className="space-y-2">
-                                {preferenceTemplates.map((template) => {
-                                    const isActive = (template.status ?? 'active') === 'active';
-                                    const selected = isActive && template.id === effectiveTemplateId;
-                                    const recommended = isActive && template.id === recommendedTemplateId;
-                                    return (
-                                        <button
-                                            key={template.id}
-                                            type="button"
-                                            disabled={!isActive}
-                                            onClick={() => {
-                                                if (!isActive) return;
-                                                setSelectedTemplateId(template.id);
-                                            }}
-                                            className={`w-full rounded-lg border px-3 py-3 text-left transition ${isActive
-                                                ? selected
-                                                    ? 'border-brand-seedling/75 bg-brand-seedling/10'
-                                                    : 'border-border bg-card hover:border-brand-seedling/50'
-                                                : 'border-border/60 bg-secondary/20 opacity-55'
-                                                }`}
-                                        >
-                                            <div className="mb-1 flex items-center justify-between gap-2">
-                                                <span className="text-sm font-semibold text-foreground">
-                                                    {template.label}
-                                                </span>
-                                                <div className="flex items-center gap-1.5">
-                                                    {recommended && (
-                                                        <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold text-secondary-foreground">
-                                                            推奨
-                                                        </span>
-                                                    )}
-                                                    {!isActive && (
-                                                        <span className="rounded-full border border-border bg-card px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                                                            To be implemented
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <p className="text-xs text-muted-foreground">{template.description}</p>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="surface-base p-4">
-                        <div className="mb-3">
-                            <h3 className="text-sm font-semibold text-foreground">目標収量</h3>
-                            <p className="text-xs text-muted-foreground">
-                                選択した圃場条件から推奨値を算出しています。必要に応じて好みの値に上書きできます。
-                            </p>
-                        </div>
-
-                        {yieldRecommendation ? (
-                            <div className="rounded-lg border border-brand-waterline/35 bg-brand-waterline/10 px-3 py-2">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">Recommended</p>
-                                <p className="text-lg font-semibold text-foreground">
-                                    {yieldRecommendation.value} {yieldUnitLabel(yieldRecommendation.unit)}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                    目安レンジ: {yieldRecommendation.min} - {yieldRecommendation.max} {yieldUnitLabel(yieldRecommendation.unit)}
-                                </p>
-                                <p className="text-xs text-muted-foreground">{yieldRecommendation.rationale}</p>
-                            </div>
-                        ) : (
-                            <div className="rounded-lg border border-dashed border-border bg-secondary/20 px-3 py-3 text-xs text-muted-foreground">
-                                圃場を選択すると推奨収量を表示します。
-                            </div>
-                        )}
-
-                        <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-[1fr_160px]">
-                            <input
-                                type="number"
-                                min={0}
-                                step={0.1}
-                                inputMode="decimal"
-                                value={preferredYieldInput}
-                                onChange={(event) => {
-                                    setYieldEdited(true);
-                                    setPreferredYieldInput(event.target.value);
-                                }}
-                                placeholder={yieldRecommendation ? String(yieldRecommendation.value) : '例: 5.0'}
-                                className="control-inset w-full px-3 py-2 text-sm"
-                            />
-                            <select
-                                value={preferredYieldUnit}
-                                onChange={(event) => {
-                                    setYieldEdited(true);
-                                    setPreferredYieldUnit(event.target.value as YieldUnit);
-                                }}
-                                className="control-inset w-full px-3 py-2 text-sm"
-                            >
-                                <option value="t_per_ha">t/ha</option>
-                                <option value="kg_total">kg (合計)</option>
-                            </select>
-                        </div>
-
-                        {hasInvalidYieldInput && (
-                            <p className="mt-2 text-xs font-medium text-red-700">
-                                目標収量は0より大きい数値を入力してください。
-                            </p>
-                        )}
-
-                        {yieldRecommendation && (
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setPreferredYieldInput(String(yieldRecommendation.value));
-                                    setPreferredYieldUnit(yieldRecommendation.unit);
-                                    setYieldEdited(false);
-                                }}
-                                className="mt-2 rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary/60"
-                            >
-                                推奨値を反映する
-                            </button>
-                        )}
-                    </div>
-                </div>
+                <ScheduleConstraintForm
+                    templates={preferenceTemplates}
+                    templatesLoading={templatesLoading}
+                    templatesError={templatesError}
+                    recommendedTemplateId={recommendedTemplateId}
+                    selectedTemplateId={effectiveTemplateId}
+                    onSelectTemplate={(templateId) => {
+                        setSelectedTemplateId(templateId);
+                        const selectedTemplate = preferenceTemplates.find((template) => template.id === templateId);
+                        if (selectedTemplate) {
+                            setAdvancedConstraints(advancedConstraintsFromTemplate(selectedTemplate));
+                        }
+                    }}
+                    preferredYieldInput={preferredYieldInput}
+                    preferredYieldUnit={preferredYieldUnit}
+                    onChangeYieldInput={(value) => {
+                        setYieldEdited(true);
+                        setPreferredYieldInput(value);
+                    }}
+                    onChangeYieldUnit={(unit) => {
+                        setYieldEdited(true);
+                        setPreferredYieldUnit(unit);
+                    }}
+                    yieldRecommendation={yieldRecommendation}
+                    hasInvalidYieldInput={hasInvalidYieldInput}
+                    onApplyRecommendedYield={() => {
+                        if (!yieldRecommendation) return;
+                        setPreferredYieldInput(String(yieldRecommendation.value));
+                        setPreferredYieldUnit(yieldRecommendation.unit);
+                        setYieldEdited(false);
+                    }}
+                    advanced={advancedConstraints}
+                    onChangeAdvanced={setAdvancedConstraints}
+                    showAdvanced={showAdvancedConstraints}
+                    onChangeShowAdvanced={setShowAdvancedConstraints}
+                />
                 <CropAnalysisCard analysis={cropAnalysis} />
                 <div className="flex justify-end gap-4">
                     <button
