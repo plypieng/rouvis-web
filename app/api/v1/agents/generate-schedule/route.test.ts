@@ -54,6 +54,7 @@ describe('/api/v1/agents/generate-schedule BFF route', () => {
           generation: {
             mode: 'async',
             runId: 'run-1',
+            engine: 'legacy_llm',
             state: 'queued',
           },
         }),
@@ -84,6 +85,7 @@ describe('/api/v1/agents/generate-schedule BFF route', () => {
       generation: {
         mode: 'async',
         runId: 'run-1',
+        engine: 'legacy_llm',
       },
     });
     expect(fetchMock).toHaveBeenCalledWith(

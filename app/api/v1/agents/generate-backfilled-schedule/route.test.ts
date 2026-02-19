@@ -54,6 +54,7 @@ describe('/api/v1/agents/generate-backfilled-schedule BFF route', () => {
           generation: {
             mode: 'async',
             runId: 'run-backfill-1',
+            engine: 'legacy_llm',
             state: 'queued',
           },
         }),
@@ -85,6 +86,7 @@ describe('/api/v1/agents/generate-backfilled-schedule BFF route', () => {
       generation: {
         mode: 'async',
         runId: 'run-backfill-1',
+        engine: 'legacy_llm',
       },
     });
     expect(fetchMock).toHaveBeenCalledWith(

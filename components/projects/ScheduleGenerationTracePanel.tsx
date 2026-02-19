@@ -9,6 +9,10 @@ type ScheduleGenerationRunDto = {
   projectId: string;
   source: 'wizard_initial' | 'project_replan';
   replanMode: 'replace_open' | 'replace_all' | null;
+  engine?: 'legacy_llm' | 'vertical_planner_v1';
+  plannerVersion?: string | null;
+  rulesetVersion?: string | null;
+  optimizerUsed?: boolean | null;
   state: RunState;
   attemptsUsed: number;
   maxAttempts: number;
@@ -227,6 +231,21 @@ export default function ScheduleGenerationTracePanel({
     }
   }, [run?.state]);
 
+  const engineLabel = useMemo(() => {
+    const fromRun = run?.engine;
+    if (fromRun === 'vertical_planner_v1') return 'vertical_planner_v1';
+    if (fromRun === 'legacy_llm') return 'legacy_llm';
+
+    for (let i = events.length - 1; i >= 0; i -= 1) {
+      const event = events[i];
+      const engine = typeof event.meta?.engine === 'string' ? event.meta.engine : null;
+      if (engine === 'vertical_planner_v1' || engine === 'legacy_llm') {
+        return engine;
+      }
+    }
+    return 'unknown';
+  }, [events, run?.engine]);
+
   const handleRetry = useCallback(async () => {
     if (!run?.retryable || retrying) return;
 
@@ -292,6 +311,10 @@ export default function ScheduleGenerationTracePanel({
 
       <div className="mb-2 text-xs text-muted-foreground">
         <p>Run ID: <span className="font-mono text-[11px] text-foreground">{activeRunId}</span></p>
+        <p>Engine: <span className="font-mono text-[11px] text-foreground">{engineLabel}</span></p>
+        {run?.plannerVersion ? <p>Planner: <span className="font-mono text-[11px] text-foreground">{run.plannerVersion}</span></p> : null}
+        {run?.rulesetVersion ? <p>Ruleset: <span className="font-mono text-[11px] text-foreground">{run.rulesetVersion}</span></p> : null}
+        {typeof run?.optimizerUsed === 'boolean' ? <p>Optimizer: <span className="font-mono text-[11px] text-foreground">{run.optimizerUsed ? 'enabled' : 'disabled'}</span></p> : null}
         {run?.errorMessage ? <p className="mt-1 text-red-700">{run.errorMessage}</p> : null}
         {loading ? <p className="mt-1">Loading trace...</p> : null}
         {error ? <p className="mt-1 text-red-700">{error}</p> : null}

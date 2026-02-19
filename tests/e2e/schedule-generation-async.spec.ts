@@ -176,6 +176,7 @@ async function setupWizardAsyncRoutes(page: Page, state: { capturedGenerateBody:
             mode: 'async',
             runId: 'run-async-1',
             source: 'wizard_initial',
+            engine: 'legacy_llm',
             state: 'queued',
             statusUrl: '/api/v1/agents/schedule-generation/runs/run-async-1',
             eventsUrl: '/api/v1/agents/schedule-generation/runs/run-async-1/events',
@@ -315,6 +316,10 @@ async function setupTracePanelAsyncRoutes(page: Page, state: {
           source: 'wizard_initial',
           replanMode: 'replace_all',
           state: succeeded ? 'succeeded' : 'running',
+          engine: 'legacy_llm',
+          plannerVersion: null,
+          rulesetVersion: null,
+          optimizerUsed: null,
           attemptsUsed: 1,
           maxAttempts: 2,
           retryable: !succeeded,
@@ -415,10 +420,23 @@ test.describe('Async schedule generation UX (wizard handoff + trace panel)', () 
 
     await page.goto('/ja/projects/project-1?debugMockProject=empty&generationRunId=run-async-1');
 
+    const runningStatus = page.getByText('Status: Running');
+    const succeededStatus = page.getByText('Status: Succeeded');
+
     await expect(page.getByTestId('schedule-generation-trace-panel')).toBeVisible();
-    await expect(page.getByText('Status: Running')).toBeVisible();
+    await expect
+      .poll(async () => {
+        if (await succeededStatus.isVisible()) {
+          return 'succeeded';
+        }
+        if (await runningStatus.isVisible()) {
+          return 'running';
+        }
+        return 'pending';
+      })
+      .not.toBe('pending');
     await expect(page.getByText('Collecting weather and project context')).toBeVisible();
-    await expect(page.getByText('Status: Succeeded')).toBeVisible({ timeout: 15_000 });
+    await expect(succeededStatus).toBeVisible({ timeout: 15_000 });
 
     expect(state.project.tasks.length).toBeGreaterThan(0);
   });
