@@ -142,6 +142,19 @@ function geometryRing(geometry: GeoJsonPolygon): Array<{ lat: number; lon: numbe
     .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lon));
 }
 
+function openRingPoints(geometry: GeoJsonPolygon): Array<{ lat: number; lon: number }> {
+  const points = geometryRing(geometry);
+  if (points.length <= 1) return points;
+
+  const first = points[0];
+  const last = points[points.length - 1];
+  if (Math.abs(first.lat - last.lat) < 1e-9 && Math.abs(first.lon - last.lon) < 1e-9) {
+    return points.slice(0, -1);
+  }
+
+  return points;
+}
+
 function featureCollection(fields: FieldRecord[], riskByFieldId: Record<string, RiskSeverity>) {
   return {
     type: 'FeatureCollection' as const,
@@ -294,11 +307,14 @@ export default function FieldMapCanvas({
   onDraftCentroidChange,
   onDrawModeChange,
 }: FieldMapCanvasProps) {
+  const initialDraftPoints = draftGeometry ? openRingPoints(draftGeometry) : [];
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<maplibregl.Map | null>(null);
   const drawModeRef = useRef<DrawMode>(drawMode);
   const draftGeometryRef = useRef<GeoJsonPolygon | null>(draftGeometry);
   const draftCentroidRef = useRef<FieldCentroid | null>(draftCentroid);
+  const draftPolygonPointsRef = useRef<Array<{ lat: number; lon: number }>>(initialDraftPoints);
+  const previousDraftGeometryRef = useRef<GeoJsonPolygon | null>(draftGeometry);
   const selectedFieldIdRef = useRef<string | null>(selectedFieldId);
   const onSelectFieldRef = useRef(onSelectField);
   const onDrawModeChangeRef = useRef(onDrawModeChange);
@@ -316,6 +332,7 @@ export default function FieldMapCanvas({
   const [searchExpanded, setSearchExpanded] = useState(false);
   const [geoPending, setGeoPending] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
+  const [draftPolygonPoints, setDraftPolygonPoints] = useState<Array<{ lat: number; lon: number }>>(initialDraftPoints);
 
   const fieldGeoJson = useMemo(() => featureCollection(fields, riskByFieldId), [fields, riskByFieldId]);
   const centroidGeoJson = useMemo(() => pointCollection(fields), [fields]);
@@ -326,11 +343,7 @@ export default function FieldMapCanvas({
   const draftGeoJsonRef = useRef(draftGeoJson);
   const draftCentroidGeoJsonRef = useRef(draftCentroidGeoJson);
 
-  const draftVertexCount = useMemo(() => {
-    if (!draftGeometry) return 0;
-    const points = geometryRing(draftGeometry);
-    return points.length > 0 ? Math.max(0, points.length - 1) : 0;
-  }, [draftGeometry]);
+  const draftVertexCount = draftPolygonPoints.length;
 
   const fitToRelevantBounds = useCallback((options?: { includeDraft?: boolean; duration?: number; maxZoom?: number }) => {
     const map = mapInstanceRef.current;
@@ -355,6 +368,11 @@ export default function FieldMapCanvas({
     if (includeDraft && draftGeometryRef.current) {
       for (const [lon, lat] of draftGeometryRef.current.coordinates[0]) {
         bounds.extend([lon, lat]);
+        hasBounds = true;
+      }
+    } else if (includeDraft && draftPolygonPointsRef.current.length > 0) {
+      for (const point of draftPolygonPointsRef.current) {
+        bounds.extend([point.lon, point.lat]);
         hasBounds = true;
       }
     } else if (includeDraft && draftCentroidRef.current) {
@@ -385,13 +403,7 @@ export default function FieldMapCanvas({
   }, []);
 
   const undoDraftVertex = useCallback(() => {
-    const liveDraft = draftGeometryRef.current;
-    if (!liveDraft) {
-      onDraftCentroidChangeRef.current(null);
-      return;
-    }
-
-    const currentPoints = geometryRing(liveDraft).slice(0, -1);
+    const currentPoints = draftPolygonPointsRef.current;
     if (!currentPoints.length) {
       onDraftGeometryChangeRef.current(null);
       onDraftCentroidChangeRef.current(null);
@@ -399,6 +411,9 @@ export default function FieldMapCanvas({
     }
 
     const nextPoints = currentPoints.slice(0, -1);
+    draftPolygonPointsRef.current = nextPoints;
+    setDraftPolygonPoints(nextPoints);
+
     if (nextPoints.length < 3) {
       onDraftGeometryChangeRef.current(null);
       const fallback = nextPoints.length ? nextPoints[nextPoints.length - 1] : null;
@@ -420,8 +435,19 @@ export default function FieldMapCanvas({
   }, [drawMode]);
 
   useEffect(() => {
+    const hadGeometry = Boolean(previousDraftGeometryRef.current);
     draftGeometryRef.current = draftGeometry;
-  }, [draftGeometry]);
+    if (draftGeometry) {
+      const nextPoints = openRingPoints(draftGeometry);
+      draftPolygonPointsRef.current = nextPoints;
+      setDraftPolygonPoints(nextPoints);
+    } else if (drawMode !== 'polygon' || hadGeometry) {
+      draftPolygonPointsRef.current = [];
+      setDraftPolygonPoints([]);
+    }
+
+    previousDraftGeometryRef.current = draftGeometry;
+  }, [draftGeometry, drawMode]);
 
   useEffect(() => {
     draftCentroidRef.current = draftCentroid;
@@ -623,17 +649,19 @@ export default function FieldMapCanvas({
           return;
         }
 
-        const liveDraftGeometry = draftGeometryRef.current;
-        const existingPoints = liveDraftGeometry ? geometryRing(liveDraftGeometry).slice(0, -1) : [];
+        const existingPoints = draftPolygonPointsRef.current;
         const nextPoints = [...existingPoints, { lat, lon }];
-        const nextGeometry = geometryFromPoints(nextPoints);
-        onDraftGeometryChangeRef.current(nextGeometry);
+        draftPolygonPointsRef.current = nextPoints;
+        setDraftPolygonPoints(nextPoints);
+        if (nextPoints.length < 3) return;
 
-        if (nextGeometry) {
-          const center = centroidFromGeometry(nextGeometry);
-          if (center) {
-            onDraftCentroidChangeRef.current(center);
-          }
+        const nextGeometry = geometryFromPoints(nextPoints);
+        if (!nextGeometry) return;
+
+        onDraftGeometryChangeRef.current(nextGeometry);
+        const center = centroidFromGeometry(nextGeometry);
+        if (center) {
+          onDraftCentroidChangeRef.current(center);
         }
       });
 

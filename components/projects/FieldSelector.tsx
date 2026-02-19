@@ -1,9 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { toastError } from '@/lib/feedback';
+import turfArea from '@turf/area';
+import turfCentroid from '@turf/centroid';
+import { toastError, toastSuccess } from '@/lib/feedback';
 import FieldMapCanvas from '@/components/fields/FieldMapCanvas';
 import type { FieldCentroid, GeoJsonPolygon } from '@/components/fields/types';
+
+type DrawMode = 'none' | 'centroid' | 'polygon';
 
 type FieldScopeValue = {
   fieldIds: string[];
@@ -22,6 +26,18 @@ type FieldRecord = {
   geoStatus?: string;
   geometry?: GeoJsonPolygon | null;
   centroid?: FieldCentroid | null;
+};
+
+type NewFieldDraft = {
+  name: string;
+  crop: string;
+  environmentType: 'open_field' | 'greenhouse' | 'home_pot';
+  containerCount: number | null;
+  color: string;
+  geometry: GeoJsonPolygon | null;
+  centroid: FieldCentroid | null;
+  areaSqm: number | null;
+  weatherSamplingMode: 'hybrid' | 'centroid';
 };
 
 interface FieldSelectorProps {
@@ -56,7 +72,7 @@ function normalizeField(raw: any): FieldRecord {
   };
 }
 
-function requiresGeo(field: FieldRecord): boolean {
+function requiresGeo(field: Pick<FieldRecord, 'environmentType'>): boolean {
   return (field.environmentType || 'open_field') === 'open_field';
 }
 
@@ -77,13 +93,13 @@ function statusTone(field: FieldRecord): string {
   return 'border-red-200 bg-red-50 text-red-700';
 }
 
-function environmentLabel(field: FieldRecord): string {
+function environmentLabel(field: Pick<FieldRecord, 'environmentType'>): string {
   if (field.environmentType === 'greenhouse') return 'ハウス';
   if (field.environmentType === 'home_pot') return '家庭ポット';
   return '露地';
 }
 
-function areaLabel(field: FieldRecord): string {
+function areaLabel(field: Pick<FieldRecord, 'areaSqm' | 'area'>): string {
   const areaSqm = typeof field.areaSqm === 'number'
     ? field.areaSqm
     : (typeof field.area === 'number' ? field.area : null);
@@ -91,10 +107,71 @@ function areaLabel(field: FieldRecord): string {
   return `${(areaSqm / 10000).toFixed(2)} ha`;
 }
 
+function geometryAreaSqm(geometry: GeoJsonPolygon | null): number | null {
+  if (!geometry) return null;
+  try {
+    const feature = {
+      type: 'Feature' as const,
+      geometry,
+      properties: {},
+    };
+    const sqm = turfArea(feature as any);
+    if (!Number.isFinite(sqm) || sqm <= 0) return null;
+    return Number(sqm.toFixed(2));
+  } catch {
+    return null;
+  }
+}
+
+function geometryCentroid(geometry: GeoJsonPolygon | null): FieldCentroid | null {
+  if (!geometry) return null;
+  try {
+    const feature = {
+      type: 'Feature' as const,
+      geometry,
+      properties: {},
+    };
+    const center = turfCentroid(feature as any);
+    const coordinates = center?.geometry?.coordinates;
+    if (!Array.isArray(coordinates) || coordinates.length < 2) return null;
+    const lon = Number(coordinates[0]);
+    const lat = Number(coordinates[1]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    return { lat, lon };
+  } catch {
+    return null;
+  }
+}
+
+function defaultDraft(): NewFieldDraft {
+  return {
+    name: '',
+    crop: '',
+    environmentType: 'open_field',
+    containerCount: null,
+    color: '#16a34a',
+    geometry: null,
+    centroid: null,
+    areaSqm: null,
+    weatherSamplingMode: 'hybrid',
+  };
+}
+
+function deriveGeoStatus(draft: Pick<NewFieldDraft, 'geometry' | 'centroid'>): 'verified' | 'approximate' | 'missing' {
+  if (draft.geometry && draft.centroid) return 'verified';
+  if (draft.centroid) return 'approximate';
+  return 'missing';
+}
+
 export default function FieldSelector({ value, onChange, onFieldsLoaded }: FieldSelectorProps) {
   const [fields, setFields] = useState<FieldRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createSaving, setCreateSaving] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [createDrawMode, setCreateDrawMode] = useState<DrawMode>('polygon');
+  const [draft, setDraft] = useState<NewFieldDraft>(defaultDraft());
 
   const fieldById = useMemo(() => {
     const map = new Map<string, FieldRecord>();
@@ -189,6 +266,112 @@ export default function FieldSelector({ value, onChange, onFieldsLoaded }: Field
     });
   };
 
+  const openCreatePanel = () => {
+    setCreateError(null);
+    setCreateOpen(true);
+  };
+
+  const closeCreatePanel = () => {
+    setCreateOpen(false);
+    setCreateSaving(false);
+    setCreateError(null);
+    setCreateDrawMode('polygon');
+    setDraft(defaultDraft());
+  };
+
+  const handleDraftGeometryChange = (geometry: GeoJsonPolygon | null) => {
+    setDraft((prev) => {
+      const centroid = geometry ? geometryCentroid(geometry) : prev.centroid;
+      const areaSqm = geometry ? geometryAreaSqm(geometry) : prev.areaSqm;
+      return {
+        ...prev,
+        geometry,
+        centroid,
+        areaSqm,
+      };
+    });
+    setCreateError(null);
+  };
+
+  const handleDraftCentroidChange = (centroid: FieldCentroid | null) => {
+    setDraft((prev) => ({
+      ...prev,
+      centroid,
+    }));
+    setCreateError(null);
+  };
+
+  const handleCreateField = async () => {
+    const name = draft.name.trim();
+    if (!name) {
+      setCreateError('圃場名を入力してください。');
+      return;
+    }
+
+    const requiresLocation = draft.environmentType === 'open_field';
+    if (requiresLocation && !draft.geometry && !draft.centroid) {
+      setCreateError('露地圃場は境界または位置ピンが必須です。');
+      return;
+    }
+
+    if (draft.environmentType === 'home_pot' && (!draft.containerCount || draft.containerCount < 1)) {
+      setCreateError('家庭ポットを選択した場合はポット数を入力してください。');
+      return;
+    }
+
+    setCreateSaving(true);
+    setCreateError(null);
+
+    try {
+      const response = await fetch('/api/v1/fields', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name,
+          crop: draft.crop.trim() || null,
+          color: draft.color,
+          environmentType: draft.environmentType,
+          containerCount: draft.environmentType === 'home_pot' ? draft.containerCount : null,
+          geometry: draft.geometry,
+          centroid: draft.centroid,
+          areaSqm: draft.areaSqm,
+          geoStatus: deriveGeoStatus(draft),
+          weatherSamplingMode: draft.weatherSamplingMode,
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload?.message || payload?.error || '圃場の作成に失敗しました');
+      }
+
+      const payload = await response.json();
+      const createdField = normalizeField(payload?.field || {});
+      await fetchFields();
+
+      const nextFieldIds = selectedFieldIds.includes(createdField.id)
+        ? selectedFieldIds
+        : [...selectedFieldIds, createdField.id];
+
+      onChange({
+        fieldIds: nextFieldIds,
+        primaryFieldId: createdField.id,
+      });
+
+      toastSuccess('圃場を作成しました。');
+      closeCreatePanel();
+    } catch (nextError) {
+      console.error('Failed to create field in project flow', nextError);
+      const message = nextError instanceof Error ? nextError.message : '圃場の作成に失敗しました';
+      setCreateError(message);
+      toastError(message);
+    } finally {
+      setCreateSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-3 rounded-xl border border-border bg-card p-4">
       <div className="flex items-center justify-between gap-2">
@@ -196,10 +379,208 @@ export default function FieldSelector({ value, onChange, onFieldsLoaded }: Field
           <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Field Scope</p>
           <h3 className="text-sm font-semibold text-foreground">圃場を選択 (複数可)</h3>
         </div>
-        <span className="rounded-full border border-border bg-secondary px-2 py-1 text-[11px] font-semibold text-secondary-foreground">
-          {selectedFieldIds.length}件選択
-        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              if (createOpen) {
+                closeCreatePanel();
+                return;
+              }
+              openCreatePanel();
+            }}
+            className="rounded-full border border-border bg-card px-3 py-1 text-[11px] font-semibold text-foreground hover:border-brand-seedling/50"
+          >
+            {createOpen ? '作成を閉じる' : '新規圃場を作成'}
+          </button>
+          <span className="rounded-full border border-border bg-secondary px-2 py-1 text-[11px] font-semibold text-secondary-foreground">
+            {selectedFieldIds.length}件選択
+          </span>
+        </div>
       </div>
+
+      {createOpen ? (
+        <section className="space-y-3 rounded-xl border border-brand-waterline/35 bg-brand-waterline/8 p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Field Creator</p>
+              <h4 className="text-sm font-semibold text-foreground">プロジェクト作成中に圃場を追加</h4>
+            </div>
+            <span className="rounded-full border border-border bg-card px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+              maplibre
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+            <label className="block">
+              <span className="mb-1 block text-xs font-semibold text-muted-foreground">圃場名</span>
+              <input
+                value={draft.name}
+                onChange={(event) => setDraft((prev) => ({ ...prev, name: event.target.value }))}
+                className="control-inset w-full rounded-lg border border-border px-3 py-2 text-sm"
+                placeholder="例: 北区画A"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-semibold text-muted-foreground">作物</span>
+              <input
+                value={draft.crop}
+                onChange={(event) => setDraft((prev) => ({ ...prev, crop: event.target.value }))}
+                className="control-inset w-full rounded-lg border border-border px-3 py-2 text-sm"
+                placeholder="例: コシヒカリ"
+              />
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
+            <label className="block md:col-span-2">
+              <span className="mb-1 block text-xs font-semibold text-muted-foreground">栽培環境</span>
+              <select
+                value={draft.environmentType}
+                onChange={(event) => {
+                  const environmentType = event.target.value as 'open_field' | 'greenhouse' | 'home_pot';
+                  setDraft((prev) => ({
+                    ...prev,
+                    environmentType,
+                    containerCount: environmentType === 'home_pot'
+                      ? (prev.containerCount && prev.containerCount > 0 ? prev.containerCount : 1)
+                      : null,
+                  }));
+
+                  if (environmentType === 'open_field' && createDrawMode === 'none') {
+                    setCreateDrawMode('polygon');
+                  }
+
+                  if (environmentType === 'home_pot' && createDrawMode === 'polygon') {
+                    setCreateDrawMode('centroid');
+                  }
+                }}
+                className="control-inset w-full rounded-lg border border-border px-3 py-2 text-sm"
+              >
+                <option value="open_field">露地</option>
+                <option value="greenhouse">ハウス</option>
+                <option value="home_pot">家庭ポット</option>
+              </select>
+            </label>
+
+            {draft.environmentType === 'home_pot' ? (
+              <label className="block md:col-span-1">
+                <span className="mb-1 block text-xs font-semibold text-muted-foreground">ポット数</span>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={draft.containerCount ?? ''}
+                  onChange={(event) => setDraft((prev) => ({
+                    ...prev,
+                    containerCount: Number.isFinite(Number(event.target.value))
+                      ? Math.max(1, Math.floor(Number(event.target.value)))
+                      : null,
+                  }))}
+                  className="control-inset w-full rounded-lg border border-border px-3 py-2 text-sm"
+                />
+              </label>
+            ) : null}
+
+            <label className="block md:col-span-1">
+              <span className="mb-1 block text-xs font-semibold text-muted-foreground">色</span>
+              <input
+                type="color"
+                value={draft.color}
+                onChange={(event) => setDraft((prev) => ({ ...prev, color: event.target.value }))}
+                className="h-10 w-full rounded-lg border border-border bg-card p-1"
+              />
+            </label>
+          </div>
+
+          <div className="rounded-lg border border-border bg-card p-2">
+            <p className="mb-2 text-xs font-semibold text-muted-foreground">描画モード</p>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setCreateDrawMode('none')}
+                className={`rounded-md border px-2 py-1 text-xs font-semibold ${createDrawMode === 'none' ? 'border-brand-waterline/60 bg-brand-waterline/10' : 'border-border bg-card'}`}
+              >
+                停止
+              </button>
+              <button
+                type="button"
+                onClick={() => setCreateDrawMode('centroid')}
+                className={`rounded-md border px-2 py-1 text-xs font-semibold ${createDrawMode === 'centroid' ? 'border-brand-waterline/60 bg-brand-waterline/10' : 'border-border bg-card'}`}
+              >
+                ピン
+              </button>
+              <button
+                type="button"
+                onClick={() => setCreateDrawMode('polygon')}
+                disabled={draft.environmentType === 'home_pot'}
+                className={`rounded-md border px-2 py-1 text-xs font-semibold ${createDrawMode === 'polygon' ? 'border-brand-waterline/60 bg-brand-waterline/10' : 'border-border bg-card'} disabled:opacity-50`}
+              >
+                境界
+              </button>
+            </div>
+            <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
+              <span>{draft.environmentType === 'open_field' ? '露地: 位置情報が必須です' : `${environmentLabel(draft)}: 位置情報は任意`}</span>
+              <span>{draft.areaSqm ? `${(draft.areaSqm / 10000).toFixed(2)} ha` : '面積未計算'}</span>
+            </div>
+          </div>
+
+          <div className="[&_[data-testid='field-map-canvas']]:h-[320px] [&_[data-testid='field-map-canvas']]:min-h-0">
+            <FieldMapCanvas
+              fields={fields}
+              selectedFieldId={primaryFieldId}
+              draftGeometry={draft.geometry}
+              draftCentroid={draft.centroid}
+              drawMode={createDrawMode}
+              riskByFieldId={{}}
+              onSelectField={(fieldId) => {
+                const field = fieldById.get(fieldId);
+                if (!field) return;
+                if (!isSelectable(field)) {
+                  toastError('露地圃場は位置情報が必要です。Mapページでピンまたは境界を設定してください。');
+                  return;
+                }
+
+                if (selectedFieldIds.includes(fieldId)) {
+                  setPrimary(fieldId);
+                  return;
+                }
+
+                onChange({
+                  fieldIds: [...selectedFieldIds, fieldId],
+                  primaryFieldId: fieldId,
+                });
+              }}
+              onDraftGeometryChange={handleDraftGeometryChange}
+              onDraftCentroidChange={handleDraftCentroidChange}
+              onDrawModeChange={setCreateDrawMode}
+            />
+          </div>
+
+          {createError ? (
+            <p className="text-sm font-semibold text-red-700">{createError}</p>
+          ) : null}
+
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={closeCreatePanel}
+              disabled={createSaving}
+              className="rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground"
+            >
+              キャンセル
+            </button>
+            <button
+              type="button"
+              onClick={handleCreateField}
+              disabled={createSaving}
+              className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+            >
+              {createSaving ? '作成中...' : '圃場を作成'}
+            </button>
+          </div>
+        </section>
+      ) : null}
 
       {loading ? (
         <div className="rounded-lg border border-border bg-secondary/35 px-3 py-4 text-sm text-muted-foreground">
@@ -222,7 +603,7 @@ export default function FieldSelector({ value, onChange, onFieldsLoaded }: Field
 
       {!loading && !error && fields.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border bg-secondary/25 px-3 py-4 text-sm text-muted-foreground">
-          圃場がありません。先にMapページで圃場を作成してください。
+          圃場がありません。上の「新規圃場を作成」から境界を描いて追加してください。
         </div>
       ) : null}
 
@@ -260,73 +641,73 @@ export default function FieldSelector({ value, onChange, onFieldsLoaded }: Field
           </div>
 
           <div className="space-y-2">
-          {fields.map((field) => {
-            const selected = selectedFieldIds.includes(field.id);
-            const primary = primaryFieldId === field.id;
-            const selectable = isSelectable(field);
-            return (
-              <div
-                key={field.id}
-                className={`rounded-lg border p-3 transition ${selected
-                  ? 'border-brand-waterline/55 bg-brand-waterline/10'
-                  : selectable
-                    ? 'border-border bg-card'
-                    : 'border-red-200 bg-red-50/40'
-                  }`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={() => toggleField(field)}
-                    className="flex min-w-0 flex-1 items-start gap-2 text-left"
-                  >
-                    <span
-                      className={`mt-0.5 inline-flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border text-[10px] font-semibold ${selected
-                        ? 'border-brand-waterline bg-brand-waterline text-white'
-                        : 'border-border bg-card text-transparent'
-                        }`}
-                    >
-                      ✓
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold text-foreground">{field.name}</span>
-                      <span className="block text-xs text-muted-foreground">
-                        {field.crop || '作物未設定'} · {areaLabel(field)} · {environmentLabel(field)}
-                      </span>
-                    </span>
-                  </button>
-
-                  {selected ? (
+            {fields.map((field) => {
+              const selected = selectedFieldIds.includes(field.id);
+              const primary = primaryFieldId === field.id;
+              const selectable = isSelectable(field);
+              return (
+                <div
+                  key={field.id}
+                  className={`rounded-lg border p-3 transition ${selected
+                    ? 'border-brand-waterline/55 bg-brand-waterline/10'
+                    : selectable
+                      ? 'border-border bg-card'
+                      : 'border-red-200 bg-red-50/40'
+                    }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
                     <button
                       type="button"
-                      onClick={() => setPrimary(field.id)}
-                      className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${primary
-                        ? 'border-brand-seedling/55 bg-brand-seedling/12 text-foreground'
-                        : 'border-border bg-secondary text-muted-foreground'
-                        }`}
+                      onClick={() => toggleField(field)}
+                      className="flex min-w-0 flex-1 items-start gap-2 text-left"
                     >
-                      {primary ? 'Primary' : 'Set primary'}
+                      <span
+                        className={`mt-0.5 inline-flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border text-[10px] font-semibold ${selected
+                          ? 'border-brand-waterline bg-brand-waterline text-white'
+                          : 'border-border bg-card text-transparent'
+                          }`}
+                      >
+                        ✓
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold text-foreground">{field.name}</span>
+                        <span className="block text-xs text-muted-foreground">
+                          {field.crop || '作物未設定'} · {areaLabel(field)} · {environmentLabel(field)}
+                        </span>
+                      </span>
                     </button>
-                  ) : null}
-                </div>
 
-                <div className="mt-2 flex items-center gap-2">
-                  {requiresGeo(field) ? (
-                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusTone(field)}`}>
-                      {statusLabel(field)}
-                    </span>
-                  ) : (
-                    <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700">
-                      位置情報は任意
-                    </span>
-                  )}
-                  {!selectable && requiresGeo(field) ? (
-                    <span className="text-[11px] font-medium text-red-700">スケジューリング不可</span>
-                  ) : null}
+                    {selected ? (
+                      <button
+                        type="button"
+                        onClick={() => setPrimary(field.id)}
+                        className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${primary
+                          ? 'border-brand-seedling/55 bg-brand-seedling/12 text-foreground'
+                          : 'border-border bg-secondary text-muted-foreground'
+                          }`}
+                      >
+                        {primary ? 'Primary' : 'Set primary'}
+                      </button>
+                    ) : null}
+                  </div>
+
+                  <div className="mt-2 flex items-center gap-2">
+                    {requiresGeo(field) ? (
+                      <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusTone(field)}`}>
+                        {statusLabel(field)}
+                      </span>
+                    ) : (
+                      <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700">
+                        位置情報は任意
+                      </span>
+                    )}
+                    {!selectable && requiresGeo(field) ? (
+                      <span className="text-[11px] font-medium text-red-700">スケジューリング不可</span>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
           </div>
         </div>
       ) : null}
