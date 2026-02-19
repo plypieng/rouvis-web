@@ -866,6 +866,7 @@
       "error": "Sign in failed. Please try again.",
       "admissionDenied": "Access is limited to admitted beta users. Please request access before signing in.",
       "requestAccessCta": "Request Beta Access",
+      "backToLanding": "Back to landing",
       "terms": "By signing in, you agree to our Terms of Service and Privacy Policy.",
       "brandTagline": "Farming chat assistant"
     },

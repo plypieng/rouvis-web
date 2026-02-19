@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { Suspense, useEffect } from 'react';
+import { ArrowLeft } from 'lucide-react';
 import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
 import TrackedEventLink from '@/components/TrackedEventLink';
 
@@ -39,6 +40,19 @@ function LoginPageContent() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex items-center justify-center px-4">
       <div className="max-w-md w-full space-y-8">
+        <div className="flex items-center justify-start">
+          <TrackedEventLink
+            href={`/${locale}`}
+            eventName="login_back_to_landing_clicked"
+            eventProperties={{ source: 'login_page' }}
+            className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white/90 px-3 py-1.5 text-sm font-medium text-emerald-700 transition hover:border-emerald-200 hover:bg-white"
+            data-testid="login-back-to-landing"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span>{t('backToLanding')}</span>
+          </TrackedEventLink>
+        </div>
+
         {/* ROuvis Logo */}
         <div className="text-center mb-6">
           <Link href={`/${locale}`} className="inline-block hover:opacity-80 transition-opacity">

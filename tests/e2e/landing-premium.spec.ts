@@ -1,6 +1,18 @@
 import { expect, test } from '@playwright/test';
 
 test.describe('Premium landing flow', () => {
+  test('login page provides explicit path back to landing', async ({ page }) => {
+    await page.goto('/ja/login');
+
+    const backToLanding = page.getByTestId('login-back-to-landing');
+    await expect(backToLanding).toBeVisible();
+    await expect(backToLanding).toHaveAttribute('href', '/ja');
+
+    await backToLanding.click();
+    await expect(page).toHaveURL(/\/ja$/);
+    await expect(page.getByTestId('landing-hero')).toBeVisible();
+  });
+
   test('renders reduced five-section architecture with interactive workflow', async ({ page }) => {
     await page.goto('/ja');
 
