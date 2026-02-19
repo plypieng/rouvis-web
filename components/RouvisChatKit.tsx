@@ -241,6 +241,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   const quickApplyInFlightRef = useRef(false);
   const lastActionTypeRef = useRef<ActionConfirmation['type'] | null>(null);
   const createThreadPromiseRef = useRef<Promise<string | null> | null>(null);
+  const lastLoadedThreadIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     setAssistantLanguage(inferAssistantLanguage(locale));
@@ -263,6 +264,32 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
       return [...filtered, step].slice(-TRACE_EXPANDED_MAX_STEPS);
     });
   }, [standoutMode]);
+
+  const appendAssistantContent = useCallback((assistantId: string, text: string) => {
+    if (!text) return;
+    setMessages(prev => {
+      const targetIndex = prev.findIndex((message) => message.id === assistantId);
+      if (targetIndex === -1) {
+        return [
+          ...prev,
+          {
+            id: assistantId,
+            role: 'assistant',
+            content: text,
+          },
+        ];
+      }
+
+      const next = [...prev];
+      const target = next[targetIndex];
+      if (!target) return prev;
+      next[targetIndex] = {
+        ...target,
+        content: `${target.content}${text}`,
+      };
+      return next;
+    });
+  }, []);
 
   const publishHandshake = useCallback((handshake: CommandHandshake | null) => {
     setActiveHandshake(handshake);
@@ -346,6 +373,8 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   useEffect(() => {
     const loadHistory = async () => {
       if (!threadId) return;
+      if (isLoading) return;
+      if (lastLoadedThreadIdRef.current === threadId) return;
 
       try {
         const res = await fetch(`/api/chatkit?thread_id=${threadId}`);
@@ -369,6 +398,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
             createdAt: m.createdAt,
           }));
           setMessages(history);
+          lastLoadedThreadIdRef.current = threadId;
 
           const replayTraceSteps = (data.messages || [])
             .filter((m) => m.role === 'assistant')
@@ -399,7 +429,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     };
 
     void loadHistory();
-  }, [threadId]);
+  }, [threadId, isLoading]);
 
   useEffect(() => {
     if (!initialMode) return;
@@ -420,6 +450,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     setCommandArtifacts([]);
     setReasoningTraceSteps([]);
     setTraceExpanded(false);
+    lastLoadedThreadIdRef.current = null;
     publishHandshake(null);
     setIntentPolicyDebug(null);
     setPendingMutationApproval(null);
@@ -585,9 +616,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
               const text = JSON.parse(line.slice(2));
               assistantRawContent += text;
               lastAssistantRawRef.current = assistantRawContent;
-              setMessages(prev => prev.map(m =>
-                m.id === assistantId ? { ...m, content: m.content + text } : m
-              ));
+              appendAssistantContent(assistantId, text);
             } catch {
               // Skip parse errors
             }
@@ -660,9 +689,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
               const content = event.delta.content;
               assistantRawContent += content;
               lastAssistantRawRef.current = assistantRawContent;
-              setMessages(prev => prev.map(m =>
-                m.id === assistantId ? { ...m, content: m.content + content } : m
-              ));
+              appendAssistantContent(assistantId, content);
             }
 
             // Source (simplified - no confidence %)
@@ -831,6 +858,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     publishHandshake,
     pushArtifact,
     pushReasoningTraceStep,
+    appendAssistantContent,
     t,
   ]);
 

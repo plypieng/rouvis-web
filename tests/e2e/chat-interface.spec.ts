@@ -444,4 +444,84 @@ test.describe('Chat Interface with /api/chatkit', () => {
     await expect(page.getByTestId('inference-trace-panel')).toBeVisible();
     await expect(page.getByTestId('inference-trace-summary')).toContainText('Drafting final response');
   });
+
+  test('keeps streamed assistant text visible when thread history resolves during send', async ({ page }) => {
+    await page.route('**/api/chatkit**', async (route) => {
+      const request = route.request();
+
+      if (request.method() === 'GET') {
+        await new Promise((resolve) => setTimeout(resolve, 180));
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ messages: [] }),
+        });
+        return;
+      }
+
+      let body: ChatRequestBody = {};
+      try {
+        body = JSON.parse(request.postData() || '{}') as ChatRequestBody;
+      } catch {
+        body = {};
+      }
+
+      if (body.action === 'chatkit.list_threads') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ threads: [] }),
+        });
+        return;
+      }
+
+      if (body.action === 'chatkit.create_thread') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            thread: {
+              id: 'thread-race',
+              title: 'Race Thread',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            },
+          }),
+        });
+        return;
+      }
+
+      if (body.action === 'chatkit.undo') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ ok: true }),
+        });
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/plain; charset=utf-8',
+        body: createStream([
+          `e:${JSON.stringify({
+            type: 'reasoning_trace',
+            stepId: 'trace-race-1',
+            phase: 'intent',
+            status: 'completed',
+            title: 'Intent recognized',
+            sourceEvent: 'intent_policy',
+            timestamp: '2026-02-19T08:00:00.000Z',
+          })}`,
+          `0:${JSON.stringify('セルトレイは苗を育てるための穴あき容器です。')}`,
+        ]),
+      });
+    });
+
+    await openChat(page);
+    await sendPrompt(page, 'セルトレイってなに？');
+
+    const assistantMessage = page.locator('.message-assistant').last();
+    await expect(assistantMessage).toContainText('セルトレイは苗を育てるための穴あき容器です。');
+  });
 });
