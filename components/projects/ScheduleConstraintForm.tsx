@@ -1,6 +1,7 @@
 'use client';
 
 import { Fragment } from 'react';
+import { useTranslations } from 'next-intl';
 
 export type YieldUnit = 't_per_ha' | 'kg_total';
 export type RiskTolerance = 'conservative' | 'balanced' | 'aggressive';
@@ -33,7 +34,7 @@ export type ScheduleConstraintAdvanced = {
   constraintsNote: string;
 };
 
-export const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+export const WEEKDAY_LABELS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
 
 const DEFAULT_ADVANCED: ScheduleConstraintAdvanced = {
   preferredWorkStartHour: 6,
@@ -231,15 +232,20 @@ export default function ScheduleConstraintForm({
   showAdvanced,
   onChangeShowAdvanced,
 }: ScheduleConstraintFormProps) {
+  const t = useTranslations('projects.schedule_constraints');
+  const localeYieldUnitLabel = (unit: YieldUnit): string => {
+    return unit === 'kg_total' ? t('yield.unit_kg_total') : t('yield.unit_t_per_ha');
+  };
+
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <section className="surface-base p-4">
         <div className="mb-3">
-          <h3 className="text-sm font-semibold text-foreground">Planning template</h3>
-          <p className="text-xs text-muted-foreground">Select a base strategy before generating the schedule.</p>
+          <h3 className="text-sm font-semibold text-foreground">{t('template.title')}</h3>
+          <p className="text-xs text-muted-foreground">{t('template.description')}</p>
         </div>
 
-        {templatesLoading ? <p className="text-xs text-muted-foreground">Loading templates...</p> : null}
+        {templatesLoading ? <p className="text-xs text-muted-foreground">{t('template.loading')}</p> : null}
         {!templatesLoading && templatesError ? (
           <p className="text-xs text-orange-700">{templatesError}</p>
         ) : null}
@@ -271,10 +277,10 @@ export default function ScheduleConstraintForm({
                     <span className="text-sm font-semibold text-foreground">{template.label}</span>
                     <span className="flex items-center gap-1.5">
                       {recommended ? (
-                        <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold text-secondary-foreground">Recommended</span>
+                        <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold text-secondary-foreground">{t('template.recommended')}</span>
                       ) : null}
                       {!isActive ? (
-                        <span className="rounded-full border border-border bg-card px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">Coming soon</span>
+                        <span className="rounded-full border border-border bg-card px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">{t('template.coming_soon')}</span>
                       ) : null}
                     </span>
                   </div>
@@ -288,24 +294,28 @@ export default function ScheduleConstraintForm({
 
       <section className="surface-base p-4">
         <div className="mb-3">
-          <h3 className="text-sm font-semibold text-foreground">Target yield</h3>
-          <p className="text-xs text-muted-foreground">Use a recommendation or override it with your own goal.</p>
+          <h3 className="text-sm font-semibold text-foreground">{t('yield.title')}</h3>
+          <p className="text-xs text-muted-foreground">{t('yield.description')}</p>
         </div>
 
         {yieldRecommendation ? (
           <div className="rounded-lg border border-brand-waterline/35 bg-brand-waterline/10 px-3 py-2">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">Recommended</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">{t('yield.recommended')}</p>
             <p className="text-lg font-semibold text-foreground">
-              {yieldRecommendation.value} {yieldUnitLabel(yieldRecommendation.unit)}
+              {yieldRecommendation.value} {localeYieldUnitLabel(yieldRecommendation.unit)}
             </p>
             <p className="text-xs text-muted-foreground">
-              Range: {yieldRecommendation.min} - {yieldRecommendation.max} {yieldUnitLabel(yieldRecommendation.unit)}
+              {t('yield.range', {
+                min: yieldRecommendation.min,
+                max: yieldRecommendation.max,
+                unit: localeYieldUnitLabel(yieldRecommendation.unit),
+              })}
             </p>
             <p className="text-xs text-muted-foreground">{yieldRecommendation.rationale}</p>
           </div>
         ) : (
           <div className="rounded-lg border border-dashed border-border bg-secondary/20 px-3 py-3 text-xs text-muted-foreground">
-            Select fields to get a recommendation.
+            {t('yield.empty')}
           </div>
         )}
 
@@ -317,7 +327,7 @@ export default function ScheduleConstraintForm({
             inputMode="decimal"
             value={preferredYieldInput}
             onChange={(event) => onChangeYieldInput(event.target.value)}
-            placeholder={yieldRecommendation ? String(yieldRecommendation.value) : 'Ex: 5.0'}
+            placeholder={yieldRecommendation ? String(yieldRecommendation.value) : t('yield.placeholder')}
             className="control-inset w-full px-3 py-2 text-sm"
           />
           <select
@@ -325,13 +335,13 @@ export default function ScheduleConstraintForm({
             onChange={(event) => onChangeYieldUnit(event.target.value as YieldUnit)}
             className="control-inset w-full px-3 py-2 text-sm"
           >
-            <option value="t_per_ha">t/ha</option>
-            <option value="kg_total">kg total</option>
+            <option value="t_per_ha">{t('yield.unit_t_per_ha')}</option>
+            <option value="kg_total">{t('yield.unit_kg_total')}</option>
           </select>
         </div>
 
         {hasInvalidYieldInput ? (
-          <p className="mt-2 text-xs font-medium text-red-700">Target yield must be a positive number.</p>
+          <p className="mt-2 text-xs font-medium text-red-700">{t('yield.invalid')}</p>
         ) : null}
 
         {yieldRecommendation && onApplyRecommendedYield ? (
@@ -340,7 +350,7 @@ export default function ScheduleConstraintForm({
             onClick={onApplyRecommendedYield}
             className="mt-2 rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary/60"
           >
-            Use recommendation
+            {t('yield.use_recommendation')}
           </button>
         ) : null}
       </section>
@@ -348,15 +358,15 @@ export default function ScheduleConstraintForm({
       <section className="surface-base p-4 lg:col-span-2">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h3 className="text-sm font-semibold text-foreground">Advanced constraints</h3>
-            <p className="text-xs text-muted-foreground">Optional controls for working window, volume, and risk style.</p>
+            <h3 className="text-sm font-semibold text-foreground">{t('advanced.title')}</h3>
+            <p className="text-xs text-muted-foreground">{t('advanced.description')}</p>
           </div>
           <button
             type="button"
             onClick={() => onChangeShowAdvanced(!showAdvanced)}
             className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-secondary/60"
           >
-            {showAdvanced ? 'Hide' : 'Show'}
+            {showAdvanced ? t('advanced.hide') : t('advanced.show')}
           </button>
         </div>
 
@@ -364,7 +374,7 @@ export default function ScheduleConstraintForm({
           <div className="mt-4 space-y-4">
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               <label className="text-xs font-medium text-muted-foreground">
-                Start hour
+                {t('advanced.start_hour')}
                 <input
                   type="number"
                   min={0}
@@ -378,7 +388,7 @@ export default function ScheduleConstraintForm({
                 />
               </label>
               <label className="text-xs font-medium text-muted-foreground">
-                End hour
+                {t('advanced.end_hour')}
                 <input
                   type="number"
                   min={1}
@@ -392,7 +402,7 @@ export default function ScheduleConstraintForm({
                 />
               </label>
               <label className="text-xs font-medium text-muted-foreground">
-                Max tasks / day
+                {t('advanced.max_tasks_per_day')}
                 <input
                   type="number"
                   min={1}
@@ -408,7 +418,7 @@ export default function ScheduleConstraintForm({
             </div>
 
             <div>
-              <p className="text-xs font-medium text-muted-foreground">Avoid weekdays</p>
+              <p className="text-xs font-medium text-muted-foreground">{t('advanced.avoid_weekdays')}</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {WEEKDAY_LABELS.map((label, day) => {
                   const active = advanced.avoidWeekdays.includes(day);
@@ -425,7 +435,7 @@ export default function ScheduleConstraintForm({
                         : 'border-border bg-card text-muted-foreground hover:bg-secondary'
                         }`}
                     >
-                      {label}
+                      {t(`weekday.${label}`)}
                     </button>
                   );
                 })}
@@ -434,7 +444,7 @@ export default function ScheduleConstraintForm({
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <label className="text-xs font-medium text-muted-foreground">
-                Risk tolerance
+                {t('advanced.risk_tolerance')}
                 <select
                   value={advanced.riskTolerance}
                   onChange={(event) => onChangeAdvanced({
@@ -443,13 +453,13 @@ export default function ScheduleConstraintForm({
                   })}
                   className="control-inset mt-1 w-full px-3 py-2 text-sm"
                 >
-                  <option value="conservative">Conservative</option>
-                  <option value="balanced">Balanced</option>
-                  <option value="aggressive">Aggressive</option>
+                  <option value="conservative">{t('advanced.risk_conservative')}</option>
+                  <option value="balanced">{t('advanced.risk_balanced')}</option>
+                  <option value="aggressive">{t('advanced.risk_aggressive')}</option>
                 </select>
               </label>
               <label className="text-xs font-medium text-muted-foreground">
-                Irrigation style
+                {t('advanced.irrigation_style')}
                 <select
                   value={advanced.irrigationStyle}
                   onChange={(event) => onChangeAdvanced({
@@ -458,15 +468,15 @@ export default function ScheduleConstraintForm({
                   })}
                   className="control-inset mt-1 w-full px-3 py-2 text-sm"
                 >
-                  <option value="manual">Manual</option>
-                  <option value="reminder">Reminder</option>
-                  <option value="strict">Strict</option>
+                  <option value="manual">{t('advanced.irrigation_manual')}</option>
+                  <option value="reminder">{t('advanced.irrigation_reminder')}</option>
+                  <option value="strict">{t('advanced.irrigation_strict')}</option>
                 </select>
               </label>
             </div>
 
             <label className="block text-xs font-medium text-muted-foreground">
-              Extra note
+              {t('advanced.extra_note')}
               <textarea
                 value={advanced.constraintsNote}
                 onChange={(event) => onChangeAdvanced({
@@ -475,7 +485,7 @@ export default function ScheduleConstraintForm({
                 })}
                 rows={3}
                 className="control-inset mt-1 w-full px-3 py-2 text-sm"
-                placeholder="Example: avoid late evening tasks when wind is strong"
+                placeholder={t('advanced.extra_note_placeholder')}
               />
             </label>
           </div>

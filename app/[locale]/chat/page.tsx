@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -443,9 +443,6 @@ export default function ChatPage() {
           <section className="surface-raised mb-3 p-3 sm:p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                  {t('cockpit.standalone.deck_label')}
-                </p>
                 <h1 className="mt-0.5 text-base font-semibold text-foreground sm:text-lg">
                   {t('cockpit.standalone.title')}
                 </h1>

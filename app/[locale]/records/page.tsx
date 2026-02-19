@@ -74,25 +74,25 @@ export default function RecordsPage() {
   const syncCopy = useMemo(() => (
     locale === 'en'
       ? {
-          title: 'Sync status',
-          online: 'Online',
-          offline: 'Offline',
-          pending: (count: number) => `${count} item(s) waiting to sync`,
-          offlineHint: 'New records will be queued on this device until connection returns.',
-          syncNow: 'Sync now',
-          syncing: 'Syncing...',
-          syncFailed: 'Some records failed to sync. Please retry.',
-        }
+        title: 'Sync status',
+        online: 'Online',
+        offline: 'Offline',
+        pending: (count: number) => `${count} item(s) waiting to sync`,
+        offlineHint: 'New records will be queued on this device until connection returns.',
+        syncNow: 'Sync now',
+        syncing: 'Syncing...',
+        syncFailed: 'Some records failed to sync. Please retry.',
+      }
       : {
-          title: '同期ステータス',
-          online: 'オンライン',
-          offline: 'オフライン',
-          pending: (count: number) => `同期待ち ${count} 件`,
-          offlineHint: '接続が戻るまで、新しい記録はこの端末にキュー保存されます。',
-          syncNow: '今すぐ同期',
-          syncing: '同期中...',
-          syncFailed: '一部の記録を同期できませんでした。再試行してください。',
-        }
+        title: '同期ステータス',
+        online: 'オンライン',
+        offline: 'オフライン',
+        pending: (count: number) => `同期待ち ${count} 件`,
+        offlineHint: '接続が戻るまで、新しい記録はこの端末にキュー保存されます。',
+        syncNow: '今すぐ同期',
+        syncing: '同期中...',
+        syncFailed: '一部の記録を同期できませんでした。再試行してください。',
+      }
   ), [locale]);
 
   const enqueueOfflineItem = useCallback((
@@ -224,7 +224,6 @@ export default function RecordsPage() {
 
   return (
     <div className="container mx-auto space-y-6 px-4 py-6">
-      <h1 className="text-2xl font-bold text-gray-900">記録・分析</h1>
 
       {(offlineQueue.length > 0 || !isOnline || queueSyncError) ? (
         <section

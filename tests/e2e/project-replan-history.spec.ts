@@ -608,6 +608,18 @@ test.describe('Project schedule lifecycle (wizard + replan + history)', () => {
     await page.getByRole('button', { name: '次へ' }).click();
 
     await page.getByRole('button', { name: '次へ：圃場を選択' }).click();
+    await expect(page.getByTestId('field-selector-create-panel')).toBeVisible();
+    await expect(page.getByText('計画テンプレート')).toBeVisible();
+    await expect(page.getByText('高度な制約')).toBeVisible();
+    await expect(page.getByText('Advanced constraints')).toHaveCount(0);
+
+    const createMapHeight = await page.getByTestId('field-selector-create-map')
+      .evaluate((element) => Math.round(element.getBoundingClientRect().height));
+    const browseMapHeight = await page.getByTestId('field-selector-browse-map')
+      .evaluate((element) => Math.round(element.getBoundingClientRect().height));
+    expect(createMapHeight).toBeGreaterThanOrEqual(430);
+    expect(browseMapHeight).toBeGreaterThanOrEqual(350);
+
     await page.getByRole('button', { name: /テスト圃場/ }).first().click();
     await page.getByRole('button', { name: 'プロジェクトを作成' }).click();
 

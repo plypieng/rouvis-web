@@ -313,7 +313,7 @@ export function ActivityDashboard({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">農業活動ダッシュボード</h2>
+          <h2 className="text-2xl font-bold text-gray-900">活動記録・分析</h2>
           <p className="text-gray-600 mt-1">今日の活動状況と今後の予定を確認</p>
         </div>
         <div className="flex gap-2">
@@ -340,9 +340,9 @@ export function ActivityDashboard({
           message={actionNotice.message}
           primaryAction={actionNotice.onAction && actionNotice.actionLabel
             ? {
-                label: actionNotice.actionLabel,
-                onClick: actionNotice.onAction,
-              }
+              label: actionNotice.actionLabel,
+              onClick: actionNotice.onAction,
+            }
             : undefined}
         />
       )}
@@ -380,7 +380,7 @@ export function ActivityDashboard({
             </div>
             <div>
               <div className="text-2xl font-bold text-gray-900">{fields.length}</div>
-              <div className="text-sm text-gray-600">管理圃場</div>
+              <div className="text-sm text-gray-600">圃場数</div>
             </div>
           </div>
         </div>
