@@ -276,7 +276,7 @@ test.describe('Chat Interface with /api/chatkit', () => {
           stepId: 'trace-1',
           phase: 'intent',
           status: 'completed',
-          title: 'Intent classified: workflow (schedule_update)',
+          title: 'Intent recognized',
           sourceEvent: 'intent_policy',
           timestamp: '2026-02-18T09:00:00.000Z',
         })}`,
@@ -285,7 +285,7 @@ test.describe('Chat Interface with /api/chatkit', () => {
           stepId: 'trace-2',
           phase: 'tooling',
           status: 'update',
-          title: 'Tool: scheduler.plan',
+          title: 'Preparing action plan',
           sourceEvent: 'tool_call_delta',
           timestamp: '2026-02-18T09:00:01.000Z',
         })}`,
@@ -303,8 +303,34 @@ test.describe('Chat Interface with /api/chatkit', () => {
     await tracePanel.getByRole('button', { name: /詳細を表示|Show details/ }).click();
     const steps = page.getByTestId('inference-trace-step');
     await expect(steps).toHaveCount(2);
-    await expect(steps.nth(0)).toContainText('Intent classified');
-    await expect(steps.nth(1)).toContainText('Tool: scheduler.plan');
+    await expect(steps.nth(0)).toContainText('Intent recognized');
+    await expect(steps.nth(1)).toContainText('Preparing action plan');
+  });
+
+  test('caps expanded inference trace list to five milestones', async ({ page }) => {
+    await mockChatkit(page, {
+      streamForPrompt: () => createStream([
+        ...Array.from({ length: 7 }, (_, idx) => `e:${JSON.stringify({
+          type: 'reasoning_trace',
+          stepId: `trace-${idx + 1}`,
+          phase: 'tooling',
+          status: 'update',
+          title: `Milestone ${idx + 1}`,
+          sourceEvent: 'tool_call_delta',
+          timestamp: `2026-02-18T09:00:0${idx}.000Z`,
+        })}`),
+        `0:${JSON.stringify('実行完了。')}`,
+      ]),
+    });
+    await openChat(page);
+    await sendPrompt(page, '詳細トレースを確認');
+
+    const tracePanel = page.getByTestId('inference-trace-panel');
+    await tracePanel.getByRole('button', { name: /詳細を表示|Show details/ }).click();
+    const steps = page.getByTestId('inference-trace-step');
+    await expect(steps).toHaveCount(5);
+    await expect(steps.nth(0)).toContainText('Milestone 3');
+    await expect(steps.nth(4)).toContainText('Milestone 7');
   });
 
   test('replays persisted TRACE_SUMMARY after thread reload', async ({ page }) => {
@@ -316,7 +342,7 @@ test.describe('Chat Interface with /api/chatkit', () => {
           stepId: 'persist-1',
           phase: 'synthesis',
           status: 'completed',
-          title: 'Reasoning summary',
+          title: 'Drafting final response',
           detail: 'Weather + workload merged.',
           sourceEvent: 'response_reasoning_summary',
           timestamp: '2026-02-18T10:00:00.000Z',
@@ -400,7 +426,7 @@ test.describe('Chat Interface with /api/chatkit', () => {
             stepId: 'persist-1',
             phase: 'synthesis',
             status: 'completed',
-            title: 'Reasoning summary',
+            title: 'Drafting final response',
             sourceEvent: 'response_reasoning_summary',
             timestamp: '2026-02-18T10:00:00.000Z',
           })}`,
@@ -416,6 +442,6 @@ test.describe('Chat Interface with /api/chatkit', () => {
     await page.reload();
     await page.waitForLoadState('networkidle');
     await expect(page.getByTestId('inference-trace-panel')).toBeVisible();
-    await expect(page.getByTestId('inference-trace-summary')).toContainText('Reasoning summary');
+    await expect(page.getByTestId('inference-trace-summary')).toContainText('Drafting final response');
   });
 });

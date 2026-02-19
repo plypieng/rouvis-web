@@ -55,9 +55,9 @@ describe('chat-artifacts reasoning trace helpers', () => {
     const summary = extractTraceSummary(content);
 
     expect(summary).not.toBeNull();
-    expect(summary?.steps).toHaveLength(12);
-    expect(summary?.steps[0]?.stepId).toBe('s2');
-    expect(summary?.steps[11]?.stepId).toBe('s13');
+    expect(summary?.steps).toHaveLength(5);
+    expect(summary?.steps[0]?.stepId).toBe('s9');
+    expect(summary?.steps[4]?.stepId).toBe('s13');
   });
 
   it('removes TRACE_SUMMARY blocks from visible content', () => {

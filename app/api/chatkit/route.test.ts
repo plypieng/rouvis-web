@@ -202,7 +202,7 @@ describe('/api/chatkit POST', () => {
       stepId: 'rt_1',
       phase: 'tooling',
       status: 'update',
-      title: 'Tool: scheduler.plan',
+      title: 'Preparing action plan',
       sourceEvent: 'tool_call_delta',
       timestamp: '2026-02-18T07:00:00.000Z',
     };

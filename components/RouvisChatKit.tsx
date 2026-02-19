@@ -115,6 +115,8 @@ const FRIENDLY_STATUS_KEYS: Record<string, string> = {
   'scheduler.updateTask': 'cockpit.status.task_update',
   'activities.log': 'cockpit.status.activity_log',
 };
+const TRACE_EXPANDED_MAX_STEPS = 5;
+const TRACE_LIVE_MAX_STEPS = 3;
 
 const MODE_CONFIG: Record<ChatMode, { color: string; bg: string; border: string }> = {
   default: { color: '', bg: '', border: '' },
@@ -258,7 +260,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     if (!step || !standoutMode) return;
     setReasoningTraceSteps(prev => {
       const filtered = prev.filter(existing => existing.stepId !== step.stepId);
-      return [...filtered, step].slice(-12);
+      return [...filtered, step].slice(-TRACE_EXPANDED_MAX_STEPS);
     });
   }, [standoutMode]);
 
@@ -374,7 +376,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
               const summary = extractTraceSummary(m.content);
               return summary?.steps || [];
             })
-            .slice(-12);
+            .slice(-TRACE_EXPANDED_MAX_STEPS);
           setReasoningTraceSteps(replayTraceSteps);
 
           const preferenceLanguage = data.preferences?.assistantLanguage;
@@ -518,6 +520,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
       setSelectedImage(null);
     }
     setIsLoading(true);
+    setTraceExpanded(false);
     setCurrentStatus('');
     setIsUserNearBottom(true);
     setHasUnreadMessages(false);
@@ -626,7 +629,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
             }
 
             const artifact = createArtifactFromStreamEvent(event);
-            if (artifact && artifact.kind !== 'reasoning') {
+            if (artifact && artifact.kind !== 'reasoning' && artifact.kind !== 'status') {
               pushArtifact(artifact);
             }
 
@@ -649,7 +652,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
             if (event.type === 'tool_call_delta' && event.delta?.tool) {
               const statusKey = FRIENDLY_STATUS_KEYS[event.delta.tool];
               const friendlyStatus = statusKey ? t(statusKey) : t('cockpit.status.processing');
-              setCurrentStatus(friendlyStatus);
+              setCurrentStatus(prev => (prev === friendlyStatus ? prev : friendlyStatus));
             }
 
             // Content
@@ -802,6 +805,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
       lastAssistantRawRef.current = assistantRawContent;
       lastAssistantFailedRef.current = assistantFailed;
       setIsLoading(false);
+      setTraceExpanded(false);
       setCurrentStatus('');
     }
   }, [
@@ -986,6 +990,12 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
         ? 'status-watch'
         : 'status-safe';
   const latestTraceStep = reasoningTraceSteps[reasoningTraceSteps.length - 1];
+  const expandedTraceSteps = reasoningTraceSteps.slice(-TRACE_EXPANDED_MAX_STEPS);
+  const liveTraceSteps = reasoningTraceSteps.slice(-TRACE_LIVE_MAX_STEPS);
+  const traceStepsForRender = traceExpanded
+    ? (isLoading ? liveTraceSteps : expandedTraceSteps)
+    : liveTraceSteps;
+  const showLiveMiniList = isLoading && !traceExpanded && liveTraceSteps.length > 0;
   const showIntentDebug = process.env.NEXT_PUBLIC_CHAT_INTENT_DEBUG === '1'
     || process.env.NEXT_PUBLIC_CHAT_INTENT_DEBUG === 'true';
 
@@ -1171,9 +1181,9 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
                   : t('cockpit.trace.summary', { count: reasoningTraceSteps.length })}
                 {latestTraceStep ? ` · ${latestTraceStep.title}` : ''}
               </p>
-              {traceExpanded && reasoningTraceSteps.length > 0 && (
+              {(traceExpanded || showLiveMiniList) && traceStepsForRender.length > 0 && (
                 <div className="mt-2 space-y-1.5" data-testid="inference-trace-steps">
-                  {reasoningTraceSteps.map((step) => {
+                  {traceStepsForRender.map((step) => {
                     const toneClass = step.status === 'error'
                       ? 'status-critical'
                       : step.status === 'completed'

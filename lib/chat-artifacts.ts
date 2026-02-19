@@ -25,6 +25,7 @@ type ReschedulePlanPayload = {
 };
 
 const TRACE_SUMMARY_PATTERN = /\[\[TRACE_SUMMARY:\s*([\s\S]*?)\]\]/;
+const TRACE_MAX_STEPS = 5;
 
 export type ChatkitEvent = {
   type?: string;
@@ -167,17 +168,21 @@ function toTraceTone(step: ReasoningTraceStep): CommandRiskTone {
   return 'watch';
 }
 
-function dedupeAndCapTraceSteps(steps: ReasoningTraceStep[], maxSteps = 12): ReasoningTraceStep[] {
-  const deduped: ReasoningTraceStep[] = [];
-  const seen = new Set<string>();
+function dedupeAndCapTraceSteps(steps: ReasoningTraceStep[], maxSteps = TRACE_MAX_STEPS): ReasoningTraceStep[] {
+  const order: string[] = [];
+  const latestById = new Map<string, ReasoningTraceStep>();
 
   for (const step of steps) {
     if (!step || typeof step.stepId !== 'string') continue;
-    if (seen.has(step.stepId)) continue;
-    seen.add(step.stepId);
-    deduped.push(step);
+    if (!latestById.has(step.stepId)) {
+      order.push(step.stepId);
+    }
+    latestById.set(step.stepId, step);
   }
 
+  const deduped = order
+    .map(stepId => latestById.get(stepId))
+    .filter((step): step is ReasoningTraceStep => Boolean(step));
   if (deduped.length <= maxSteps) return deduped;
   return deduped.slice(deduped.length - maxSteps);
 }
