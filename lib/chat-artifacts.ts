@@ -189,7 +189,7 @@ function dedupeAndCapTraceSteps(steps: ReasoningTraceStep[], maxSteps = TRACE_MA
 
 export function stripHiddenBlocks(content: string): string {
   if (!content) return content;
-  return content.replace(/\[\[(RESCHEDULE_PLAN|UPDATE_TASK|CHOICE|TRACE_SUMMARY):[\s\S]*?\]\]/g, '').trim();
+  return content.replace(/\[\[(RESCHEDULE_PLAN|UPDATE_TASK|CREATE_TASK|CHOICE|TRACE_SUMMARY):[\s\S]*?\]\]/g, '').trim();
 }
 
 export function extractReschedulePlanBlock(content: string): string | null {

@@ -1,4 +1,4 @@
-import type { FarmerUiMode } from '@/types/farmer-ui-mode';
+import type { FarmerUiMode } from '../types/farmer-ui-mode';
 
 export const GOOGLE_AUTH_SCOPE = 'openid email profile';
 
