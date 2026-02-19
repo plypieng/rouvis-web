@@ -19,8 +19,7 @@ import ScheduleConstraintForm, {
     type YieldRecommendation,
     type YieldUnit,
 } from './ScheduleConstraintForm';
-import { toastError, toastInfo, toastSuccess, toastWarning } from '@/lib/feedback';
-import { buildStarterTasks } from '@/lib/starter-tasks';
+import { toastError, toastInfo, toastSuccess } from '@/lib/feedback';
 import { trackUXEvent } from '@/lib/analytics';
 import {
     statusForScheduleStage,
@@ -37,40 +36,6 @@ type CropAnalysis = {
     notes?: string;
     daysToHarvest?: number;
     knowledge?: unknown;
-};
-
-type GeneratedTask = {
-    title: string;
-    description?: string;
-    dueDate?: string;
-    priority?: string;
-};
-
-type GeneratedWeek = { tasks?: GeneratedTask[] };
-
-type GeneratedSchedule = {
-    weeks?: GeneratedWeek[];
-    pastTasks?: GeneratedWeek[];
-    currentWeekTasks?: GeneratedTask[];
-    futureTasks?: GeneratedWeek[];
-};
-
-type TaskPayload = {
-    title: string;
-    description?: string;
-    dueDate?: string;
-    priority?: string;
-    fieldId: string;
-    status: 'pending' | 'completed';
-    isBackfilled?: boolean;
-    isAssumed?: boolean;
-};
-
-type PersistedTask = {
-    id: string;
-    title: string;
-    dueDate?: string;
-    status: 'pending' | 'completed';
 };
 
 type NoticeState = {
@@ -116,6 +81,7 @@ type WizardFieldRecord = {
 };
 
 const FALLBACK_TEMPLATE_ID = 'conservative-weather';
+const GENERATION_REQUEST_TIMEOUT_MS = 20_000;
 const MAX_SCAN_PAYLOAD_BYTES = 3_900_000;
 const MAX_SCAN_DIMENSION = 1800;
 const MIN_SCAN_SCALE = 0.25;
@@ -524,82 +490,12 @@ export default function ProjectWizard({ locale }: { locale: string }) {
         };
     }, []);
 
-    const toTaskPayload = (
-        task: GeneratedTask,
-        fieldId: string,
-        status: TaskPayload['status'],
-        isBackfilledTask?: boolean
-    ): TaskPayload => ({
-        title: task.title,
-        description: task.description,
-        dueDate: task.dueDate,
-        priority: task.priority,
-        fieldId,
-        status,
-        ...(isBackfilledTask ? { isBackfilled: true } : {}),
-    });
-
-    const buildTaskPayloads = (schedule: GeneratedSchedule, isBackfilled: boolean, fieldId: string): TaskPayload[] => {
-        if (isBackfilled) {
-            const pastTasks = (schedule.pastTasks || []).flatMap((week) =>
-                (week.tasks || []).map((task) => toTaskPayload(task, fieldId, 'completed', true))
-            );
-            const currentTasks = (schedule.currentWeekTasks || []).map((task) => toTaskPayload(task, fieldId, 'pending'));
-            const futureTasks = (schedule.futureTasks || []).flatMap((week) =>
-                (week.tasks || []).map((task) => toTaskPayload(task, fieldId, 'pending'))
-            );
-            return [...pastTasks, ...currentTasks, ...futureTasks];
-        }
-
-        return (schedule.weeks || []).flatMap((week) =>
-            (week.tasks || []).map((task) => toTaskPayload(task, fieldId, 'pending'))
-        );
-    };
-
-    const commitInitialScheduleRevision = async (
+    const generateInitialSchedule = async (
         projectId: string,
-        tasks: TaskPayload[],
-        schedulingPreferences?: Record<string, unknown>,
-        preferenceTemplateId?: string | null
-    ): Promise<PersistedTask[]> => {
-        const saveResponse = await fetch(`/api/v1/projects/${projectId}/replan`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                mode: 'replace_all',
-                source: 'wizard_initial',
-                tasks,
-                ...(preferenceTemplateId ? { preferenceTemplate: preferenceTemplateId } : {}),
-                ...(schedulingPreferences ? { schedulingPreferences } : {}),
-            }),
-        });
-
-        if (!saveResponse.ok) {
-            throw new Error(await extractErrorMessage(saveResponse, '初回スケジュールの確定に失敗しました'));
-        }
-
-        const payload = await saveResponse.json().catch(() => ({}));
-        const persistedTasks = Array.isArray(payload?.tasks)
-            ? (payload.tasks as Array<{ id?: string; title?: string; dueDate?: string; status?: string }>)
-            : [];
-
-        return persistedTasks
-            .filter((task): task is { id: string; title: string; dueDate?: string; status: string } => Boolean(task?.id && task?.title))
-            .map((task) => ({
-                id: task.id,
-                title: task.title,
-                dueDate: task.dueDate,
-                status: task.status === 'completed' ? 'completed' : 'pending',
-            }));
-    };
-
-    const generateAndPersistInitialSchedule = async (
-        projectId: string,
-        defaultFieldId: string,
         schedulingPreferences?: Record<string, unknown>,
         preferenceTemplateId?: string | null,
         onProgress?: (status: ScheduleProcessingStatus) => void,
-    ): Promise<{ taskCount: number; usedFallback: boolean; firstPendingTaskId: string | null }> => {
+    ): Promise<{ mode: 'sync' | 'async'; runId: string | null; taskCount: number | null }> => {
         if (!cropAnalysis) throw new Error('作物情報が見つかりません');
 
         const isBackfilled = projectType === 'existing' && !!plantingDate;
@@ -608,44 +504,46 @@ export default function ProjectWizard({ locale }: { locale: string }) {
             ? '/api/v1/agents/generate-backfilled-schedule'
             : '/api/v1/agents/generate-schedule';
         const preferenceTemplate = preferenceTemplateId || undefined;
-        let usedFallback = false;
-        let tasks: TaskPayload[] = [];
+        onProgress?.(statusForScheduleStage('generate_schedule'));
+        const generationPayload = isBackfilled
+            ? {
+                projectId,
+                source: 'wizard_initial',
+                ...(preferenceTemplate ? { preferenceTemplate } : {}),
+                ...(schedulingPreferences ? { schedulingPreferences } : {}),
+                cropAnalysis: {
+                    crop: cropAnalysis.crop,
+                    variety: cropAnalysis.variety,
+                    startDate: effectivePlantingDate,
+                    targetHarvestDate: cropAnalysis.targetHarvestDate || '',
+                    notes: cropAnalysis.notes,
+                },
+                plantingDate: effectivePlantingDate,
+                currentDate: new Date().toISOString().split('T')[0],
+            }
+            : {
+                projectId,
+                source: 'wizard_initial',
+                ...(preferenceTemplate ? { preferenceTemplate } : {}),
+                ...(schedulingPreferences ? { schedulingPreferences } : {}),
+                cropAnalysis: {
+                    crop: cropAnalysis.crop,
+                    variety: cropAnalysis.variety,
+                    startDate: cropAnalysis.startDate || new Date().toISOString().split('T')[0],
+                    targetHarvestDate: cropAnalysis.targetHarvestDate || '',
+                    notes: cropAnalysis.notes,
+                },
+                currentDate: new Date().toISOString().split('T')[0],
+            };
 
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), GENERATION_REQUEST_TIMEOUT_MS);
         try {
-            onProgress?.(statusForScheduleStage('generate_schedule'));
-            const generationPayload = isBackfilled
-                ? {
-                    projectId,
-                    ...(preferenceTemplate ? { preferenceTemplate } : {}),
-                    ...(schedulingPreferences ? { schedulingPreferences } : {}),
-                    cropAnalysis: {
-                        crop: cropAnalysis.crop,
-                        variety: cropAnalysis.variety,
-                        startDate: effectivePlantingDate,
-                        targetHarvestDate: cropAnalysis.targetHarvestDate || '',
-                        notes: cropAnalysis.notes,
-                    },
-                    plantingDate: effectivePlantingDate,
-                    currentDate: new Date().toISOString().split('T')[0],
-                }
-                : {
-                    projectId,
-                    ...(preferenceTemplate ? { preferenceTemplate } : {}),
-                    ...(schedulingPreferences ? { schedulingPreferences } : {}),
-                    cropAnalysis: {
-                        crop: cropAnalysis.crop,
-                        variety: cropAnalysis.variety,
-                        startDate: cropAnalysis.startDate || new Date().toISOString().split('T')[0],
-                        targetHarvestDate: cropAnalysis.targetHarvestDate || '',
-                        notes: cropAnalysis.notes,
-                    },
-                    currentDate: new Date().toISOString().split('T')[0],
-                };
-
             const scheduleResponse = await fetch(endpoint, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(generationPayload),
+                signal: controller.signal,
             });
 
             const generatedData = await scheduleResponse.json().catch(() => ({}));
@@ -665,57 +563,27 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                 );
             }
 
-            const schedule: GeneratedSchedule = generatedData?.schedule || generatedData;
-            tasks = buildTaskPayloads(schedule, isBackfilled, defaultFieldId);
-            onProgress?.(statusForScheduleStage('validate_schedule'));
-            if (!tasks.length) {
-                throw new Error('初回スケジュールにタスクが含まれていませんでした');
+            const generation = (generatedData as Record<string, unknown>)?.generation as Record<string, unknown> | undefined;
+            const generationMode = typeof generation?.mode === 'string' ? generation.mode : 'sync';
+            const runId = typeof generation?.runId === 'string' ? generation.runId : null;
+            const taskCount = typeof (generatedData as Record<string, unknown>)?.taskCount === 'number'
+                ? (generatedData as Record<string, unknown>).taskCount as number
+                : null;
+            onProgress?.(statusForScheduleStage('finalize'));
+
+            return {
+                mode: generationMode === 'async' ? 'async' : 'sync',
+                runId,
+                taskCount,
+            };
+        } catch (error) {
+            if ((error as { name?: string })?.name === 'AbortError') {
+                throw new Error('初回スケジュール生成がタイムアウトしました。もう一度お試しください。');
             }
-        } catch (generationError) {
-            console.warn('Schedule generation failed. Falling back to starter tasks.', generationError);
-            usedFallback = true;
-            onProgress?.(statusForScheduleStage('fallback_tasks'));
-            tasks = buildStarterTasks({
-                crop: cropAnalysis.crop,
-                startDate: effectivePlantingDate,
-                isBackfilled,
-            }).map((task) => ({
-                title: task.title,
-                description: task.description,
-                dueDate: task.dueDate,
-                priority: task.priority,
-                fieldId: defaultFieldId,
-                status: task.status,
-                isBackfilled: task.isBackfilled,
-                isAssumed: task.isAssumed,
-            }));
+            throw error;
+        } finally {
+            clearTimeout(timeout);
         }
-
-        if (!tasks.length) {
-            throw new Error('初回タスクの作成に失敗しました');
-        }
-
-        onProgress?.(statusForScheduleStage('persist_tasks'));
-        const persistedTasks = await commitInitialScheduleRevision(
-            projectId,
-            tasks,
-            schedulingPreferences,
-            preferenceTemplateId,
-        );
-        onProgress?.(statusForScheduleStage('finalize'));
-        const firstPendingTask = persistedTasks
-            .filter((task) => task.status === 'pending')
-            .sort((left, right) => {
-                const leftTime = left.dueDate ? new Date(left.dueDate).getTime() : Number.POSITIVE_INFINITY;
-                const rightTime = right.dueDate ? new Date(right.dueDate).getTime() : Number.POSITIVE_INFINITY;
-                return leftTime - rightTime;
-            })[0];
-
-        return {
-            taskCount: tasks.length,
-            usedFallback,
-            firstPendingTaskId: firstPendingTask?.id ?? null,
-        };
     };
 
     // Step 0: Project Type Selection (FIRST STEP)
@@ -944,9 +812,8 @@ export default function ProjectWizard({ locale }: { locale: string }) {
             setNotice({ type: 'info', message: 'AIが初回スケジュールを作成しています...' });
             toastInfo('AIが初回スケジュールを作成しています...');
             setProcessingStatus(statusForScheduleStage('generate_schedule'));
-            const { taskCount, usedFallback, firstPendingTaskId } = await generateAndPersistInitialSchedule(
+            const generationResult = await generateInitialSchedule(
                 projectId,
-                primaryFieldId,
                 schedulingPreferences,
                 effectiveTemplateId,
                 (status) => setProcessingStatus(status),
@@ -954,23 +821,16 @@ export default function ProjectWizard({ locale }: { locale: string }) {
             void trackUXEvent('schedule_generated', {
                 projectId,
                 flow: 'wizard',
-                taskCount,
-                usedFallback,
+                taskCount: generationResult.taskCount ?? 0,
+                generationMode: generationResult.mode,
                 projectType: projectType || 'new',
             });
-            if (usedFallback) {
-                const fallbackMessage = `AI生成が不安定だったため、スタータータスクを作成しました（${taskCount}件）`;
-                setNotice({ type: 'info', message: fallbackMessage });
-                toastWarning(fallbackMessage);
-                void trackUXEvent('schedule_generation_fallback_used', {
-                    flow: 'wizard',
-                    taskCount,
-                });
-            } else {
-                const successMessage = `初回スケジュールを作成しました（${taskCount}件）`;
-                setNotice({ type: 'success', message: successMessage });
-                toastSuccess(successMessage);
-            }
+
+            const successMessage = generationResult.mode === 'async'
+                ? '初回スケジュールの生成を開始しました。進捗を表示します。'
+                : `初回スケジュールを作成しました${typeof generationResult.taskCount === 'number' ? `（${generationResult.taskCount}件）` : ''}`;
+            setNotice({ type: 'success', message: successMessage });
+            toastSuccess(successMessage);
             setProcessingStatus(statusForScheduleStage('redirect'));
 
             // Refresh session so onboarding guard sees the new project immediately.
@@ -982,9 +842,12 @@ export default function ProjectWizard({ locale }: { locale: string }) {
             router.refresh(); // Ensure list is updated
             void trackUXEvent('activation_flow_redirected', {
                 destination: 'project_page',
-                hasFirstTask: Boolean(firstPendingTaskId),
+                generationMode: generationResult.mode,
             });
-            router.push(`/${locale}/projects/${projectId}`);
+            const generationRunIdQuery = generationResult.mode === 'async' && generationResult.runId
+                ? `?generationRunId=${encodeURIComponent(generationResult.runId)}`
+                : '';
+            router.push(`/${locale}/projects/${projectId}${generationRunIdQuery}`);
         } catch (error) {
             console.error('Project creation error:', error);
             const apiCode = typeof error === 'object'

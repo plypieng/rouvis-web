@@ -13,40 +13,12 @@ import ScheduleConstraintForm, {
   type YieldRecommendation,
   type YieldUnit,
 } from './ScheduleConstraintForm';
-import { buildStarterTasks } from '@/lib/starter-tasks';
-import { toastError, toastInfo, toastSuccess, toastWarning } from '@/lib/feedback';
+import { toastError, toastInfo, toastSuccess } from '@/lib/feedback';
 import { trackUXEvent } from '@/lib/analytics';
 import {
   statusForScheduleStage,
   type ScheduleProcessingStatus,
 } from './scheduleProgress';
-
-type GeneratedTask = {
-  title: string;
-  description?: string;
-  dueDate?: string;
-  priority?: string;
-};
-
-type GeneratedWeek = { tasks?: GeneratedTask[] };
-
-type GeneratedSchedule = {
-  weeks?: GeneratedWeek[];
-  pastTasks?: GeneratedWeek[];
-  currentWeekTasks?: GeneratedTask[];
-  futureTasks?: GeneratedWeek[];
-};
-
-type TaskPayload = {
-  title: string;
-  description?: string;
-  dueDate?: string;
-  priority?: string;
-  fieldId: string;
-  status: 'pending' | 'completed';
-  isBackfilled?: boolean;
-  isAssumed?: boolean;
-};
 
 type PreferenceTemplateCatalog = {
   templates?: ScheduleConstraintTemplate[];
@@ -81,9 +53,11 @@ type ProjectForReplan = {
 };
 
 type ReplanResult = {
-  taskCount: number;
   mode: 'replace_open' | 'replace_all';
+  taskCount?: number;
   revisionId?: string;
+  asyncAccepted?: boolean;
+  generationRunId?: string;
 };
 
 type ReplanScheduleDialogProps = {
@@ -115,46 +89,14 @@ function parseYieldRecommendation(preferences: ProjectSchedulingPreferences): Yi
   };
 }
 
-function toTaskPayload(
-  task: GeneratedTask,
-  fieldId: string,
-  status: TaskPayload['status'],
-  isBackfilledTask?: boolean
-): TaskPayload {
-  return {
-    title: task.title,
-    description: task.description,
-    dueDate: task.dueDate,
-    priority: task.priority,
-    fieldId,
-    status,
-    ...(isBackfilledTask ? { isBackfilled: true } : {}),
-  };
-}
-
-function buildTaskPayloads(schedule: GeneratedSchedule, isBackfilled: boolean, fieldId: string): TaskPayload[] {
-  if (isBackfilled) {
-    const pastTasks = (schedule.pastTasks || []).flatMap((week) =>
-      (week.tasks || []).map((task) => toTaskPayload(task, fieldId, 'completed', true))
-    );
-    const currentTasks = (schedule.currentWeekTasks || []).map((task) => toTaskPayload(task, fieldId, 'pending'));
-    const futureTasks = (schedule.futureTasks || []).flatMap((week) =>
-      (week.tasks || []).map((task) => toTaskPayload(task, fieldId, 'pending'))
-    );
-    return [...pastTasks, ...currentTasks, ...futureTasks];
-  }
-
-  return (schedule.weeks || []).flatMap((week) =>
-    (week.tasks || []).map((task) => toTaskPayload(task, fieldId, 'pending'))
-  );
-}
-
 function isBackfilledProject(startDate: string): boolean {
   const parsed = new Date(startDate);
   if (!Number.isFinite(parsed.getTime())) return false;
   const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
   return parsed.getTime() < sevenDaysAgo;
 }
+
+const GENERATION_REQUEST_TIMEOUT_MS = 20_000;
 
 export default function ReplanScheduleDialog({
   open,
@@ -330,139 +272,107 @@ export default function ReplanScheduleDialog({
 
     try {
       toastInfo(t('replan_dialog.generating_toast'));
-      let usedFallback = false;
-      let taskPayloads: TaskPayload[] = [];
-
-      try {
-        setProcessingStatus(statusForScheduleStage('generate_schedule'));
-        const generationPayload = useBackfilled
-          ? {
-            projectId: project.id,
-            ...(effectiveTemplateId ? { preferenceTemplate: effectiveTemplateId } : {}),
-            ...(schedulingPreferences ? { schedulingPreferences } : {}),
-            cropAnalysis: {
-              crop: project.crop,
-              variety: project.variety,
-              startDate,
-              targetHarvestDate: project.targetHarvestDate || '',
-              notes: project.notes,
-            },
-            plantingDate: startDate,
-            currentDate: new Date().toISOString().split('T')[0],
-          }
-          : {
-            projectId: project.id,
-            ...(effectiveTemplateId ? { preferenceTemplate: effectiveTemplateId } : {}),
-            ...(schedulingPreferences ? { schedulingPreferences } : {}),
-            cropAnalysis: {
-              crop: project.crop,
-              variety: project.variety,
-              startDate,
-              targetHarvestDate: project.targetHarvestDate || '',
-              notes: project.notes,
-            },
-            currentDate: new Date().toISOString().split('T')[0],
-          };
-
-        const generationResponse = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(generationPayload),
-        });
-
-        const generatedData = await generationResponse.json().catch(() => ({}));
-        if (!generationResponse.ok) {
-          throw new Error(
-            (generatedData as Record<string, unknown>)?.error as string
-            || (generatedData as Record<string, unknown>)?.message as string
-            || 'Failed to generate schedule'
-          );
-        }
-
-        const schedule: GeneratedSchedule = (generatedData as Record<string, unknown>)?.schedule as GeneratedSchedule
-          || generatedData as GeneratedSchedule;
-        taskPayloads = buildTaskPayloads(schedule, useBackfilled, project.primaryFieldId);
-        setProcessingStatus(statusForScheduleStage('validate_schedule'));
-
-        if (!taskPayloads.length) {
-          throw new Error('Generated schedule did not include tasks');
-        }
-      } catch (generationError) {
-        console.warn('Replan generation failed, using starter fallback.', generationError);
-        usedFallback = true;
-        setProcessingStatus(statusForScheduleStage('fallback_tasks'));
-        taskPayloads = buildStarterTasks({
-          crop: project.crop,
-          startDate,
-          isBackfilled: useBackfilled,
-        }).map((task) => ({
-          title: task.title,
-          description: task.description,
-          dueDate: task.dueDate,
-          priority: task.priority,
-          fieldId: project.primaryFieldId as string,
-          status: task.status,
-          isBackfilled: task.isBackfilled,
-          isAssumed: task.isAssumed,
-        }));
-      }
-
-      if (!taskPayloads.length) {
-        throw new Error('No tasks available for replan');
-      }
-
-      setProcessingStatus(statusForScheduleStage('persist_tasks'));
-      const commitResponse = await fetch(`/api/v1/projects/${project.id}/replan`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mode,
+      setProcessingStatus(statusForScheduleStage('generate_schedule'));
+      const generationPayload = useBackfilled
+        ? {
+          projectId: project.id,
           source: 'project_replan',
-          tasks: taskPayloads,
+          replanMode: mode,
           ...(effectiveTemplateId ? { preferenceTemplate: effectiveTemplateId } : {}),
           ...(schedulingPreferences ? { schedulingPreferences } : {}),
           ...(note.trim() ? { note: note.trim() } : {}),
-        }),
-      });
+          cropAnalysis: {
+            crop: project.crop,
+            variety: project.variety,
+            startDate,
+            targetHarvestDate: project.targetHarvestDate || '',
+            notes: project.notes,
+          },
+          plantingDate: startDate,
+          currentDate: new Date().toISOString().split('T')[0],
+        }
+        : {
+          projectId: project.id,
+          source: 'project_replan',
+          replanMode: mode,
+          ...(effectiveTemplateId ? { preferenceTemplate: effectiveTemplateId } : {}),
+          ...(schedulingPreferences ? { schedulingPreferences } : {}),
+          ...(note.trim() ? { note: note.trim() } : {}),
+          cropAnalysis: {
+            crop: project.crop,
+            variety: project.variety,
+            startDate,
+            targetHarvestDate: project.targetHarvestDate || '',
+            notes: project.notes,
+          },
+          currentDate: new Date().toISOString().split('T')[0],
+        };
 
-      const commitPayload = await commitResponse.json().catch(() => ({}));
-      if (!commitResponse.ok) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), GENERATION_REQUEST_TIMEOUT_MS);
+      const generationResponse = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(generationPayload),
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timeout));
+
+      const generatedData = await generationResponse.json().catch(() => ({}));
+      if (!generationResponse.ok) {
         throw new Error(
-          (commitPayload as Record<string, unknown>)?.error as string
-          || (commitPayload as Record<string, unknown>)?.message as string
-          || 'Failed to commit replan'
+          (generatedData as Record<string, unknown>)?.error as string
+          || (generatedData as Record<string, unknown>)?.message as string
+          || 'Failed to generate schedule'
         );
       }
-      setProcessingStatus(statusForScheduleStage('finalize'));
 
-      const taskCount = Array.isArray((commitPayload as Record<string, unknown>)?.tasks)
-        ? ((commitPayload as Record<string, unknown>).tasks as unknown[]).length
-        : taskPayloads.length;
-
-      if (usedFallback) {
-        toastWarning(t('replan_dialog.fallback_toast', { count: taskCount }));
-      } else {
-        toastSuccess(t('replan_dialog.success_toast', { count: taskCount }));
+      const generation = (generatedData as Record<string, unknown>)?.generation as Record<string, unknown> | undefined;
+      if (generationResponse.status === 202 || generation?.mode === 'async') {
+        const runId = typeof generation?.runId === 'string' ? generation.runId : undefined;
+        toastInfo('再計画を受け付けました。進捗を表示します。');
+        void trackUXEvent('replan_accepted_async', {
+          projectId: project.id,
+          mode,
+          source: 'project_replan',
+          runId: runId || null,
+        });
+        onReplanned?.({
+          mode,
+          asyncAccepted: true,
+          generationRunId: runId,
+        });
+        onClose();
+        return;
       }
+
+      setProcessingStatus(statusForScheduleStage('finalize'));
+      const taskCount = typeof (generatedData as Record<string, unknown>)?.taskCount === 'number'
+        ? (generatedData as Record<string, unknown>).taskCount as number
+        : 0;
+      toastSuccess(t('replan_dialog.success_toast', { count: taskCount }));
 
       void trackUXEvent('replan_completed', {
         projectId: project.id,
         mode,
         source: 'project_replan',
         taskCount,
-        usedFallback,
+        generationMode: 'sync',
       });
 
       onReplanned?.({
         taskCount,
         mode,
-        revisionId: typeof (commitPayload as Record<string, unknown>)?.revision === 'object'
-          ? ((commitPayload as Record<string, unknown>).revision as { id?: string })?.id
+        revisionId: typeof (generatedData as Record<string, unknown>)?.commitRevisionId === 'string'
+          ? (generatedData as Record<string, unknown>).commitRevisionId as string
           : undefined,
       });
       onClose();
     } catch (error) {
-      const message = error instanceof Error ? error.message : t('replan_dialog.error_generic');
+      const message = (error as { name?: string })?.name === 'AbortError'
+        ? '再計画の要求がタイムアウトしました。もう一度お試しください。'
+        : error instanceof Error
+          ? error.message
+          : t('replan_dialog.error_generic');
       setErrorMessage(message);
       toastError(message);
       void trackUXEvent('replan_failed', {

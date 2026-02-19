@@ -8,6 +8,7 @@ import { RouvisChatKit, RouvisChatKitRef } from '@/components/RouvisChatKit';
 import ProjectHeader from '@/components/projects/ProjectHeader';
 import ProjectCalendar from '@/components/projects/ProjectCalendar';
 import ReplanScheduleDialog from '@/components/projects/ReplanScheduleDialog';
+import ScheduleGenerationTracePanel from '@/components/projects/ScheduleGenerationTracePanel';
 import ScheduleHistoryPanel from '@/components/projects/ScheduleHistoryPanel';
 import TaskCreateModal from './TaskCreateModal';
 import type {
@@ -66,7 +67,7 @@ interface ProjectDetailClientProps {
 }
 
 type NoticeState = {
-    type: 'success' | 'error';
+    type: 'success' | 'error' | 'info';
     message: string;
     actionLabel?: string;
     onAction?: () => void;
@@ -105,6 +106,7 @@ export default function ProjectDetailClient({
     );
     const [showReplanDialog, setShowReplanDialog] = useState(false);
     const [showScheduleHistory, setShowScheduleHistory] = useState(false);
+    const [generationRunId, setGenerationRunId] = useState<string | null>(null);
     const chatRef = useRef<RouvisChatKitRef>(null);
     const splitContainerRef = useRef<HTMLDivElement>(null);
     const resizeStateRef = useRef<{ startX: number; startRatio: number } | null>(null);
@@ -124,6 +126,11 @@ export default function ProjectDetailClient({
         if (panel === 'chat' || panel === 'calendar') {
             setPanelMode(panel);
         }
+    }, [searchParams]);
+
+    useEffect(() => {
+        const runId = searchParams?.get('generationRunId');
+        setGenerationRunId(runId && runId.trim() ? runId : null);
     }, [searchParams]);
 
     useEffect(() => {
@@ -174,6 +181,18 @@ export default function ProjectDetailClient({
         const params = new URLSearchParams(searchParams?.toString() || '');
         params.set('panel', mode);
         router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    }, [pathname, router, searchParams]);
+
+    const updateGenerationRunQuery = useCallback((nextRunId: string | null) => {
+        const params = new URLSearchParams(searchParams?.toString() || '');
+        if (nextRunId) {
+            params.set('generationRunId', nextRunId);
+        } else {
+            params.delete('generationRunId');
+        }
+        const nextQuery = params.toString();
+        router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
+        setGenerationRunId(nextRunId);
     }, [pathname, router, searchParams]);
 
     const commitSplitRatio = useCallback((ratio: number) => {
@@ -294,16 +313,30 @@ export default function ProjectDetailClient({
         setShowTaskCreateModal(true);
     };
 
-    const handleReplanCompleted = useCallback((result: { taskCount: number; mode: 'replace_open' | 'replace_all' }) => {
+    const handleReplanCompleted = useCallback((result: {
+        taskCount?: number;
+        mode: 'replace_open' | 'replace_all';
+        asyncAccepted?: boolean;
+        generationRunId?: string;
+    }) => {
+        if (result.asyncAccepted && result.generationRunId) {
+            setNotice({
+                type: 'info',
+                message: '再計画を受け付けました。進捗を追跡しています。',
+            });
+            updateGenerationRunQuery(result.generationRunId);
+            return;
+        }
+
         setNotice({
             type: 'success',
             message: t('replan_completed_notice', {
-                count: result.taskCount,
+                count: result.taskCount ?? 0,
                 mode: result.mode === 'replace_all' ? t('replan_mode_replace_all') : t('replan_mode_replace_open'),
             }),
         });
         router.refresh();
-    }, [router, t]);
+    }, [router, t, updateGenerationRunQuery]);
 
     const handleQuickApplyRequest = useCallback(async (prompt: string): Promise<QuickApplyResult> => {
         if (!chatRef.current) {
@@ -489,7 +522,9 @@ export default function ProjectDetailClient({
                         className={`mb-3 rounded-lg border px-4 py-3 text-sm ${
                             notice.type === 'success'
                                 ? 'status-safe'
-                                : 'status-critical'
+                                : notice.type === 'info'
+                                    ? 'status-watch'
+                                    : 'status-critical'
                         }`}
                     >
                         <div className="flex items-center justify-between gap-3">
@@ -506,6 +541,16 @@ export default function ProjectDetailClient({
                         </div>
                     </div>
                 )}
+
+                {generationRunId ? (
+                    <ScheduleGenerationTracePanel
+                        runId={generationRunId}
+                        onRunIdChange={updateGenerationRunQuery}
+                        onSucceeded={() => {
+                            router.refresh();
+                        }}
+                    />
+                ) : null}
 
                 <div className="mb-2 lg:hidden">
                     <div className="surface-base mb-3 p-1">

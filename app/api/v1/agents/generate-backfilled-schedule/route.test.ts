@@ -1,0 +1,102 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { NextRequest } from 'next/server';
+
+const getBackendAuthMock = vi.hoisted(() => vi.fn());
+
+vi.mock('../../../../../lib/backend-proxy-auth', () => ({
+  getBackendAuth: getBackendAuthMock,
+}));
+
+import { POST } from './route';
+
+function makeRequest(requestId: string, body: unknown): NextRequest {
+  return new NextRequest('http://localhost:3000/api/v1/agents/generate-backfilled-schedule', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-request-id': requestId,
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+describe('/api/v1/agents/generate-backfilled-schedule BFF route', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns 401 envelope when unauthenticated', async () => {
+    getBackendAuthMock.mockResolvedValueOnce({ headers: null });
+
+    const response = await POST(makeRequest('req-backfill-unauth-1', {
+      projectId: 'project-1',
+    }));
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get('x-request-id')).toBe('req-backfill-unauth-1');
+    expect(await response.json()).toMatchObject({
+      code: 'UNAUTHORIZED',
+      message: 'Unauthorized',
+      requestId: 'req-backfill-unauth-1',
+    });
+  });
+
+  it('proxies accepted async response (202) from backend', async () => {
+    getBackendAuthMock.mockResolvedValueOnce({
+      headers: {
+        Authorization: 'Bearer test-token',
+      },
+    });
+
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          generation: {
+            mode: 'async',
+            runId: 'run-backfill-1',
+            state: 'queued',
+          },
+        }),
+        {
+          status: 202,
+          headers: {
+            'content-type': 'application/json',
+            'x-request-id': 'backend-backfill-1',
+          },
+        },
+      ),
+    );
+
+    const response = await POST(makeRequest('req-backfill-async-1', {
+      projectId: 'project-1',
+      source: 'wizard_initial',
+      plantingDate: '2026-02-01',
+      cropAnalysis: {
+        crop: 'Tomato',
+        startDate: '2026-02-01',
+        targetHarvestDate: '2026-06-01',
+      },
+      currentDate: '2026-02-19',
+    }));
+
+    expect(response.status).toBe(202);
+    expect(response.headers.get('x-request-id')).toBe('backend-backfill-1');
+    expect(await response.json()).toMatchObject({
+      generation: {
+        mode: 'async',
+        runId: 'run-backfill-1',
+      },
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/api/v1/agents/generate-backfilled-schedule'),
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'X-Request-Id': 'req-backfill-async-1',
+        }),
+      }),
+    );
+
+    fetchMock.mockRestore();
+  });
+});
