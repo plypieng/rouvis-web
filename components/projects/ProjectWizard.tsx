@@ -81,7 +81,6 @@ type WizardFieldRecord = {
 };
 
 const FALLBACK_TEMPLATE_ID = 'conservative-weather';
-const GENERATION_REQUEST_TIMEOUT_MS = 20_000;
 const MAX_SCAN_PAYLOAD_BYTES = 3_900_000;
 const MAX_SCAN_DIMENSION = 1800;
 const MIN_SCAN_SCALE = 0.25;
@@ -536,54 +535,42 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                 currentDate: new Date().toISOString().split('T')[0],
             };
 
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), GENERATION_REQUEST_TIMEOUT_MS);
-        try {
-            const scheduleResponse = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(generationPayload),
-                signal: controller.signal,
-            });
+        const scheduleResponse = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(generationPayload),
+        });
 
-            const generatedData = await scheduleResponse.json().catch(() => ({}));
-            if (!scheduleResponse.ok) {
-                if (
-                    scheduleResponse.status === 409
-                    && (generatedData as Record<string, unknown>)?.error === 'SCHEDULING_PREFERENCES_REQUIRED'
-                ) {
-                    applyTemplateCatalog(generatedData as PreferenceTemplateCatalog);
-                }
-
-                throw new Error(
-                    ((generatedData as Record<string, unknown>)?.error as string)
-                    || ((generatedData as Record<string, unknown>)?.message as string)
-                    || ((generatedData as Record<string, unknown>)?.details as string)
-                    || '初回スケジュールの生成に失敗しました'
-                );
+        const generatedData = await scheduleResponse.json().catch(() => ({}));
+        if (!scheduleResponse.ok) {
+            if (
+                scheduleResponse.status === 409
+                && (generatedData as Record<string, unknown>)?.error === 'SCHEDULING_PREFERENCES_REQUIRED'
+            ) {
+                applyTemplateCatalog(generatedData as PreferenceTemplateCatalog);
             }
 
-            const generation = (generatedData as Record<string, unknown>)?.generation as Record<string, unknown> | undefined;
-            const generationMode = typeof generation?.mode === 'string' ? generation.mode : 'sync';
-            const runId = typeof generation?.runId === 'string' ? generation.runId : null;
-            const taskCount = typeof (generatedData as Record<string, unknown>)?.taskCount === 'number'
-                ? (generatedData as Record<string, unknown>).taskCount as number
-                : null;
-            onProgress?.(statusForScheduleStage('finalize'));
-
-            return {
-                mode: generationMode === 'async' ? 'async' : 'sync',
-                runId,
-                taskCount,
-            };
-        } catch (error) {
-            if ((error as { name?: string })?.name === 'AbortError') {
-                throw new Error('初回スケジュール生成がタイムアウトしました。もう一度お試しください。');
-            }
-            throw error;
-        } finally {
-            clearTimeout(timeout);
+            throw new Error(
+                ((generatedData as Record<string, unknown>)?.error as string)
+                || ((generatedData as Record<string, unknown>)?.message as string)
+                || ((generatedData as Record<string, unknown>)?.details as string)
+                || '初回スケジュールの生成に失敗しました'
+            );
         }
+
+        const generation = (generatedData as Record<string, unknown>)?.generation as Record<string, unknown> | undefined;
+        const generationMode = typeof generation?.mode === 'string' ? generation.mode : 'sync';
+        const runId = typeof generation?.runId === 'string' ? generation.runId : null;
+        const taskCount = typeof (generatedData as Record<string, unknown>)?.taskCount === 'number'
+            ? (generatedData as Record<string, unknown>).taskCount as number
+            : null;
+        onProgress?.(statusForScheduleStage('finalize'));
+
+        return {
+            mode: generationMode === 'async' ? 'async' : 'sync',
+            runId,
+            taskCount,
+        };
     };
 
     // Step 0: Project Type Selection (FIRST STEP)

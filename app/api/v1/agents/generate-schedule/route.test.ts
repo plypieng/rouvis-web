@@ -101,16 +101,14 @@ describe('/api/v1/agents/generate-schedule BFF route', () => {
     fetchMock.mockRestore();
   });
 
-  it('returns 504 when upstream request aborts on timeout', async () => {
+  it('returns 500 when upstream request fails', async () => {
     getBackendAuthMock.mockResolvedValueOnce({
       headers: {
         Authorization: 'Bearer test-token',
       },
     });
 
-    const abortError = new Error('aborted');
-    (abortError as Error & { name: string }).name = 'AbortError';
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(abortError);
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('network down'));
 
     const response = await POST(makeRequest('req-generate-timeout-1', {
       projectId: 'project-1',
@@ -123,10 +121,10 @@ describe('/api/v1/agents/generate-schedule BFF route', () => {
       currentDate: '2026-02-19',
     }));
 
-    expect(response.status).toBe(504);
+    expect(response.status).toBe(500);
     expect(await response.json()).toMatchObject({
       code: 'INTERNAL_ERROR',
-      message: 'Schedule generation upstream timeout',
+      message: 'Failed to generate schedule',
       requestId: 'req-generate-timeout-1',
     });
 

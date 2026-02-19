@@ -96,8 +96,6 @@ function isBackfilledProject(startDate: string): boolean {
   return parsed.getTime() < sevenDaysAgo;
 }
 
-const GENERATION_REQUEST_TIMEOUT_MS = 20_000;
-
 export default function ReplanScheduleDialog({
   open,
   onClose,
@@ -308,14 +306,11 @@ export default function ReplanScheduleDialog({
           currentDate: new Date().toISOString().split('T')[0],
         };
 
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), GENERATION_REQUEST_TIMEOUT_MS);
       const generationResponse = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(generationPayload),
-        signal: controller.signal,
-      }).finally(() => clearTimeout(timeout));
+      });
 
       const generatedData = await generationResponse.json().catch(() => ({}));
       if (!generationResponse.ok) {
@@ -368,11 +363,7 @@ export default function ReplanScheduleDialog({
       });
       onClose();
     } catch (error) {
-      const message = (error as { name?: string })?.name === 'AbortError'
-        ? '再計画の要求がタイムアウトしました。もう一度お試しください。'
-        : error instanceof Error
-          ? error.message
-          : t('replan_dialog.error_generic');
+      const message = error instanceof Error ? error.message : t('replan_dialog.error_generic');
       setErrorMessage(message);
       toastError(message);
       void trackUXEvent('replan_failed', {
