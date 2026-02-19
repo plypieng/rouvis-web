@@ -31,7 +31,7 @@ function LoginPageContent() {
   if (status === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-green-50 to-white">
-        <div className="text-gray-600">Loading...</div>
+        <div className="text-gray-600">{t('loading')}</div>
       </div>
     );
   }
@@ -44,7 +44,7 @@ function LoginPageContent() {
           <Link href={`/${locale}`} className="inline-block hover:opacity-80 transition-opacity">
             <h1 className="text-4xl font-bold text-emerald-600 tracking-tight mb-2">ROUVIS</h1>
           </Link>
-          <p className="text-sm text-gray-500">農業チャットアシスタント</p>
+          <p className="text-sm text-gray-500">{t('brandTagline')}</p>
         </div>
 
         {/* Sign-In Card */}
@@ -87,7 +87,7 @@ function LoginPageContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-green-50 to-white"><div className="text-gray-600">Loading...</div></div>}>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-green-50 to-white"><div className="text-gray-600">...</div></div>}>
       <LoginPageContent />
     </Suspense>
   );

@@ -559,7 +559,7 @@ export default function ChatPage() {
 
                   <div className="mt-2 rounded-lg border border-border/70 bg-card/60 p-2">
                     <div className="mb-2 flex items-center justify-between gap-2">
-                      <p className="text-[11px] font-semibold text-foreground">Intent Health</p>
+                      <p className="text-[11px] font-semibold text-foreground">{t('cockpit.standalone.intent_health_title')}</p>
                       <div className="flex items-center gap-1">
                         {(['1h', '24h', '7d'] as IntentMetricsWindow[]).map((windowKey) => (
                           <button
@@ -574,10 +574,10 @@ export default function ChatPage() {
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-1 text-[10px] text-muted-foreground">
-                      <span>Misroute {misrouteRatePercent}%</span>
-                      <span>Clarify {clarificationRatePercent}%</span>
-                      <span>Detected {intentMetrics?.totals?.detected || 0}</span>
-                      <span>Workflow p95 {typeof workflowP95Latency === 'number' ? `${workflowP95Latency}ms` : '-'}</span>
+                      <span>{t('cockpit.standalone.metrics.misroute', { value: misrouteRatePercent })}</span>
+                      <span>{t('cockpit.standalone.metrics.clarify', { value: clarificationRatePercent })}</span>
+                      <span>{t('cockpit.standalone.metrics.detected', { count: intentMetrics?.totals?.detected || 0 })}</span>
+                      <span>{t('cockpit.standalone.metrics.workflow_p95', { value: typeof workflowP95Latency === 'number' ? `${workflowP95Latency}ms` : '-' })}</span>
                     </div>
                   </div>
                 </div>

@@ -256,7 +256,7 @@
     },
     "empty_cta_ai": "AIに相談",
     "modes": {
-      "new_focus_title": "Today Focus",
+      "new_focus_title": "今日の重点",
       "new_focus_count": "{count}件を優先",
       "new_focus_helper": "まずは今日の重要な作業だけに集中しましょう。",
       "new_focus_empty": "今日の優先作業はありません。",
@@ -265,7 +265,11 @@
       "new_project_next": "次の作業: {task}",
       "new_advanced_disclosure": "詳細コンテキストを表示",
       "new_advanced_helper": "慣れてきたら、日次ループやセットアップ状況も確認できます。"
-    }
+    },
+    "upcoming_activities": "今後の作業",
+    "farm_metrics": "営農指標",
+    "crop_recommendations": "AI作付け提案",
+    "profit_analysis": "利益分析"
   },
   "planner": {
     "title": "作付けレイアウト",
@@ -652,7 +656,7 @@
     "yield_in_tons": "収量（t/ha）",
     "avg_yield": "平均収量",
     "climate_influence": "気象データによる収量影響",
-    "current_year_data": "2025 Data",
+    "current_year_data": "2025年データ",
     "temperature_c": "気温（°C）",
     "rainfall_mm": "降水量（mm）",
     "humidity_percent": "湿度（%）"
@@ -708,14 +712,14 @@
     "evidence_title": "証拠",
     "evidence_empty": "証拠がありません",
     "prompts": {
-      "today_label": "💬 今日は何をすればいいですか?",
-      "today": "今日は何をすればいいですか?",
-      "weather_label": "🌤️ 今日の天気は?",
+      "today_label": "💬 今日は何をすればいいですか？",
+      "today": "今日は何をすればいいですか？",
+      "weather_label": "🌤️ 今日の天気は？",
       "weather": "今週の天気と注意点を教えてください。",
-      "frost_label": "❄️ 今週、霜の恐れはありますか？対策を教えてください?",
-      "frost": "Do you think it's going to get cold? Please tell me about Koshihikari countermeasures",
-      "watering_label": "💧 今日は灌水した方が良いですか？目安量も教えてください。?",
-      "watering": "今日は灌水した方が良いですか？目安量も教えてください。?"
+      "frost_label": "❄️ 今週、霜の恐れはありますか？対策を教えてください。",
+      "frost": "今週、霜の恐れはありますか？コシヒカリ向けの対策を教えてください。",
+      "watering_label": "💧 今日は灌水した方が良いですか？目安量も教えてください。",
+      "watering": "今日は灌水した方が良いですか？目安量も教えてください。"
     },
     "cockpit": {
       "new_conversation": "新しい会話",
@@ -782,6 +786,13 @@
           "calendar": "予定調整",
           "project": "プロジェクト相談",
           "general": "一般相談"
+        },
+        "intent_health_title": "意図ヘルス",
+        "metrics": {
+          "misroute": "誤ルーティング {value}%",
+          "clarify": "確認誘導 {value}%",
+          "detected": "検出 {count}",
+          "workflow_p95": "ワークフロー p95 {value}"
         }
       },
       "greeting": {
@@ -879,9 +890,10 @@
       }
     },
     "tools": {
-      "attach_field": "Field",
-      "attach_photo": "Photo"
-    }
+      "attach_field": "圃場",
+      "attach_photo": "写真"
+    },
+    "history": "履歴"
   },
   "weather": {
     "today": "今日",
@@ -919,22 +931,22 @@
     "sources": "出典元"
   },
   "common": {
-    "loading": "Loading...",
-    "error": "An error occurred.",
-    "try_again": "Try Again",
-    "cancel": "Cancel",
-    "save": "Save",
-    "delete": "Delete",
-    "edit": "Edit",
-    "language": "Language",
-    "english": "English",
-    "japanese": "Japanese",
-    "dark_mode": "Dark Mode",
-    "light_mode": "Light Mode",
-    "export_data": "Export Data",
-    "new_analysis": "New Analysis",
-    "optional": "optional",
-    "delete_confirm": "Are you sure you want to delete this item? This action cannot be undone."
+    "loading": "読み込み中...",
+    "error": "エラーが発生しました。",
+    "try_again": "再試行",
+    "cancel": "キャンセル",
+    "save": "保存",
+    "delete": "削除",
+    "edit": "編集",
+    "language": "言語",
+    "english": "英語",
+    "japanese": "日本語",
+    "dark_mode": "ダークモード",
+    "light_mode": "ライトモード",
+    "export_data": "データをエクスポート",
+    "new_analysis": "新しい分析",
+    "optional": "任意",
+    "delete_confirm": "この項目を削除してもよろしいですか？この操作は取り消せません。"
   },
   "fields": {
     "title": "圃場管理",
@@ -957,24 +969,53 @@
     "map_boundaries_note": "{mapped}/{total} 区画で境界が設定されています。",
     "no_fields_mapped": "まだ圃場の境界が登録されていません。",
     "recenter_map": "地図を再センタリング",
-    "auto_calculated": "自動計算"
+    "auto_calculated": "自動計算",
+    "add_field": "圃場を追加",
+    "create_field": "圃場を作成",
+    "update_field": "圃場を更新",
+    "delete_field": "圃場を削除",
+    "field_name": "圃場名",
+    "field_name_placeholder": "例：北側の水田",
+    "geojson": "境界データ（GeoJSON）",
+    "upload_geojson": "GeoJSONファイルをアップロード",
+    "geojson_help": "GeoJSONファイルをアップロードするか、下に直接入力してください",
+    "geojson_placeholder": "GeoJSON境界データを入力...",
+    "name_required": "圃場名は必須です",
+    "invalid_geojson": "GeoJSON形式が不正です",
+    "invalid_geojson_file": "GeoJSONファイルが不正です",
+    "create_error": "圃場の作成に失敗しました",
+    "update_error": "圃場の更新に失敗しました",
+    "search_placeholder": "圃場名または作物で検索...",
+    "select": "選択",
+    "loading": "読み込み中...",
+    "no_results": "該当する結果がありません",
+    "no_fields": "圃場が登録されていません",
+    "error_loading": "圃場の読み込みに失敗しました",
+    "retry": "再試行",
+    "area_unit": "平方メートル",
+    "location": "場所",
+    "created": "作成日",
+    "last_updated": "最終更新",
+    "current_crop": "現在の作物",
+    "legend": "凡例",
+    "delete_confirm": "この圃場を削除してもよろしいですか？この操作は取り消せません。"
   },
   "rotation": {
-    "title": "Crop Rotation Planning",
-    "add_plan": "Add Plan",
-    "select_field": "Select a field to view rotation plan",
-    "no_plan": "No plan",
-    "no_plan_current_year": "No plan for current year",
-    "plan_now": "Plan now",
-    "same_crop_warning": "Same crop planted consecutively. Crop rotation recommended.",
-    "change_crop": "Change crop",
-    "rotation_plan": "Rotation Plan",
-    "recommendations": "Recommendations",
-    "benefits_title": "Benefits of Crop Rotation",
-    "benefit_soil_health": "Maintain soil health",
-    "benefit_pest_control": "Prevent pest and disease buildup",
-    "benefit_yield_stability": "Stabilize yields",
-    "benefit_nutrient_balance": "Improve nutrient balance"
+    "title": "輪作計画",
+    "add_plan": "計画を追加",
+    "select_field": "圃場を選択して輪作計画を表示",
+    "no_plan": "計画なし",
+    "no_plan_current_year": "今年の計画はありません",
+    "plan_now": "今すぐ計画",
+    "same_crop_warning": "同じ作物の連作です。輪作を推奨します。",
+    "change_crop": "作物を変更",
+    "rotation_plan": "輪作計画",
+    "recommendations": "推奨",
+    "benefits_title": "輪作のメリット",
+    "benefit_soil_health": "土壌の健全性を維持",
+    "benefit_pest_control": "病害虫の蓄積を抑制",
+    "benefit_yield_stability": "収量を安定化",
+    "benefit_nutrient_balance": "養分バランスを改善"
   },
   "kpis": {
     "overall_health": "全体健康度",
@@ -995,16 +1036,25 @@
       "generate": "タスクを生成",
       "completed": "完了: {done} / {total}",
       "week_view": "週間予定を見る →",
-      "field": "📍 {field}",
-      "eta": "⏱️ {time}",
+      "field": "圃場: {field}",
+      "eta": "目安: {time}",
       "weather_dependent": "🌤️ 天候次第"
     },
     "prompts": {
       "intro": "質問や相談があれば、いつでもどうぞ",
-      "today": "今日は何をすればいいですか？(member_name)",
+      "today": "今日は何をすればいいですか？",
       "harvest_koshi": "コシヒカリの収穫時期はいつ頃？",
       "yield_trend": "A圃場の収量トレンドを見せて",
       "frost_tonight": "今夜霜の心配はある？"
+    },
+    "insights_panel": {
+      "title": "AI栽培アドバイス",
+      "weather_impact": "気象影響",
+      "stage_advice": "生育ステージ",
+      "priority_tasks": "優先タスク",
+      "view_details": "詳細を見る",
+      "ask_ai": "AIに相談",
+      "close_chat": "閉じる"
     }
   },
   "quick_actions": {
@@ -1110,7 +1160,8 @@
       "error": "ログインに失敗しました。もう一度お試しください。",
       "admissionDenied": "現在は招待済みベータユーザーのみログインできます。先にアクセス申請をお願いします。",
       "requestAccessCta": "ベータ参加を申請",
-      "terms": "ログインすることで、利用規約とプライバシーポリシーに同意したものとみなされます。"
+      "terms": "ログインすることで、利用規約とプライバシーポリシーに同意したものとみなされます。",
+      "brandTagline": "農業チャットアシスタント"
     },
     "waitlist": {
       "title": "ベータ参加を申請",
@@ -1148,9 +1199,9 @@
         "farmer_mode_label": "表示モード",
         "farmer_mode_help": "作業経験に合わせてダッシュボードの情報量を調整します。",
         "farmer_mode_required": "利用モードを選択してください。",
-        "farmer_mode_new_title": "New Farmer",
+        "farmer_mode_new_title": "はじめての方",
         "farmer_mode_new_desc": "今日の判断に必要な情報だけを表示します。",
-        "farmer_mode_veteran_title": "Veteran Farmer",
+        "farmer_mode_veteran_title": "経験者",
         "farmer_mode_veteran_desc": "季節文脈と運用詳細をまとめて表示します。",
         "backButton": "戻る",
         "nextButton": "次へ"
@@ -1172,7 +1223,7 @@
       },
       "success": {
         "title": "準備完了！",
-        "subtitle": "ROuvisを使い始めることができます",
+        "subtitle": "ROUVISを使い始めることができます",
         "dashboardButton": "ダッシュボードへ"
       }
     }
@@ -1224,11 +1275,11 @@
       "theme_light": "ライト",
       "theme_dark": "ダーク",
       "theme_system": "システム",
-      "farmer_mode_section": "Farmer Mode",
+      "farmer_mode_section": "表示モード",
       "farmer_mode_desc": "あなたの作業スタイルに合わせて、ダッシュボードの情報量を切り替えます。",
-      "farmer_mode_new_title": "New Farmer",
+      "farmer_mode_new_title": "はじめての方",
       "farmer_mode_new_desc": "迷わず進めるために、必要な情報を絞って表示します。",
-      "farmer_mode_veteran_title": "Veteran Farmer",
+      "farmer_mode_veteran_title": "経験者",
       "farmer_mode_veteran_desc": "季節文脈と運用指標をまとめて確認できます。",
       "farmer_mode_loading": "現在のモードを読み込み中...",
       "farmer_mode_saving": "モードを保存中...",
@@ -1269,7 +1320,73 @@
     },
     "account": {
       "title": "アカウント",
-      "save": "保存"
+      "save": "保存",
+      "description": "アカウント情報とデータリクエストを管理します。",
+      "sections": {
+        "profile_information": "プロフィール情報",
+        "data_management": "データ管理",
+        "danger_zone": "注意が必要な操作"
+      },
+      "labels": {
+        "user_id": "ユーザーID",
+        "name": "名前",
+        "email": "メールアドレス"
+      },
+      "notices": {
+        "async_processing": "データ操作はコンプライアンス確認のため非同期で処理されます。操作種別ごとに同時に1件のみ申請できます。"
+      },
+      "loading": {
+        "requests": "データリクエスト状況を読み込み中..."
+      },
+      "actions": {
+        "retry": "再試行",
+        "review": "確認",
+        "cancel": "キャンセル",
+        "download_latest_export": "最新のエクスポートをダウンロード",
+        "request_export": "エクスポート申請",
+        "request_pending": "申請処理中",
+        "submitting": "送信中...",
+        "submit_deletion_request": "削除申請を送信",
+        "request_deletion": "削除申請",
+        "open_chat": "チャットを開く"
+      },
+      "export": {
+        "title": "個人データのエクスポート",
+        "description": "個人データのコピーを受け取るための申請を送信します。"
+      },
+      "delete": {
+        "title": "アカウント削除",
+        "description": "アカウント削除申請を送信します。処理には追加の確認時間が必要です。"
+      },
+      "confirm": {
+        "delete_request_title": "削除申請を確認",
+        "delete_request_message": "この操作はコンプライアンス確認申請を送信します。即時削除はされません。"
+      },
+      "messages": {
+        "confirm_delete_continue": "続行するには削除申請を確認してください。",
+        "deletion_not_submitted": "削除申請は送信されませんでした。",
+        "latest_status": "最新: {status}（{date}）",
+        "request_active": "{type}申請はすでに処理中です。",
+        "request_submitted": "{type}申請を送信しました。"
+      },
+      "support": {
+        "message": "お急ぎのアカウント対応が必要ですか？チャットからユーザーIDを添えてお問い合わせください。"
+      },
+      "types": {
+        "export": "エクスポート",
+        "delete": "削除"
+      },
+      "status": {
+        "pending": "受付済み",
+        "processing": "処理中",
+        "completed": "完了",
+        "rejected": "却下",
+        "canceled": "キャンセル"
+      },
+      "errors": {
+        "fetch_requests": "データリクエストの取得に失敗しました",
+        "submit_request": "申請の送信に失敗しました"
+      }
     },
     "auth": {
       "signin": {
@@ -1280,11 +1397,29 @@
         "title": "新規登録",
         "cta": "アカウントを作成"
       }
+    },
+    "agent_lab": {
+      "title": "AgentKit プレイグラウンド",
+      "subtitle": "実際のエージェント実行を送り、ツール呼び出しと出典イベントを確認します。",
+      "setup_title": "セットアップ",
+      "setup_step_backend": "バックエンドAPIを起動し、`AGENTKIT_ENABLED=true`（または `USE_AGENTS=true`）を設定します。",
+      "setup_step_api": "WebアプリのAPI先を設定します: `NEXT_PUBLIC_API_BASE_URL=http://localhost:4000`",
+      "tips_title": "ヒント",
+      "tip_try": "例: `水やり 20L をA圃場で`",
+      "tip_stream": "`tool_call_delta`、`tool_call_result`、出典イベントのストリーミングを確認してください。",
+      "tip_contract": "バックエンド契約: `POST /v1/agents/run`（SSEストリーミング）。",
+      "event_format_help": "イベント形式の詳細は",
+      "proxy_link_label": "/api/chatkit",
+      "event_format_suffix": "プロキシのSSE正規化仕様を確認してください。"
+    },
+    "scheduler_runs": {
+      "title": "スケジューラ非同期実行ライフサイクル",
+      "description": "スケジューラ実行の投入、状態ポーリング、再実行、SLOヘルス確認を行います。"
     }
   },
   "landing": {
     "hero": {
-      "header_tag": "JAPAN FARM OS",
+      "header_tag": "日本の営農OS",
       "eyebrow": "日本の現場向けAI営農プラットフォーム",
       "title": "日本の農業に、",
       "title_accent": "毎朝の判断を支える営農OSを。",
@@ -1443,7 +1578,7 @@
       "low": "最低"
     },
     "dashboard": {
-      "window_weather": "{location} · {highLabel} {high}° / {lowLabel} {low}°",
+      "window_weather": "{location} ・ {highLabel} {high}° / {lowLabel} {low}°",
       "overdue_note": "{count}件の期限超過タスクがあります",
       "on_track_note": "今日の重点タスクを先に完了させると遅延を防げます",
       "alerts": "警戒 {count} 件",

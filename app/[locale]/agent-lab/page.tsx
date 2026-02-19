@@ -1,11 +1,13 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { RouvisChatKit } from '@/components/RouvisChatKit';
 
-export default function AgentLabPage() {
+export default async function AgentLabPage() {
   if (process.env.NEXT_PUBLIC_ENABLE_AGENT_LAB !== 'true') {
     notFound();
   }
+  const t = await getTranslations('pages.agent_lab');
 
   return (
     <div className="w-full max-w-6xl mx-auto px-4 py-6 space-y-4">
@@ -16,33 +18,33 @@ export default function AgentLabPage() {
               AK
             </span>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">AgentKit Playground</h1>
-              <p className="text-sm text-gray-600">Send real agent requests and inspect tool/citation events.</p>
+              <h1 className="text-xl font-bold text-gray-900">{t('title')}</h1>
+              <p className="text-sm text-gray-600">{t('subtitle')}</p>
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-700">
             <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-3">
-              <div className="font-semibold text-emerald-800 mb-1">Setup</div>
+              <div className="font-semibold text-emerald-800 mb-1">{t('setup_title')}</div>
               <ul className="list-disc list-inside space-y-1 text-emerald-900">
-                <li>Start backend API and set <code>AGENTKIT_ENABLED=true</code> (or <code>USE_AGENTS=true</code>)</li>
-                <li>Point web to your API: <code>NEXT_PUBLIC_API_BASE_URL=http://localhost:4000</code></li>
+                <li>{t('setup_step_backend')}</li>
+                <li>{t('setup_step_api')}</li>
               </ul>
             </div>
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-              <div className="font-semibold text-gray-800 mb-1">Tips</div>
+              <div className="font-semibold text-gray-800 mb-1">{t('tips_title')}</div>
               <ul className="list-disc list-inside space-y-1">
-                <li>Try: <span className="font-mono">水やり 20L をA圃場で</span></li>
-                <li>Look for streamed <code>tool_call_delta</code>, <code>tool_call_result</code>, and citations in the UI.</li>
-                <li>Backend contract: <code>POST /v1/agents/run</code> streaming SSE.</li>
+                <li>{t('tip_try')}</li>
+                <li>{t('tip_stream')}</li>
+                <li>{t('tip_contract')}</li>
               </ul>
             </div>
           </div>
           <div className="text-xs text-gray-500">
-            Need the event format? See{' '}
+            {t('event_format_help')}{' '}
             <Link href="/app/api/chatkit/route.ts" className="text-emerald-700 underline">
-              /api/chatkit
+              {t('proxy_link_label')}
             </Link>{' '}
-            proxy for the expected SSE normalization.
+            {t('event_format_suffix')}
           </div>
         </div>
       </div>

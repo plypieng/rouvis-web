@@ -501,6 +501,13 @@
           "calendar": "Schedule tuning",
           "project": "Project advisory",
           "general": "General"
+        },
+        "intent_health_title": "Intent Health",
+        "metrics": {
+          "misroute": "Misroute {value}%",
+          "clarify": "Clarify {value}%",
+          "detected": "Detected {count}",
+          "workflow_p95": "Workflow p95 {value}"
         }
       },
       "greeting": {
@@ -859,7 +866,8 @@
       "error": "Sign in failed. Please try again.",
       "admissionDenied": "Access is limited to admitted beta users. Please request access before signing in.",
       "requestAccessCta": "Request Beta Access",
-      "terms": "By signing in, you agree to our Terms of Service and Privacy Policy."
+      "terms": "By signing in, you agree to our Terms of Service and Privacy Policy.",
+      "brandTagline": "Farming chat assistant"
     },
     "waitlist": {
       "title": "Request Beta Access",
@@ -877,7 +885,7 @@
       "welcome": {
         "title": "Welcome to ROUVIS",
         "subtitle": "A new way to manage your farm through conversation",
-        "description": "ROuvis helps you manage fields, log activities, and plan harvests by chatting with an AI assistant.",
+        "description": "ROUVIS helps you manage fields, log activities, and plan harvests by chatting with an AI assistant.",
         "benefits": {
           "chat": "Log and discuss work via chat",
           "weather": "Weather forecasts and suggestions",
@@ -953,6 +961,92 @@
       "email_alerts_desc": "Receive important alerts by email",
       "weekly_report": "Weekly report",
       "weekly_report_desc": "Receive a weekly summary of activity"
+    },
+    "agent_lab": {
+      "title": "AgentKit Playground",
+      "subtitle": "Send real agent requests and inspect tool/citation events.",
+      "setup_title": "Setup",
+      "setup_step_backend": "Start backend API and set `AGENTKIT_ENABLED=true` (or `USE_AGENTS=true`).",
+      "setup_step_api": "Point web to your API: `NEXT_PUBLIC_API_BASE_URL=http://localhost:4000`.",
+      "tips_title": "Tips",
+      "tip_try": "Try: `Water 20L in Field A`.",
+      "tip_stream": "Look for streamed `tool_call_delta`, `tool_call_result`, and citation events in the UI.",
+      "tip_contract": "Backend contract: `POST /v1/agents/run` streaming SSE.",
+      "event_format_help": "Need the event format? See",
+      "proxy_link_label": "/api/chatkit",
+      "event_format_suffix": "proxy for the expected SSE normalization."
+    },
+    "scheduler_runs": {
+      "title": "Scheduler Async Run Lifecycle",
+      "description": "Queue scheduler runs, poll lifecycle states, trigger retries, and review scheduler/auth SLO health."
+    },
+    "account": {
+      "description": "Manage your account details and data requests.",
+      "sections": {
+        "profile_information": "Profile Information",
+        "data_management": "Data Management",
+        "danger_zone": "Danger Zone"
+      },
+      "labels": {
+        "user_id": "User ID",
+        "name": "Name",
+        "email": "Email"
+      },
+      "notices": {
+        "async_processing": "Data actions are processed asynchronously for compliance review. You can submit one active request per action type."
+      },
+      "loading": {
+        "requests": "Loading account request status..."
+      },
+      "actions": {
+        "retry": "Retry",
+        "review": "Review",
+        "cancel": "Cancel",
+        "download_latest_export": "Download latest export",
+        "request_export": "Request Export",
+        "request_pending": "Request Pending",
+        "submitting": "Submitting...",
+        "submit_deletion_request": "Submit deletion request",
+        "request_deletion": "Request Deletion",
+        "open_chat": "Open chat"
+      },
+      "export": {
+        "title": "Export Personal Data",
+        "description": "Submit a request to receive a copy of your personal data."
+      },
+      "delete": {
+        "title": "Delete Account",
+        "description": "Submit an account deletion request. Processing can take additional review time."
+      },
+      "confirm": {
+        "delete_request_title": "Confirm deletion request",
+        "delete_request_message": "This will submit a compliance review request. Account removal is not immediate."
+      },
+      "messages": {
+        "confirm_delete_continue": "Confirm account deletion request to continue.",
+        "deletion_not_submitted": "Deletion request was not submitted.",
+        "latest_status": "Latest: {status} at {date}",
+        "request_active": "{type} request is already active.",
+        "request_submitted": "{type} request submitted successfully."
+      },
+      "support": {
+        "message": "Need urgent account assistance? Contact support from chat and include your user ID."
+      },
+      "types": {
+        "export": "Export",
+        "delete": "Delete"
+      },
+      "status": {
+        "pending": "Pending",
+        "processing": "Processing",
+        "completed": "Completed",
+        "rejected": "Rejected",
+        "canceled": "Canceled"
+      },
+      "errors": {
+        "fetch_requests": "Failed to fetch account data requests",
+        "submit_request": "Failed to submit request"
+      }
     }
   },
   "alerts": {
