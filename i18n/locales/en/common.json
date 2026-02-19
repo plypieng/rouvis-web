@@ -1064,13 +1064,13 @@
       "eyebrow": "AI farm operations platform for Japanese growers",
       "title": "Built for Japanese farms,",
       "title_accent": "so daily decisions get easier.",
-      "subtitle": "ROUVIS unifies weather, work planning, and records so your team can decide today's priorities in minutes, even during peak season.",
+      "subtitle": "ROUVIS turns weather shifts, field execution, and records into one operating rhythm so your team can run each morning with confidence.",
       "cta_start": "Start Free",
       "cta_login": "Sign In",
-      "cta_demo": "Watch Demo",
+      "cta_demo": "See How It Works",
       "cta_beta": "Request Beta Access",
       "choice_signin_label": "Already invited",
-      "choice_signin_desc": "Use Sign In if your team already has beta access.",
+      "choice_signin_desc": "If your team already has beta access, continue with",
       "choice_waitlist_label": "Need access",
       "choice_waitlist_desc": "Use Request Beta Access to join the waitlist.",
       "chip_1": "JMA weather integration",
@@ -1128,7 +1128,7 @@
     },
     "workflow": {
       "title": "Simple onboarding in three steps",
-      "subtitle": "A mobile-first workflow that teams can adopt quickly.",
+      "subtitle": "Three practical steps to move from reactive scheduling to confident daily execution.",
       "steps": {
         "capture": {
           "title": "Register fields and crops",
@@ -1167,17 +1167,17 @@
       }
     },
     "trust": {
-      "stat_1_label": "Operations",
-      "stat_1": "Morning priorities automatically organized",
-      "stat_2_label": "Data",
-      "stat_2": "Weather and field activity unified",
-      "stat_3_label": "Team model",
-      "stat_3": "Designed for small farm teams"
+      "stat_1_label": "Morning planning",
+      "stat_1": "Teams report faster priority alignment before field work starts",
+      "stat_2_label": "Weather agility",
+      "stat_2": "Faster response when weather changes force schedule adjustments",
+      "stat_3_label": "Execution reliability",
+      "stat_3": "Fewer critical tasks missed during peak workload windows"
     },
     "cta": {
-      "title": "Move from reactive farming to reliable operations",
-      "subtitle": "Join the beta and build an operating model tailored to your crops and fields.",
-      "primary": "Start Free",
+      "title": "Run your farm with the confidence of a modern operations stack",
+      "subtitle": "Apply for beta access and shape a workflow tuned to your crops, weather, and field reality.",
+      "primary": "Apply for Beta",
       "secondary": "Sign In"
     },
     "footer": {
