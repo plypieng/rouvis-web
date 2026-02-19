@@ -8,7 +8,6 @@
 import { type NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
-import type { AdapterAccount } from "next-auth/adapters";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { prisma, authPrisma } from "./prisma";
 import { resolveFarmerUiMode } from "./farmerUiMode";
@@ -42,10 +41,10 @@ export const authOptions: NextAuthOptions = {
     // When using prompt:'consent', Google always re-issues tokens.
     // The default adapter's linkAccount calls create() which fails on 
     // the unique constraint. We catch that and update instead.
-    linkAccount: async (account: AdapterAccount): Promise<void> => {
+    linkAccount: async (account: any): Promise<void> => {
       debugLog('LINK_ACCOUNT', { provider: account.provider, providerAccountId: account.providerAccountId, userId: account.userId });
       try {
-        await baseAdapter.linkAccount?.(account);
+        await baseAdapter.linkAccount?.(account as any);
         return;
       } catch (err: any) {
         debugLog('LINK_ACCOUNT_ERROR', { name: err?.name, message: err?.message?.substring(0, 300) });
