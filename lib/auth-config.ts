@@ -246,6 +246,14 @@ export const authOptions: NextAuthOptions = {
         token.id = token.sub;
       }
 
+      const previousProfileComplete = typeof token.profileComplete === 'boolean'
+        ? token.profileComplete
+        : false;
+      const previousOnboardingComplete = typeof token.onboardingComplete === 'boolean'
+        ? token.onboardingComplete
+        : false;
+      const previousUiMode = token.uiMode;
+
       // Self-healing: If ID is missing or looks numeric (Google Sub), force CUID lookup via Email
       // This fixes the issue where users are identified by Sub ID instead of database CUID
       const isNumericId = token.id && /^\d+$/.test(token.id as string);
@@ -289,9 +297,10 @@ export const authOptions: NextAuthOptions = {
           token.uiMode = resolveFarmerUiMode(undefined, userProfile?.experienceLevel);
         } catch (error) {
           debugLog('JWT_ONBOARDING_CHECK_ERROR', { error: (error as any)?.message?.substring(0, 200) });
-          // Don't block login if onboarding check fails
-          token.profileComplete = false;
-          token.onboardingComplete = false;
+          // Preserve known claims so transient DB errors don't regress completed users.
+          token.profileComplete = previousProfileComplete;
+          token.onboardingComplete = previousOnboardingComplete;
+          token.uiMode = previousUiMode;
         }
       }
 

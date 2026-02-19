@@ -82,9 +82,10 @@ export default async function middleware(request: NextRequest) {
   const isProjectCreateRoute = pathWithoutLocale.startsWith('/projects/create');
   const isOnboardingRoute = onboardingSafeRoutes.some((route) => pathWithoutLocale.startsWith(route));
 
-  // If user hasn't completed onboarding, keep them on onboarding flow
-  // to avoid inconsistent app state (missing profile/field context).
-  if (!onboardingComplete) {
+  // If user hasn't completed profile setup, keep them on onboarding flow.
+  // Fail-open safeguard: once profile is complete, avoid hard redirects
+  // based solely on onboardingComplete claim to reduce stale-claim lockouts.
+  if (!onboardingComplete && !profileComplete) {
     if (isProjectCreateRoute && !profileComplete) {
       const onboardingUrl = new URL(`/${locale}/onboarding`, request.url);
       onboardingUrl.searchParams.set('reason', 'onboarding_required');

@@ -51,10 +51,17 @@ export default async function RootLayout(props: {
 
   const typedLocale = locale as Locale;
   const isAuthenticated = Boolean(session?.user?.id);
+  const profileComplete = Boolean(
+    (session?.user as { profileComplete?: boolean } | undefined)?.profileComplete
+  );
   const onboardingComplete = Boolean(
     (session?.user as { onboardingComplete?: boolean } | undefined)?.onboardingComplete
   );
   const isOnboardingIncompleteUser = isAuthenticated && !onboardingComplete;
+  // Fail-open safeguard: only hide global navigation for users who still
+  // have not completed profile setup. This avoids trapping users if
+  // onboardingComplete is briefly stale after login/onboarding.
+  const shouldHideGlobalChrome = isAuthenticated && !profileComplete;
   const headerUser = session?.user
     ? {
         name: session.user.name ?? undefined,
@@ -76,22 +83,22 @@ export default async function RootLayout(props: {
           lang={locale}
           data-authenticated={shellProps.isAuthenticated ? 'true' : 'false'}
         >
-          {!isOnboardingIncompleteUser && <Header locale={typedLocale} user={headerUser} />}
+          {!shouldHideGlobalChrome && <Header locale={typedLocale} user={headerUser} />}
 
           <main
             id="main-content"
             className={`shell-main flex-1 overflow-auto mobile-scroll safe-bottom ${
-              isOnboardingIncompleteUser ? 'pb-0' : 'pb-28 lg:pb-6'
+              shouldHideGlobalChrome ? 'pb-0' : 'pb-28 lg:pb-6'
             }`}
           >
             {children}
           </main>
 
-          {!isOnboardingIncompleteUser && <Footer locale={typedLocale} user={session?.user} />}
-          {!isOnboardingIncompleteUser && session?.user && <FeedbackButton />}
-          {!isOnboardingIncompleteUser && session?.user && <OnboardingTour />}
+          {!shouldHideGlobalChrome && <Footer locale={typedLocale} user={session?.user} />}
+          {!shouldHideGlobalChrome && session?.user && <FeedbackButton />}
+          {!shouldHideGlobalChrome && session?.user && <OnboardingTour />}
 
-          {!isOnboardingIncompleteUser && (
+          {!shouldHideGlobalChrome && (
             <div className="mobile-nav-height lg:hidden">
               <BottomNav locale={typedLocale} user={session?.user} />
             </div>
