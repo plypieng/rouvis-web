@@ -576,6 +576,7 @@
         "title": "Inference Trace",
         "expand": "Show details",
         "collapse": "Hide details",
+        "thinking": "Thinking...",
         "empty": "No trace steps yet.",
         "summary": "{count} trace steps"
       },

@@ -116,7 +116,6 @@ const FRIENDLY_STATUS_KEYS: Record<string, string> = {
   'activities.log': 'cockpit.status.activity_log',
 };
 const TRACE_EXPANDED_MAX_STEPS = 5;
-const TRACE_LIVE_MAX_STEPS = 3;
 
 const MODE_CONFIG: Record<ChatMode, { color: string; bg: string; border: string }> = {
   default: { color: '', bg: '', border: '' },
@@ -1019,11 +1018,12 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
         : 'status-safe';
   const latestTraceStep = reasoningTraceSteps[reasoningTraceSteps.length - 1];
   const expandedTraceSteps = reasoningTraceSteps.slice(-TRACE_EXPANDED_MAX_STEPS);
-  const liveTraceSteps = reasoningTraceSteps.slice(-TRACE_LIVE_MAX_STEPS);
-  const traceStepsForRender = traceExpanded
-    ? (isLoading ? liveTraceSteps : expandedTraceSteps)
-    : liveTraceSteps;
-  const showLiveMiniList = isLoading && !traceExpanded && liveTraceSteps.length > 0;
+  const traceStepsForRender = expandedTraceSteps;
+  const traceSummaryText = isLoading
+    ? t('cockpit.trace.thinking')
+    : reasoningTraceSteps.length === 0
+      ? t('cockpit.trace.empty')
+      : `${t('cockpit.trace.summary', { count: reasoningTraceSteps.length })}${latestTraceStep ? ` · ${latestTraceStep.title}` : ''}`;
   const showIntentDebug = process.env.NEXT_PUBLIC_CHAT_INTENT_DEBUG === '1'
     || process.env.NEXT_PUBLIC_CHAT_INTENT_DEBUG === 'true';
 
@@ -1198,18 +1198,16 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
                 <button
                   type="button"
                   className="touch-target rounded-md border border-border/80 px-2 py-1 text-[11px] font-semibold hover:bg-secondary/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  disabled={isLoading}
                   onClick={() => setTraceExpanded(prev => !prev)}
                 >
                   {traceExpanded ? t('cockpit.trace.collapse') : t('cockpit.trace.expand')}
                 </button>
               </div>
               <p className="mt-1 text-[11px] text-muted-foreground" data-testid="inference-trace-summary">
-                {reasoningTraceSteps.length === 0
-                  ? t('cockpit.trace.empty')
-                  : t('cockpit.trace.summary', { count: reasoningTraceSteps.length })}
-                {latestTraceStep ? ` · ${latestTraceStep.title}` : ''}
+                {traceSummaryText}
               </p>
-              {(traceExpanded || showLiveMiniList) && traceStepsForRender.length > 0 && (
+              {!isLoading && traceExpanded && traceStepsForRender.length > 0 && (
                 <div className="mt-2 space-y-1.5" data-testid="inference-trace-steps">
                   {traceStepsForRender.map((step) => {
                     const toneClass = step.status === 'error'

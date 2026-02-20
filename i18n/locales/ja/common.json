@@ -1039,6 +1039,7 @@
         "title": "推論トレース",
         "expand": "詳細を表示",
         "collapse": "詳細を閉じる",
+        "thinking": "思考中...",
         "empty": "まだトレースがありません。",
         "summary": "トレース {count}件"
       },
