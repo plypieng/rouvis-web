@@ -1400,6 +1400,22 @@
       "yield_history": "Historical Yield",
       "empty_state": "No analytics data available yet. Complete tasks and log activities to see your project performance."
     },
+    "ledger": {
+      "fetch_error": "Failed to load ledger entries.",
+      "retry": "Retry",
+      "empty_state": "No activities or completed tasks found in this project yet.",
+      "total_entries": "{count} entries",
+      "amount_label": "Amount",
+      "badge_task": "Task",
+      "load_more": "Load more",
+      "loading_more": "Loading...",
+      "type_watering": "Watering",
+      "type_fertilizer": "Fertilizing",
+      "type_harvest": "Harvest",
+      "type_inspection": "Inspection",
+      "type_maintenance": "Maintenance",
+      "type_completed_task": "Completed Task"
+    },
     "replan_schedule": "Replan schedule",
     "schedule_empty_badge": "No Schedule",
     "schedule_empty_title": "This project has no schedule yet",

@@ -340,6 +340,22 @@
       "yield_history": "過去の収量",
       "empty_state": "分析データはまだありません。タスクを完了し、作業を記録するとプロジェクトの実績が表示されます。"
     },
+    "ledger": {
+      "fetch_error": "履歴データの取得に失敗しました。",
+      "retry": "再試行",
+      "empty_state": "このプロジェクトにはまだ作業記録や完了タスクがありません。",
+      "total_entries": "{count}件",
+      "amount_label": "数量",
+      "badge_task": "タスク",
+      "load_more": "もっと見る",
+      "loading_more": "読み込み中...",
+      "type_watering": "水やり",
+      "type_fertilizer": "施肥",
+      "type_harvest": "収穫",
+      "type_inspection": "点検",
+      "type_maintenance": "整備",
+      "type_completed_task": "完了タスク"
+    },
     "title": "プロジェクト",
     "create_new": "新規プロジェクト作成",
     "list_title": "プロジェクト一覧",
