@@ -13,6 +13,7 @@ import ScheduleHistoryPanel from '@/components/projects/ScheduleHistoryPanel';
 import ProjectEditModal from '@/components/projects/ProjectEditModal';
 import ProjectLedgerPanel from '@/components/projects/ProjectLedgerPanel';
 import ProjectAnalyticsPanel from '@/components/projects/ProjectAnalyticsPanel';
+import ProjectSettingsPanel from '@/components/projects/ProjectSettingsPanel';
 import TaskCreateModal from './TaskCreateModal';
 import type {
     CockpitPanelMode,
@@ -752,41 +753,28 @@ export default function ProjectDetailClient({
 
                 {tabMode === 'settings' ? (
                     <div className="flex-1 min-h-[640px] pt-4 pb-6 px-4 overflow-y-auto w-full">
-                        <div className="max-w-3xl mx-auto space-y-6">
-                            <div className="surface-base border border-border p-6 rounded-lg">
-                                <h2 className="text-xl font-semibold mb-2">{t('tabs.settings')}</h2>
-                                <p className="text-muted-foreground text-sm mb-6">{t('tabs.settings_placeholder')}</p>
-
-                                <div className="space-y-4">
-                                    <div className="flex items-center justify-between border-b border-border pb-4">
-                                        <div>
-                                            <h3 className="text-sm font-semibold tracking-wide text-foreground">{t('project_name')}</h3>
-                                            <p className="text-sm text-muted-foreground mt-1">{project.name}</p>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowEditModal(true)}
-                                            className="px-4 py-2 text-sm font-semibold rounded-md border border-border hover:bg-secondary transition"
-                                        >
-                                            {t('edit')}
-                                        </button>
-                                    </div>
-
-                                    <div className="flex items-center justify-between border-b border-border pb-4">
-                                        <div>
-                                            <h3 className="text-sm font-semibold tracking-wide text-foreground">{t('crop')} / {t('variety')}</h3>
-                                            <p className="text-sm text-muted-foreground mt-1">{project.crop}{project.variety ? ` - ${project.variety}` : ''}</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center justify-between border-b border-border pb-4">
-                                        <div>
-                                            <h3 className="text-sm font-semibold tracking-wide text-foreground">{t('target_harvest_date')}</h3>
-                                            <p className="text-sm text-muted-foreground mt-1">{project.targetHarvestDate || '--'}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                        <div className="max-w-3xl mx-auto">
+                            <ProjectSettingsPanel
+                                project={project}
+                                onEditProject={() => setShowEditModal(true)}
+                                onArchiveProject={() => {
+                                    // TODO: Wire to ArchiveConfirmation dialog
+                                    if (confirm(t('confirm_archive_message', { name: project.name }))) {
+                                        fetch(`/api/v1/projects/${project.id}`, {
+                                            method: 'PUT',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ status: 'archived' }),
+                                        }).then((res) => {
+                                            if (res.ok) {
+                                                toastSuccess(t('archive_success'));
+                                                router.push(`/${locale}/projects`);
+                                            } else {
+                                                toastError(t('archive_failed'));
+                                            }
+                                        }).catch(() => toastError(t('archive_failed')));
+                                    }
+                                }}
+                            />
                         </div>
                     </div>
                 ) : null}
