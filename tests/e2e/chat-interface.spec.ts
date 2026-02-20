@@ -268,6 +268,136 @@ test.describe('Chat Interface with /api/chatkit', () => {
     await expect(errorMessage.getByRole('button', { name: /もう一度試す|Try again/ })).toBeVisible();
   });
 
+  test('hides loading status line after first streamed assistant token', async ({ page }) => {
+    await mockChatkit(page, {
+      streamForPrompt: () => createStream([
+        `e:${JSON.stringify({
+          type: 'tool_call_delta',
+          delta: { tool: 'jma.getForecast', status: 'running' },
+        })}`,
+        `0:${JSON.stringify('最初のトークンです。')}`,
+      ]),
+    });
+    await openChat(page);
+    await sendPrompt(page, 'ステータス確認');
+
+    await expect(page.locator('.message-assistant').last()).toContainText('最初のトークンです。');
+    await expect(page.getByTestId('streaming-indicator')).toHaveCount(0);
+  });
+
+  test('keeps unread guard when user scrolls away during delayed stream', async ({ page }) => {
+    const history = Array.from({ length: 30 }, (_, idx) => ({
+      id: `hist-${idx + 1}`,
+      role: 'assistant',
+      content: `履歴メッセージ ${idx + 1}`,
+      createdAt: new Date(Date.now() - (30 - idx) * 60_000).toISOString(),
+    }));
+
+    await page.route('**/api/chatkit**', async (route) => {
+      const request = route.request();
+
+      if (request.method() === 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ messages: history }),
+        });
+        return;
+      }
+
+      let body: ChatRequestBody = {};
+      try {
+        body = JSON.parse(request.postData() || '{}') as ChatRequestBody;
+      } catch {
+        body = {};
+      }
+
+      if (body.action === 'chatkit.list_threads') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            threads: [{
+              id: 'thread-scroll-guard',
+              title: 'Scroll Guard Thread',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            }],
+          }),
+        });
+        return;
+      }
+
+      if (body.action === 'chatkit.create_thread') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            thread: {
+              id: 'thread-scroll-guard',
+              title: 'Scroll Guard Thread',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            },
+          }),
+        });
+        return;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/plain; charset=utf-8',
+        body: createStream([
+          `e:${JSON.stringify({
+            type: 'reasoning_trace',
+            stepId: 'guard-1',
+            phase: 'tooling',
+            status: 'update',
+            title: 'Preparing action plan',
+            sourceEvent: 'tool_call_delta',
+            timestamp: '2026-02-20T08:00:00.000Z',
+          })}`,
+          `0:${JSON.stringify('スクロール保護テスト出力です。')}`,
+        ]),
+      });
+    });
+
+    await openChat(page);
+    const scroller = page.locator('[data-testid="chat-container"] .mobile-scroll');
+    await sendPrompt(page, 'スクロール維持');
+    await scroller.evaluate((el) => {
+      el.scrollTop = 0;
+    });
+
+    await expect(page.getByRole('button', { name: /最新のメッセージへ|Jump to latest/ })).toBeVisible();
+    await expect(page.locator('.message-assistant').last()).toContainText('スクロール保護テスト出力です。');
+  });
+
+  test('keeps streamed output prioritized with dense reasoning trace events', async ({ page }) => {
+    await mockChatkit(page, {
+      streamForPrompt: () => createStream([
+        ...Array.from({ length: 6 }, (_, idx) => `e:${JSON.stringify({
+          type: 'reasoning_trace',
+          stepId: `dense-${idx + 1}`,
+          phase: 'tooling',
+          status: 'update',
+          title: `Trace step ${idx + 1}`,
+          sourceEvent: 'tool_call_delta',
+          timestamp: `2026-02-20T08:00:0${idx}.000Z`,
+        })}`),
+        `0:${JSON.stringify('出力1 ')}`,
+        `0:${JSON.stringify('出力2')}`,
+      ]),
+    });
+
+    await openChat(page);
+    await sendPrompt(page, 'trace多めで確認');
+
+    await expect(page.locator('.message-assistant').last()).toContainText('出力1 出力2');
+    await expect(page.getByTestId('inference-trace-steps')).toHaveCount(0);
+  });
+
   test('shows inference trace collapsed by default and expands ordered steps', async ({ page }) => {
     await mockChatkit(page, {
       streamForPrompt: () => createStream([

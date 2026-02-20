@@ -232,6 +232,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   const [assistantLanguage, setAssistantLanguage] = useState<AssistantLanguage>(defaultAssistantLanguage);
   const [assistantVerbosity, setAssistantVerbosity] = useState<AssistantVerbosity>('balanced');
   const [pendingMutationApproval, setPendingMutationApproval] = useState<PendingMutationApproval | null>(null);
+  const [streamTokenSeq, setStreamTokenSeq] = useState(0);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -241,6 +242,8 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   const lastActionTypeRef = useRef<ActionConfirmation['type'] | null>(null);
   const createThreadPromiseRef = useRef<Promise<string | null> | null>(null);
   const lastLoadedThreadIdRef = useRef<string | null>(null);
+  const activeAssistantIdRef = useRef<string | null>(null);
+  const hasFirstAssistantTokenRef = useRef(false);
 
   useEffect(() => {
     setAssistantLanguage(inferAssistantLanguage(locale));
@@ -289,6 +292,16 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
       return next;
     });
   }, []);
+
+  const appendAssistantStreamToken = useCallback((assistantId: string, text: string) => {
+    if (!text) return;
+    appendAssistantContent(assistantId, text);
+    if (activeAssistantIdRef.current !== assistantId) return;
+    if (!hasFirstAssistantTokenRef.current) {
+      hasFirstAssistantTokenRef.current = true;
+    }
+    setStreamTokenSeq(prev => prev + 1);
+  }, [appendAssistantContent]);
 
   const publishHandshake = useCallback((handshake: CommandHandshake | null) => {
     setActiveHandshake(handshake);
@@ -554,6 +567,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     setCurrentStatus('');
     setIsUserNearBottom(true);
     setHasUnreadMessages(false);
+    setStreamTokenSeq(0);
     if (!options?.mutationApprovalToken) {
       setPendingMutationApproval(null);
     }
@@ -564,6 +578,8 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
       role: 'assistant',
       content: '',
     };
+    activeAssistantIdRef.current = assistantId;
+    hasFirstAssistantTokenRef.current = false;
     setMessages(prev => [...prev, newAssistantMessage]);
 
     try {
@@ -615,7 +631,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
               const text = JSON.parse(line.slice(2));
               assistantRawContent += text;
               lastAssistantRawRef.current = assistantRawContent;
-              appendAssistantContent(assistantId, text);
+              appendAssistantStreamToken(assistantId, text);
             } catch {
               // Skip parse errors
             }
@@ -688,7 +704,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
               const content = event.delta.content;
               assistantRawContent += content;
               lastAssistantRawRef.current = assistantRawContent;
-              appendAssistantContent(assistantId, content);
+              appendAssistantStreamToken(assistantId, content);
             }
 
             // Source (simplified - no confidence %)
@@ -828,6 +844,8 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
           : m
       ));
     } finally {
+      activeAssistantIdRef.current = null;
+      hasFirstAssistantTokenRef.current = false;
       lastAssistantRawRef.current = assistantRawContent;
       lastAssistantFailedRef.current = assistantFailed;
       setIsLoading(false);
@@ -857,7 +875,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     publishHandshake,
     pushArtifact,
     pushReasoningTraceStep,
-    appendAssistantContent,
+    appendAssistantStreamToken,
     t,
   ]);
 
@@ -958,12 +976,23 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   }));
 
   useEffect(() => {
+    if (isLoading) return;
     if (isUserNearBottom) {
       scrollToBottom('auto');
     } else {
       setHasUnreadMessages(true);
     }
-  }, [messages, isUserNearBottom, scrollToBottom]);
+  }, [messages, isLoading, isUserNearBottom, scrollToBottom]);
+
+  useEffect(() => {
+    if (!isLoading) return;
+    if (streamTokenSeq === 0) return;
+    if (isUserNearBottom) {
+      scrollToBottom('auto');
+    } else {
+      setHasUnreadMessages(true);
+    }
+  }, [streamTokenSeq, isLoading, isUserNearBottom, scrollToBottom]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1024,6 +1053,9 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     : reasoningTraceSteps.length === 0
       ? t('cockpit.trace.empty')
       : `${t('cockpit.trace.summary', { count: reasoningTraceSteps.length })}${latestTraceStep ? ` · ${latestTraceStep.title}` : ''}`;
+  const showStreamingStatus = isLoading
+    && Boolean(currentStatus)
+    && !hasFirstAssistantTokenRef.current;
   const showIntentDebug = process.env.NEXT_PUBLIC_CHAT_INTENT_DEBUG === '1'
     || process.env.NEXT_PUBLIC_CHAT_INTENT_DEBUG === 'true';
 
@@ -1116,7 +1148,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
         ))}
 
         {/* Simple status line while loading */}
-        {isLoading && currentStatus && (
+        {showStreamingStatus && (
           <p className="text-sm text-muted-foreground animate-pulse pl-1" data-testid="streaming-indicator">
             {currentStatus}
           </p>
