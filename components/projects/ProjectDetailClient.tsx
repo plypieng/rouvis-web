@@ -10,6 +10,8 @@ import ProjectCalendar from '@/components/projects/ProjectCalendar';
 import ReplanScheduleDialog from '@/components/projects/ReplanScheduleDialog';
 import ScheduleGenerationTracePanel from '@/components/projects/ScheduleGenerationTracePanel';
 import ScheduleHistoryPanel from '@/components/projects/ScheduleHistoryPanel';
+import ProjectEditModal from '@/components/projects/ProjectEditModal';
+import ProjectLedgerPanel from '@/components/projects/ProjectLedgerPanel';
 import TaskCreateModal from './TaskCreateModal';
 import type {
     CockpitPanelMode,
@@ -17,6 +19,8 @@ import type {
     QuickApplyResult,
     QuickApplyState,
 } from '@/types/project-cockpit';
+
+type ProjectTabMode = 'cockpit' | 'history' | 'ledger' | 'settings';
 import { toastError, toastSuccess } from '@/lib/feedback';
 import { trackUXEvent } from '@/lib/analytics';
 import {
@@ -97,6 +101,7 @@ export default function ProjectDetailClient({
     const [taskInitialData, setTaskInitialData] = useState<{ title: string; description?: string } | undefined>(undefined);
     const [notice, setNotice] = useState<NoticeState>(null);
     const [panelMode, setPanelMode] = useState<CockpitPanelMode>('chat');
+    const [tabMode, setTabMode] = useState<ProjectTabMode>('cockpit');
     const [splitRatio, setSplitRatio] = useState(DEFAULT_SPLIT);
     const [isResizing, setIsResizing] = useState(false);
     const [quickApplyState, setQuickApplyState] = useState<QuickApplyState>({ status: 'idle' });
@@ -105,7 +110,7 @@ export default function ProjectDetailClient({
         () => (project.tasks || []).some((task) => task.status === 'completed')
     );
     const [showReplanDialog, setShowReplanDialog] = useState(false);
-    const [showScheduleHistory, setShowScheduleHistory] = useState(false);
+    const [showEditModal, setShowEditModal] = useState(false);
     const [generationRunId, setGenerationRunId] = useState<string | null>(null);
     const chatRef = useRef<RouvisChatKitRef>(null);
     const splitContainerRef = useRef<HTMLDivElement>(null);
@@ -125,6 +130,11 @@ export default function ProjectDetailClient({
         const panel = searchParams?.get('panel');
         if (panel === 'chat' || panel === 'calendar') {
             setPanelMode(panel);
+        }
+
+        const tab = searchParams?.get('tab');
+        if (tab === 'history' || tab === 'settings' || tab === 'cockpit') {
+            setTabMode(tab);
         }
     }, [searchParams]);
 
@@ -181,6 +191,14 @@ export default function ProjectDetailClient({
         const params = new URLSearchParams(searchParams?.toString() || '');
         params.set('panel', mode);
         router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    }, [pathname, router, searchParams]);
+
+    const updateTabQuery = useCallback((mode: ProjectTabMode) => {
+        const params = new URLSearchParams(searchParams?.toString() || '');
+        if (mode === 'cockpit') params.delete('tab');
+        else params.set('tab', mode);
+        router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+        setTabMode(mode);
     }, [pathname, router, searchParams]);
 
     const updateGenerationRunQuery = useCallback((nextRunId: string | null) => {
@@ -479,7 +497,7 @@ export default function ProjectDetailClient({
                     onQuickApplyRequest={handleQuickApplyRequest}
                     quickApplyState={quickApplyState}
                     externalHandshake={chatCockpitStandoutEnabled ? activeHandshake : null}
-                    onOpenHistory={() => setShowScheduleHistory(true)}
+                    onOpenHistory={() => updateTabQuery('history')}
                 />
             </div>
         </div>
@@ -506,7 +524,7 @@ export default function ProjectDetailClient({
                     </button>
                     <button
                         type="button"
-                        onClick={() => setShowScheduleHistory(true)}
+                        onClick={() => updateTabQuery('history')}
                         className="rounded-md border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-secondary"
                     >
                         {t('calendar.history_button')}
@@ -541,13 +559,12 @@ export default function ProjectDetailClient({
 
                 {notice && (
                     <div
-                        className={`mb-3 rounded-lg border px-4 py-3 text-sm ${
-                            notice.type === 'success'
-                                ? 'status-safe'
-                                : notice.type === 'info'
-                                    ? 'status-watch'
-                                    : 'status-critical'
-                        }`}
+                        className={`mb-3 rounded-lg border px-4 py-3 text-sm ${notice.type === 'success'
+                            ? 'status-safe'
+                            : notice.type === 'info'
+                                ? 'status-watch'
+                                : 'status-critical'
+                            }`}
                     >
                         <div className="flex items-center justify-between gap-3">
                             <span>{notice.message}</span>
@@ -564,91 +581,203 @@ export default function ProjectDetailClient({
                     </div>
                 )}
 
-                <div className="mb-2 lg:hidden">
-                    <div className="surface-base mb-3 p-1">
-                        <div className="grid grid-cols-2 gap-1" role="tablist" aria-label={t('calendar.mobile_panel_switcher')}>
-                            <button
-                                type="button"
-                                role="tab"
-                                aria-selected={panelMode === 'chat'}
-                                onClick={() => {
-                                    setPanelMode('chat');
-                                    updatePanelQuery('chat');
-                                }}
-                                data-testid="project-mobile-tab-chat"
-                                className={`touch-target rounded-lg px-3 py-2 text-sm font-semibold transition ${panelMode === 'chat'
-                                    ? 'bg-primary text-primary-foreground'
-                                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/75'
-                                    }`}
-                            >
-                                {t('calendar.mobile_tab_chat')}
-                            </button>
-                            <button
-                                type="button"
-                                role="tab"
-                                aria-selected={panelMode === 'calendar'}
-                                onClick={() => {
-                                    setPanelMode('calendar');
-                                    updatePanelQuery('calendar');
-                                }}
-                                data-testid="project-mobile-tab-calendar"
-                                className={`touch-target rounded-lg px-3 py-2 text-sm font-semibold transition ${panelMode === 'calendar'
-                                    ? 'bg-primary text-primary-foreground'
-                                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/75'
-                                    }`}
-                            >
-                                {t('calendar.mobile_tab_calendar')}
-                            </button>
+                <div className="mb-4 flex-none border-b border-border px-2">
+                    <nav className="-mb-px flex space-x-6" aria-label="Tabs">
+                        <button
+                            type="button"
+                            onClick={() => updateTabQuery('cockpit')}
+                            className={`whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium transition ${tabMode === 'cockpit'
+                                ? 'border-primary text-primary'
+                                : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
+                                }`}
+                        >
+                            {t('tabs.cockpit')}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => updateTabQuery('ledger')}
+                            className={`whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium transition ${tabMode === 'ledger'
+                                ? 'border-primary text-primary'
+                                : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
+                                }`}
+                        >
+                            {t('tabs.ledger')}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => updateTabQuery('history')}
+                            className={`whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium transition ${tabMode === 'history'
+                                ? 'border-primary text-primary'
+                                : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
+                                }`}
+                        >
+                            {t('tabs.history')}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => updateTabQuery('settings')}
+                            className={`whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium transition ${tabMode === 'settings'
+                                ? 'border-primary text-primary'
+                                : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
+                                }`}
+                        >
+                            {t('tabs.settings')}
+                        </button>
+                    </nav>
+                </div>
+
+                <div className={tabMode === 'cockpit' ? 'contents' : 'hidden'}>
+                    <div className="mb-2 lg:hidden">
+                        <div className="surface-base mb-3 p-1">
+                            <div className="grid grid-cols-2 gap-1" role="tablist" aria-label={t('calendar.mobile_panel_switcher')}>
+                                <button
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={panelMode === 'chat'}
+                                    onClick={() => {
+                                        setPanelMode('chat');
+                                        updatePanelQuery('chat');
+                                    }}
+                                    data-testid="project-mobile-tab-chat"
+                                    className={`touch-target rounded-lg px-3 py-2 text-sm font-semibold transition ${panelMode === 'chat'
+                                        ? 'bg-primary text-primary-foreground'
+                                        : 'bg-secondary text-secondary-foreground hover:bg-secondary/75'
+                                        }`}
+                                >
+                                    {t('calendar.mobile_tab_chat')}
+                                </button>
+                                <button
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={panelMode === 'calendar'}
+                                    onClick={() => {
+                                        setPanelMode('calendar');
+                                        updatePanelQuery('calendar');
+                                    }}
+                                    data-testid="project-mobile-tab-calendar"
+                                    className={`touch-target rounded-lg px-3 py-2 text-sm font-semibold transition ${panelMode === 'calendar'
+                                        ? 'bg-primary text-primary-foreground'
+                                        : 'bg-secondary text-secondary-foreground hover:bg-secondary/75'
+                                        }`}
+                                >
+                                    {t('calendar.mobile_tab_calendar')}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="h-[calc(100vh-210px)] min-h-[520px]">
+                            {panelMode === 'chat' ? chatPane : planningPane}
                         </div>
                     </div>
 
-                    <div className="h-[calc(100vh-210px)] min-h-[520px]">
-                        {panelMode === 'chat' ? chatPane : planningPane}
-                    </div>
-                </div>
-
-                <div
-                    ref={splitContainerRef}
-                    className="mb-2 hidden h-[calc(100vh-120px)] min-h-[640px] lg:grid"
-                    style={{ gridTemplateColumns: `${Math.round(splitRatio * 1000) / 10}% 12px minmax(0,1fr)` }}
-                >
-                    <div className="min-h-0 pr-1">
-                        {chatPane}
-                    </div>
-
                     <div
-                        role="separator"
-                        aria-orientation="vertical"
-                        aria-label={t('calendar.desktop_splitter_label')}
-                        aria-valuemin={Math.round(MIN_SPLIT * 100)}
-                        aria-valuemax={Math.round(MAX_SPLIT * 100)}
-                        aria-valuenow={Math.round(splitRatio * 100)}
-                        tabIndex={0}
-                        onMouseDown={(event) => {
-                            resizeStateRef.current = { startX: event.clientX, startRatio: splitRatio };
-                            setIsResizing(true);
-                        }}
-                        onKeyDown={(event) => {
-                            if (event.key === 'ArrowLeft') {
-                                event.preventDefault();
-                                commitSplitRatio(splitRatio - 0.03);
-                            }
-                            if (event.key === 'ArrowRight') {
-                                event.preventDefault();
-                                commitSplitRatio(splitRatio + 0.03);
-                            }
-                        }}
-                        className={`group relative mx-auto h-full w-[8px] cursor-col-resize rounded-full transition ${isResizing ? 'bg-primary/50' : 'bg-border/70 hover:bg-primary/35'
-                            } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
+                        ref={splitContainerRef}
+                        className="mb-2 hidden h-[calc(100vh-120px)] min-h-[640px] lg:grid"
+                        style={{ gridTemplateColumns: `${Math.round(splitRatio * 1000) / 10}% 12px minmax(0,1fr)` }}
                     >
-                        <span className="absolute left-1/2 top-1/2 h-14 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-muted-foreground/45 group-hover:bg-primary" />
-                    </div>
+                        <div className="min-h-0 pr-1">
+                            {chatPane}
+                        </div>
 
-                    <div className="min-h-0 pl-1">
-                        {planningPane}
+                        <div
+                            role="separator"
+                            aria-orientation="vertical"
+                            aria-label={t('calendar.desktop_splitter_label')}
+                            aria-valuemin={Math.round(MIN_SPLIT * 100)}
+                            aria-valuemax={Math.round(MAX_SPLIT * 100)}
+                            aria-valuenow={Math.round(splitRatio * 100)}
+                            tabIndex={0}
+                            onMouseDown={(event) => {
+                                resizeStateRef.current = { startX: event.clientX, startRatio: splitRatio };
+                                setIsResizing(true);
+                            }}
+                            onKeyDown={(event) => {
+                                if (event.key === 'ArrowLeft') {
+                                    event.preventDefault();
+                                    commitSplitRatio(splitRatio - 0.03);
+                                }
+                                if (event.key === 'ArrowRight') {
+                                    event.preventDefault();
+                                    commitSplitRatio(splitRatio + 0.03);
+                                }
+                            }}
+                            className={`group relative mx-auto h-full w-[8px] cursor-col-resize rounded-full transition ${isResizing ? 'bg-primary/50' : 'bg-border/70 hover:bg-primary/35'
+                                } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`}
+                        >
+                            <span className="absolute left-1/2 top-1/2 h-14 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-muted-foreground/45 group-hover:bg-primary" />
+                        </div>
+
+                        <div className="min-h-0 pl-1">
+                            {planningPane}
+                        </div>
                     </div>
                 </div>
+
+                {tabMode === 'history' ? (
+                    <div className="flex-1 min-h-[640px] pt-4 pb-6 w-full">
+                        <ScheduleHistoryPanel
+                            open={true}
+                            projectId={project.id}
+                            variant="embedded"
+                        />
+                    </div>
+                ) : null}
+
+                {tabMode === 'ledger' ? (
+                    <div className="flex-1 min-h-[640px] pt-4 pb-6 px-4 overflow-y-auto w-full">
+                        <div className="max-w-3xl mx-auto">
+                            <ProjectLedgerPanel projectId={project.id} />
+                        </div>
+                    </div>
+                ) : null}
+
+                {tabMode === 'settings' ? (
+                    <div className="flex-1 min-h-[640px] pt-4 pb-6 px-4 overflow-y-auto w-full">
+                        <div className="max-w-3xl mx-auto space-y-6">
+                            <div className="surface-base border border-border p-6 rounded-lg">
+                                <h2 className="text-xl font-semibold mb-2">{t('tabs.settings')}</h2>
+                                <p className="text-muted-foreground text-sm mb-6">{t('tabs.settings_placeholder')}</p>
+
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between border-b border-border pb-4">
+                                        <div>
+                                            <h3 className="text-sm font-semibold tracking-wide text-foreground">{t('project_name')}</h3>
+                                            <p className="text-sm text-muted-foreground mt-1">{project.name}</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowEditModal(true)}
+                                            className="px-4 py-2 text-sm font-semibold rounded-md border border-border hover:bg-secondary transition"
+                                        >
+                                            {t('edit')}
+                                        </button>
+                                    </div>
+
+                                    <div className="flex items-center justify-between border-b border-border pb-4">
+                                        <div>
+                                            <h3 className="text-sm font-semibold tracking-wide text-foreground">{t('crop')} / {t('variety')}</h3>
+                                            <p className="text-sm text-muted-foreground mt-1">{project.crop}{project.variety ? ` - ${project.variety}` : ''}</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between border-b border-border pb-4">
+                                        <div>
+                                            <h3 className="text-sm font-semibold tracking-wide text-foreground">{t('target_harvest_date')}</h3>
+                                            <p className="text-sm text-muted-foreground mt-1">{project.targetHarvestDate || '--'}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
             </div>
+
+            <ProjectEditModal
+                project={project}
+                isOpen={showEditModal}
+                onClose={() => setShowEditModal(false)}
+            />
 
             <TaskCreateModal
                 projectId={project.id}
@@ -674,12 +803,6 @@ export default function ProjectDetailClient({
                 }}
                 onReplanned={handleReplanCompleted}
             />
-
-            <ScheduleHistoryPanel
-                open={showScheduleHistory}
-                onClose={() => setShowScheduleHistory(false)}
-                projectId={project.id}
-            />
-        </div>
+        </div >
     );
 }

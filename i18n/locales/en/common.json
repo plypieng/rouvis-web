@@ -1377,6 +1377,13 @@
     ]
   },
   "projects": {
+    "tabs": {
+      "cockpit": "Overview",
+      "ledger": "Ledger",
+      "history": "History",
+      "settings": "Settings",
+      "settings_placeholder": "Manage project configuration and AI scheduling preferences here."
+    },
     "replan_schedule": "Replan schedule",
     "schedule_empty_badge": "No Schedule",
     "schedule_empty_title": "This project has no schedule yet",

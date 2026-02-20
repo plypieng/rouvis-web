@@ -317,6 +317,13 @@
     "next": "次へ"
   },
   "projects": {
+    "tabs": {
+      "cockpit": "概要",
+      "ledger": "履歴・記録",
+      "history": "システム履歴",
+      "settings": "設定",
+      "settings_placeholder": "プロジェクトの設定やAIスケジュールの条件を管理します。"
+    },
     "title": "プロジェクト",
     "create_new": "新規プロジェクト作成",
     "list_title": "プロジェクト一覧",

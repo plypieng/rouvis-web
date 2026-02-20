@@ -32,8 +32,9 @@ type ScheduleRevisionDetail = {
 
 type ScheduleHistoryPanelProps = {
   open: boolean;
-  onClose: () => void;
+  onClose?: () => void;
   projectId: string;
+  variant?: 'dialog' | 'embedded';
 };
 
 function formatRevisionLabel(
@@ -62,7 +63,7 @@ function formatDate(value: string): string {
   }).format(date);
 }
 
-export default function ScheduleHistoryPanel({ open, onClose, projectId }: ScheduleHistoryPanelProps) {
+export default function ScheduleHistoryPanel({ open, onClose, projectId, variant = 'dialog' }: ScheduleHistoryPanelProps) {
   const t = useTranslations('projects');
   const [revisions, setRevisions] = useState<ScheduleRevisionSummary[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -195,19 +196,16 @@ export default function ScheduleHistoryPanel({ open, onClose, projectId }: Sched
     replaceOpen: t('schedule_history.revision_label_replace_open'),
   };
 
-  return (
-    <div className="fixed inset-0 z-50" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/30" />
-      <aside
-        className="absolute right-0 top-0 h-full w-full max-w-5xl border-l border-border bg-card shadow-2xl"
-        onClick={(event) => event.stopPropagation()}
-        data-testid="schedule-history-panel"
-      >
-        <header className="flex items-center justify-between border-b border-border px-4 py-3">
-          <div>
-            <h2 className="text-base font-semibold text-foreground">{t('schedule_history.title')}</h2>
-            <p className="text-xs text-muted-foreground">{t('schedule_history.subtitle')}</p>
-          </div>
+  const isEmbedded = variant === 'embedded';
+
+  const content = (
+    <div className="flex h-full flex-col">
+      <header className="flex items-center justify-between border-b border-border px-4 py-3">
+        <div>
+          <h2 className="text-base font-semibold text-foreground">{t('schedule_history.title')}</h2>
+          <p className="text-xs text-muted-foreground">{t('schedule_history.subtitle')}</p>
+        </div>
+        {onClose && !isEmbedded ? (
           <button
             type="button"
             onClick={onClose}
@@ -216,121 +214,142 @@ export default function ScheduleHistoryPanel({ open, onClose, projectId }: Sched
           >
             <span className="material-symbols-outlined text-[18px]">close</span>
           </button>
-        </header>
+        ) : null}
+      </header>
 
-        <div className="grid h-[calc(100%-64px)] grid-cols-1 lg:grid-cols-[340px_minmax(0,1fr)]">
-          <section className="border-b border-border lg:border-b-0 lg:border-r">
-            {baselineNotice ? (
-              <p className="mx-3 mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-                {baselineNotice}
-              </p>
+      <div className="grid h-[calc(100%-64px)] grid-cols-1 lg:grid-cols-[340px_minmax(0,1fr)] flex-1 min-h-0">
+        <section className="border-b border-border lg:border-b-0 lg:border-r flex flex-col">
+          {baselineNotice ? (
+            <p className="mx-3 mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 flex-none">
+              {baselineNotice}
+            </p>
+          ) : null}
+
+          {errorMessage ? (
+            <p className="mx-3 mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 flex-none">{errorMessage}</p>
+          ) : null}
+
+          <div className="h-full overflow-y-auto p-3 flex-1">
+            {loadingList && revisions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t('schedule_history.loading')}</p>
             ) : null}
 
-            {errorMessage ? (
-              <p className="mx-3 mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{errorMessage}</p>
+            {!loadingList && revisions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t('schedule_history.empty')}</p>
             ) : null}
 
-            <div className="h-full overflow-y-auto p-3">
-              {loadingList && revisions.length === 0 ? (
-                <p className="text-sm text-muted-foreground">{t('schedule_history.loading')}</p>
-              ) : null}
+            <ul className="space-y-2">
+              {revisions.map((revision) => {
+                const selected = revision.id === selectedRevisionId;
+                const summary = revision.summary || null;
+                const generated = parseCount(summary, 'generatedTaskCount');
+                const replaced = parseCount(summary, 'replacedTaskCount');
+                const after = parseCount(summary, 'afterTaskCount');
 
-              {!loadingList && revisions.length === 0 ? (
-                <p className="text-sm text-muted-foreground">{t('schedule_history.empty')}</p>
-              ) : null}
+                return (
+                  <li key={revision.id}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedRevisionId(revision.id)}
+                      className={`w-full rounded-lg border px-3 py-2 text-left transition ${selected
+                        ? 'border-brand-seedling/60 bg-brand-seedling/10'
+                        : 'border-border bg-card hover:bg-secondary'
+                        }`}
+                    >
+                      <p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">{revision.type}</p>
+                      <p className="text-sm font-semibold text-foreground">{formatRevisionLabel(revision, revisionLabels)}</p>
+                      <p className="text-xs text-muted-foreground">{formatDate(revision.createdAt)}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        generated={generated ?? '-'} · replaced={replaced ?? '-'} · after={after ?? '-'}
+                      </p>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
 
-              <ul className="space-y-2">
-                {revisions.map((revision) => {
-                  const selected = revision.id === selectedRevisionId;
-                  const summary = revision.summary || null;
-                  const generated = parseCount(summary, 'generatedTaskCount');
-                  const replaced = parseCount(summary, 'replacedTaskCount');
-                  const after = parseCount(summary, 'afterTaskCount');
-
-                  return (
-                    <li key={revision.id}>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedRevisionId(revision.id)}
-                        className={`w-full rounded-lg border px-3 py-2 text-left transition ${selected
-                          ? 'border-brand-seedling/60 bg-brand-seedling/10'
-                          : 'border-border bg-card hover:bg-secondary'
-                          }`}
-                      >
-                        <p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">{revision.type}</p>
-                        <p className="text-sm font-semibold text-foreground">{formatRevisionLabel(revision, revisionLabels)}</p>
-                        <p className="text-xs text-muted-foreground">{formatDate(revision.createdAt)}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          generated={generated ?? '-'} · replaced={replaced ?? '-'} · after={after ?? '-'}
-                        </p>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-
-              {hasMore ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    void loadList(nextCursor);
-                  }}
-                  disabled={loadingList || !nextCursor}
-                  className="mt-3 w-full rounded-md border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-secondary disabled:opacity-60"
-                >
-                  {loadingList ? t('schedule_history.loading_more') : t('schedule_history.load_more')}
-                </button>
-              ) : null}
-            </div>
-          </section>
-
-          <section className="min-h-0 overflow-y-auto p-4">
-            {loadingDetail ? (
-              <p className="text-sm text-muted-foreground">{t('schedule_history.loading_detail')}</p>
+            {hasMore ? (
+              <button
+                type="button"
+                onClick={() => {
+                  void loadList(nextCursor);
+                }}
+                disabled={loadingList || !nextCursor}
+                className="mt-3 w-full rounded-md border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-secondary disabled:opacity-60"
+              >
+                {loadingList ? t('schedule_history.loading_more') : t('schedule_history.load_more')}
+              </button>
             ) : null}
+          </div>
+        </section>
 
-            {!loadingDetail && !selectedSummary ? (
-              <p className="text-sm text-muted-foreground">{t('schedule_history.empty_detail')}</p>
-            ) : null}
+        <section className="min-h-0 overflow-y-auto p-4 flex-1">
+          {loadingDetail ? (
+            <p className="text-sm text-muted-foreground">{t('schedule_history.loading_detail')}</p>
+          ) : null}
 
-            {!loadingDetail && selectedSummary && selectedDetail ? (
-              <div className="space-y-4">
-                <div className="rounded-lg border border-border bg-card p-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">{t('schedule_history.revision_meta')}</p>
-                  <p className="text-sm font-semibold text-foreground">{formatRevisionLabel(selectedSummary, revisionLabels)}</p>
-                  <p className="text-xs text-muted-foreground">{formatDate(selectedSummary.createdAt)}</p>
-                  {selectedDetail.note ? <p className="mt-2 text-sm text-foreground">{selectedDetail.note}</p> : null}
+          {!loadingDetail && !selectedSummary ? (
+            <p className="text-sm text-muted-foreground">{t('schedule_history.empty_detail')}</p>
+          ) : null}
+
+          {!loadingDetail && selectedSummary && selectedDetail ? (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-border bg-card p-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">{t('schedule_history.revision_meta')}</p>
+                <p className="text-sm font-semibold text-foreground">{formatRevisionLabel(selectedSummary, revisionLabels)}</p>
+                <p className="text-xs text-muted-foreground">{formatDate(selectedSummary.createdAt)}</p>
+                {selectedDetail.note ? <p className="mt-2 text-sm text-foreground">{selectedDetail.note}</p> : null}
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="rounded-lg border border-border p-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">{t('schedule_history.before_snapshot')}</p>
+                  <p className="text-sm font-semibold text-foreground">{t('schedule_history.task_count', { count: selectedDetail.beforeTasksSnapshot?.length || 0 })}</p>
+                  <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                    {(selectedDetail.beforeTasksSnapshot || []).slice(0, 12).map((task, index) => (
+                      <li key={`${task.id || 'before'}-${index}`}>
+                        {typeof task.title === 'string' ? task.title : t('schedule_history.untitled_task')}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div className="rounded-lg border border-border p-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">{t('schedule_history.before_snapshot')}</p>
-                    <p className="text-sm font-semibold text-foreground">{t('schedule_history.task_count', { count: selectedDetail.beforeTasksSnapshot?.length || 0 })}</p>
-                    <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
-                      {(selectedDetail.beforeTasksSnapshot || []).slice(0, 12).map((task, index) => (
-                        <li key={`${task.id || 'before'}-${index}`}>
-                          {typeof task.title === 'string' ? task.title : t('schedule_history.untitled_task')}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div className="rounded-lg border border-border p-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">{t('schedule_history.after_snapshot')}</p>
-                    <p className="text-sm font-semibold text-foreground">{t('schedule_history.task_count', { count: selectedDetail.afterTasksSnapshot?.length || 0 })}</p>
-                    <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
-                      {(selectedDetail.afterTasksSnapshot || []).slice(0, 12).map((task, index) => (
-                        <li key={`${task.id || 'after'}-${index}`}>
-                          {typeof task.title === 'string' ? task.title : t('schedule_history.untitled_task')}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+                <div className="rounded-lg border border-border p-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">{t('schedule_history.after_snapshot')}</p>
+                  <p className="text-sm font-semibold text-foreground">{t('schedule_history.task_count', { count: selectedDetail.afterTasksSnapshot?.length || 0 })}</p>
+                  <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                    {(selectedDetail.afterTasksSnapshot || []).slice(0, 12).map((task, index) => (
+                      <li key={`${task.id || 'after'}-${index}`}>
+                        {typeof task.title === 'string' ? task.title : t('schedule_history.untitled_task')}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               </div>
-            ) : null}
-          </section>
-        </div>
+            </div>
+          ) : null}
+        </section>
+      </div>
+    </div>
+  );
+
+  if (isEmbedded) {
+    return (
+      <div className="h-full w-full bg-card flex flex-col rounded-lg border border-border overflow-hidden" data-testid="schedule-history-panel">
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/30" />
+      <aside
+        className="absolute right-0 top-0 h-full w-full max-w-5xl border-l border-border bg-card shadow-2xl overflow-hidden"
+        onClick={(event) => event.stopPropagation()}
+        data-testid="schedule-history-panel"
+      >
+        {content}
       </aside>
     </div>
   );
