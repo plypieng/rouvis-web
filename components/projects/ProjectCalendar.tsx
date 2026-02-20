@@ -41,7 +41,7 @@ interface ProjectCalendarProps {
   onQuickApplyRequest?: (prompt: string) => Promise<QuickApplyResult>;
   quickApplyState?: QuickApplyState;
   externalHandshake?: CommandHandshake | null;
-  onOpenHistory?: () => void;
+
 }
 
 type RescheduleSuggestion = {
@@ -74,7 +74,7 @@ export default function ProjectCalendar({
   onQuickApplyRequest,
   quickApplyState,
   externalHandshake,
-  onOpenHistory,
+
 }: ProjectCalendarProps) {
   const locale = useLocale();
   const t = useTranslations('projects.calendar');
@@ -343,16 +343,6 @@ export default function ProjectCalendar({
               </div>
 
               <div className="col-span-4 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={onOpenHistory}
-                  className="touch-target inline-flex items-center gap-1 rounded-full border border-border bg-card px-3 py-1.5 text-[11px] font-semibold text-foreground hover:bg-secondary disabled:opacity-50"
-                  disabled={!onOpenHistory}
-                  data-testid="project-history-button"
-                >
-                  <span className="material-symbols-outlined text-[16px]">history</span>
-                  <span className="hidden sm:inline">{t('history_button')}</span>
-                </button>
                 <button
                   type="button"
                   onClick={() => onRescheduleRequest?.()}

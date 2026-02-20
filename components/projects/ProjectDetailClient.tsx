@@ -499,7 +499,6 @@ export default function ProjectDetailClient({
                     onQuickApplyRequest={handleQuickApplyRequest}
                     quickApplyState={quickApplyState}
                     externalHandshake={chatCockpitStandoutEnabled ? activeHandshake : null}
-                    onOpenHistory={() => updateTabQuery('settings')}
                 />
             </div>
         </div>
