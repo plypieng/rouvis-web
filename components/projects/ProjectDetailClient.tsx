@@ -22,7 +22,7 @@ import type {
     QuickApplyState,
 } from '@/types/project-cockpit';
 
-type ProjectTabMode = 'cockpit' | 'history' | 'ledger' | 'analytics' | 'settings';
+type ProjectTabMode = 'cockpit' | 'ledger' | 'analytics' | 'settings';
 import { toastError, toastSuccess } from '@/lib/feedback';
 import { trackUXEvent } from '@/lib/analytics';
 import {
@@ -135,7 +135,7 @@ export default function ProjectDetailClient({
         }
 
         const tab = searchParams?.get('tab');
-        if (tab === 'history' || tab === 'settings' || tab === 'cockpit') {
+        if (tab === 'settings' || tab === 'cockpit') {
             setTabMode(tab);
         }
     }, [searchParams]);
@@ -499,7 +499,7 @@ export default function ProjectDetailClient({
                     onQuickApplyRequest={handleQuickApplyRequest}
                     quickApplyState={quickApplyState}
                     externalHandshake={chatCockpitStandoutEnabled ? activeHandshake : null}
-                    onOpenHistory={() => updateTabQuery('history')}
+                    onOpenHistory={() => updateTabQuery('settings')}
                 />
             </div>
         </div>
@@ -526,10 +526,10 @@ export default function ProjectDetailClient({
                     </button>
                     <button
                         type="button"
-                        onClick={() => updateTabQuery('history')}
+                        onClick={() => updateTabQuery('settings')}
                         className="rounded-md border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-secondary"
                     >
-                        {t('calendar.history_button')}
+                        {t('tabs.settings')}
                     </button>
                 </div>
             </div>
@@ -604,16 +604,6 @@ export default function ProjectDetailClient({
                                 }`}
                         >
                             {t('tabs.ledger')}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => updateTabQuery('history')}
-                            className={`whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium transition ${tabMode === 'history'
-                                ? 'border-primary text-primary'
-                                : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
-                                }`}
-                        >
-                            {t('tabs.history')}
                         </button>
                         <button
                             type="button"
@@ -725,15 +715,6 @@ export default function ProjectDetailClient({
                     </div>
                 </div>
 
-                {tabMode === 'history' ? (
-                    <div className="flex-1 min-h-[640px] pt-4 pb-6 w-full">
-                        <ScheduleHistoryPanel
-                            open={true}
-                            projectId={project.id}
-                            variant="embedded"
-                        />
-                    </div>
-                ) : null}
 
                 {tabMode === 'ledger' ? (
                     <div className="flex-1 min-h-[640px] pt-4 pb-6 px-4 overflow-y-auto w-full">
