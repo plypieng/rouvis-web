@@ -120,6 +120,7 @@ const FRIENDLY_STATUS_KEYS: Record<string, string> = {
   'scheduler.reschedulePlan': 'cockpit.status.reschedule',
   'scheduler.updateTask': 'cockpit.status.task_update',
   'activities.log': 'cockpit.status.activity_log',
+  'web_search': 'cockpit.status.web_search',
 };
 const TRACE_EXPANDED_MAX_STEPS = 5;
 

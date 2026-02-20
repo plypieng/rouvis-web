@@ -1101,6 +1101,7 @@
         "reschedule": "予定を見直し中...",
         "task_update": "予定を調整中...",
         "activity_log": "記録中...",
+        "web_search": "インターネットを検索中...",
         "processing": "処理中..."
       },
       "confirmations": {
