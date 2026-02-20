@@ -1,7 +1,7 @@
 'use client';
 
 import { forwardRef, useImperativeHandle, useRef, useEffect, useState, useCallback } from 'react';
-import { Send, Loader2, RefreshCw, Undo2, Paperclip, X, ArrowRight } from 'lucide-react';
+import { Send, Loader2, RefreshCw, Undo2, Paperclip, X, ArrowRight, Plus, ChevronDown, MessageSquarePlus, Clock } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useLocale, useTranslations } from 'next-intl';
 import { toastError } from '@/lib/feedback';
@@ -20,6 +20,12 @@ import type {
   QuickApplyResult,
   ReasoningTraceStep,
 } from '@/types/project-cockpit';
+
+export interface ThreadInfo {
+  id: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 export type ChatMode = 'default' | 'reschedule' | 'diagnosis' | 'logging';
 export type ChatSuggestion = {
@@ -233,6 +239,11 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   const [assistantVerbosity, setAssistantVerbosity] = useState<AssistantVerbosity>('balanced');
   const [pendingMutationApproval, setPendingMutationApproval] = useState<PendingMutationApproval | null>(null);
   const [streamTokenSeq, setStreamTokenSeq] = useState(0);
+
+  const [threadList, setThreadList] = useState<ThreadInfo[]>([]);
+  const [isThreadListOpen, setIsThreadListOpen] = useState(false);
+  const [isCreatingThread, setIsCreatingThread] = useState(false);
+
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -348,38 +359,48 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     return createdThreadId || undefined;
   }, [autoCreateThread, projectId, threadId]);
 
+  const fetchThreadList = useCallback(async () => {
+    try {
+      const listThreadsPayload = projectId
+        ? { action: 'chatkit.list_threads', payload: { projectId } }
+        : { action: 'chatkit.list_threads' };
+      const res = await fetch('/api/chatkit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(listThreadsPayload),
+      });
+      if (!res.ok) return [];
+      const data = await res.json().catch(() => ({})) as { threads?: ThreadInfo[] };
+      const threads = data.threads || [];
+      setThreadList(threads);
+      return threads;
+    } catch (error) {
+      console.warn('Failed to load thread list:', error);
+      return [];
+    }
+  }, [projectId]);
+
   useEffect(() => {
     let cancelled = false;
 
-    const loadLatestThread = async () => {
-      if (threadId) return;
+    const initThreads = async () => {
+      const threads = await fetchThreadList();
+      if (cancelled) return;
 
-      try {
-        const listThreadsPayload = projectId
-          ? { action: 'chatkit.list_threads', payload: { projectId } }
-          : { action: 'chatkit.list_threads' };
-        const res = await fetch('/api/chatkit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(listThreadsPayload),
-        });
-        if (!res.ok) return;
-        const data = await res.json().catch(() => ({})) as { threads?: Array<{ id?: string }> };
-        const latestThreadId = typeof data.threads?.[0]?.id === 'string' ? data.threads[0].id : undefined;
-        if (!cancelled && latestThreadId) {
-          setThreadId(latestThreadId);
+      setThreadId(current => {
+        if (!current && threads.length > 0 && threads[0].id) {
+          return threads[0].id;
         }
-      } catch (error) {
-        console.warn('Failed to load latest thread:', error);
-      }
+        return current;
+      });
     };
 
-    void loadLatestThread();
+    void initThreads();
 
     return () => {
       cancelled = true;
     };
-  }, [projectId, threadId]);
+  }, [fetchThreadList]);
 
   // Load chat history on mount
   useEffect(() => {
@@ -1061,6 +1082,95 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
 
   return (
     <div className={`surface-base flex flex-col h-full ${className}`} data-testid="chat-container">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-border/60 px-4 py-2 bg-card relative z-20">
+        <div className="relative">
+          <button
+            onClick={() => setIsThreadListOpen(!isThreadListOpen)}
+            className="flex items-center gap-1.5 text-sm font-medium text-foreground hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md px-2 py-1"
+          >
+            <Clock className="w-4 h-4 text-muted-foreground" />
+            <span>{assistantLanguage === 'ja' ? '履歴' : 'History'}</span>
+            <ChevronDown className={`w-3 h-3 text-muted-foreground transition-transform ${isThreadListOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {isThreadListOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setIsThreadListOpen(false)}
+              />
+              <div className="absolute top-full left-0 mt-1 w-64 max-h-80 overflow-y-auto bg-popover text-popover-foreground border border-border/80 shadow-md rounded-md z-50">
+                {threadList.length === 0 ? (
+                  <div className="px-4 py-3 text-sm text-muted-foreground text-center">
+                    {assistantLanguage === 'ja' ? '履歴がありません' : 'No history found'}
+                  </div>
+                ) : (
+                  <div className="p-1">
+                    {threadList.map((thread, index) => {
+                      const label = assistantLanguage === 'ja' ? `チャット ${threadList.length - index}` : `Chat ${threadList.length - index}`;
+                      return (
+                        <button
+                          key={thread.id}
+                          onClick={() => {
+                            setThreadId(thread.id);
+                            setIsThreadListOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 text-sm rounded-sm hover:bg-muted transition-colors ${thread.id === threadId ? 'bg-muted/70 font-medium' : ''}`}
+                        >
+                          <div className="truncate">{label}</div>
+                          {thread.updatedAt && (
+                            <div className="text-xs text-muted-foreground mt-0.5 truncate">
+                              {new Intl.DateTimeFormat(locale, {
+                                month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                              }).format(new Date(thread.updatedAt))}
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
+        <button
+          onClick={async () => {
+            setIsCreatingThread(true);
+            try {
+              const res = await fetch('/api/chatkit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  action: 'chatkit.create_thread',
+                  payload: { ...(projectId ? { projectId } : {}) },
+                }),
+              });
+              if (res.ok) {
+                const data = await res.json().catch(() => ({}));
+                if (data?.thread?.id) {
+                  setThreadId(data.thread.id);
+                  // Refresh the list immediately to include the new thread
+                  const threads = await fetchThreadList();
+                  if (threads.length > 0) {
+                    setThreadList(threads);
+                  }
+                }
+              }
+            } finally {
+              setIsCreatingThread(false);
+            }
+          }}
+          disabled={isCreatingThread}
+          className="flex items-center gap-1.5 text-xs font-semibold text-foreground border border-border/80 bg-background hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md px-3 py-1.5 disabled:opacity-50 shadow-sm"
+        >
+          {isCreatingThread ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+          <span>{assistantLanguage === 'ja' ? '新しいチャット' : 'New Chat'}</span>
+        </button>
+      </div>
+
       {/* Messages */}
       <div
         ref={messagesContainerRef}
@@ -1290,9 +1400,9 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
                           ? t('cockpit.artifacts.memory_title')
                           : artifact.kind === 'reasoning'
                             ? t('cockpit.artifacts.reasoning_title')
-                          : artifact.kind === 'error'
-                            ? t('cockpit.artifacts.error_title')
-                            : artifact.title;
+                            : artifact.kind === 'error'
+                              ? t('cockpit.artifacts.error_title')
+                              : artifact.title;
               const artifactDescription = artifact.kind === 'choice'
                 ? t('cockpit.artifacts.choice_detail', { count: choiceCount })
                 : artifact.description;
