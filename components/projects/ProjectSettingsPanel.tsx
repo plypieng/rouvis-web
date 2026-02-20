@@ -31,6 +31,8 @@ interface ProjectSettingsPanelProps {
     project: SettingsProject;
     onEditProject: () => void;
     onArchiveProject?: () => void;
+    onReplanSchedule?: () => void;
+    onResetSchedule?: () => void;
 }
 
 function SettingsSection({ title, children }: { title: string; children: React.ReactNode }) {
@@ -56,7 +58,7 @@ function SettingsRow({ label, value, action }: { label: string; value: React.Rea
 
 const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
 
-export default function ProjectSettingsPanel({ project, onEditProject, onArchiveProject }: ProjectSettingsPanelProps) {
+export default function ProjectSettingsPanel({ project, onEditProject, onArchiveProject, onReplanSchedule, onResetSchedule }: ProjectSettingsPanelProps) {
     const t = useTranslations('projects');
     const locale = useLocale();
     const [showScheduleHistory, setShowScheduleHistory] = useState(false);
@@ -219,6 +221,43 @@ export default function ProjectSettingsPanel({ project, onEditProject, onArchive
                         {t('settings.show_schedule_history')}
                     </button>
                 )}
+            </SettingsSection>
+
+            {/* Section 3b: Schedule Actions */}
+            <SettingsSection title={t('settings.schedule_actions')}>
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm font-medium text-foreground">{t('settings.replan_schedule')}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">{t('settings.replan_description')}</p>
+                        </div>
+                        {onReplanSchedule && (
+                            <button
+                                type="button"
+                                onClick={onReplanSchedule}
+                                className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition"
+                            >
+                                {t('replan_schedule')}
+                            </button>
+                        )}
+                    </div>
+                    <div className="border-t border-border" />
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm font-medium text-foreground">{t('settings.reset_schedule')}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">{t('settings.reset_description')}</p>
+                        </div>
+                        {onResetSchedule && (
+                            <button
+                                type="button"
+                                onClick={onResetSchedule}
+                                className="px-4 py-2 text-sm font-medium border border-orange-500/50 text-orange-600 rounded-md hover:bg-orange-500/10 transition"
+                            >
+                                {t('settings.reset_button')}
+                            </button>
+                        )}
+                    </div>
+                </div>
             </SettingsSection>
 
             {/* Section 4: Danger Zone */}

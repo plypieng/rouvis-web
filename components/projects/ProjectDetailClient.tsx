@@ -757,8 +757,22 @@ export default function ProjectDetailClient({
                             <ProjectSettingsPanel
                                 project={project}
                                 onEditProject={() => setShowEditModal(true)}
+                                onReplanSchedule={() => setShowReplanDialog(true)}
+                                onResetSchedule={() => {
+                                    if (confirm(t('settings.reset_confirm'))) {
+                                        fetch(`/api/v1/projects/${project.id}/tasks`, {
+                                            method: 'DELETE',
+                                        }).then((res) => {
+                                            if (res.ok) {
+                                                toastSuccess(t('settings.reset_success'));
+                                                router.refresh();
+                                            } else {
+                                                toastError(t('settings.reset_failed'));
+                                            }
+                                        }).catch(() => toastError(t('settings.reset_failed')));
+                                    }
+                                }}
                                 onArchiveProject={() => {
-                                    // TODO: Wire to ArchiveConfirmation dialog
                                     if (confirm(t('confirm_archive_message', { name: project.name }))) {
                                         fetch(`/api/v1/projects/${project.id}`, {
                                             method: 'PUT',

@@ -383,7 +383,16 @@
       "hide_schedule_history": "← 変更履歴を非表示",
       "danger_zone": "危険ゾーン",
       "archive_project": "このプロジェクトをアーカイブ",
-      "archive_description": "アーカイブするとアクティブ一覧から削除されますが、後で復元できます。"
+      "archive_description": "アーカイブするとアクティブ一覧から削除されますが、後で復元できます。",
+      "schedule_actions": "スケジュール操作",
+      "replan_schedule": "スケジュール再作成",
+      "replan_description": "現在の制約と天気データに基づいて、AIが最適化したスケジュールを生成します。",
+      "reset_schedule": "スケジュールリセット",
+      "reset_description": "すべてのタスクを削除して最初からやり直します。この操作は元に戻せません。",
+      "reset_button": "リセット",
+      "reset_confirm": "すべてのタスクを削除しますか？この操作は元に戻せません。",
+      "reset_success": "スケジュールをリセットしました。すべてのタスクが削除されました。",
+      "reset_failed": "スケジュールのリセットに失敗しました。"
     },
     "archive_success": "プロジェクトをアーカイブしました。",
     "archive_failed": "アーカイブに失敗しました。",

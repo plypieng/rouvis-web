@@ -1443,7 +1443,16 @@
       "hide_schedule_history": "← Hide revision history",
       "danger_zone": "Danger Zone",
       "archive_project": "Archive this project",
-      "archive_description": "Archiving removes the project from your active list. You can restore it later."
+      "archive_description": "Archiving removes the project from your active list. You can restore it later.",
+      "schedule_actions": "Schedule Actions",
+      "replan_schedule": "Replan Schedule",
+      "replan_description": "Generate a new AI-optimized schedule based on current constraints and weather data.",
+      "reset_schedule": "Reset Schedule",
+      "reset_description": "Delete all tasks and start fresh. This cannot be undone.",
+      "reset_button": "Reset",
+      "reset_confirm": "Are you sure you want to delete all tasks? This action cannot be undone.",
+      "reset_success": "Schedule has been reset. All tasks deleted.",
+      "reset_failed": "Failed to reset the schedule."
     },
     "archive_success": "Project archived successfully.",
     "archive_failed": "Failed to archive the project.",
