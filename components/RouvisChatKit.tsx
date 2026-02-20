@@ -663,6 +663,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
 
     try {
       const resolvedThreadId = threadId || await ensureThreadId();
+      const resolvedMode = options?.skipUserMessage ? undefined : (overrideMode || chatMode);
       const response = await fetch('/api/chatkit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -671,7 +672,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
           messages: apiMessages,
           projectId,
           threadId: resolvedThreadId,
-          mode: options?.skipUserMessage ? undefined : (overrideMode || chatMode),
+          mode: resolvedMode && resolvedMode !== 'default' ? resolvedMode : undefined,
           channel,
           channelKind,
           channelActorId,
