@@ -12,6 +12,7 @@ import ScheduleGenerationTracePanel from '@/components/projects/ScheduleGenerati
 import ScheduleHistoryPanel from '@/components/projects/ScheduleHistoryPanel';
 import ProjectEditModal from '@/components/projects/ProjectEditModal';
 import ProjectLedgerPanel from '@/components/projects/ProjectLedgerPanel';
+import ProjectAnalyticsPanel from '@/components/projects/ProjectAnalyticsPanel';
 import TaskCreateModal from './TaskCreateModal';
 import type {
     CockpitPanelMode,
@@ -20,7 +21,7 @@ import type {
     QuickApplyState,
 } from '@/types/project-cockpit';
 
-type ProjectTabMode = 'cockpit' | 'history' | 'ledger' | 'settings';
+type ProjectTabMode = 'cockpit' | 'history' | 'ledger' | 'analytics' | 'settings';
 import { toastError, toastSuccess } from '@/lib/feedback';
 import { trackUXEvent } from '@/lib/analytics';
 import {
@@ -615,6 +616,16 @@ export default function ProjectDetailClient({
                         </button>
                         <button
                             type="button"
+                            onClick={() => updateTabQuery('analytics')}
+                            className={`whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium transition ${tabMode === 'analytics'
+                                ? 'border-primary text-primary'
+                                : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
+                                }`}
+                        >
+                            {t('tabs.analytics')}
+                        </button>
+                        <button
+                            type="button"
                             onClick={() => updateTabQuery('settings')}
                             className={`whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium transition ${tabMode === 'settings'
                                 ? 'border-primary text-primary'
@@ -727,6 +738,14 @@ export default function ProjectDetailClient({
                     <div className="flex-1 min-h-[640px] pt-4 pb-6 px-4 overflow-y-auto w-full">
                         <div className="max-w-3xl mx-auto">
                             <ProjectLedgerPanel projectId={project.id} />
+                        </div>
+                    </div>
+                ) : null}
+
+                {tabMode === 'analytics' ? (
+                    <div className="flex-1 min-h-[640px] pt-4 pb-6 px-4 overflow-y-auto w-full">
+                        <div className="max-w-3xl mx-auto">
+                            <ProjectAnalyticsPanel projectId={project.id} />
                         </div>
                     </div>
                 ) : null}
