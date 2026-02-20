@@ -1,7 +1,7 @@
 'use client';
 
 import { forwardRef, useImperativeHandle, useRef, useEffect, useState, useCallback } from 'react';
-import { Send, Loader2, RefreshCw, Undo2, Paperclip, X, ArrowRight, Plus, ChevronDown, MessageSquarePlus, Clock } from 'lucide-react';
+import { Send, Loader2, RefreshCw, Undo2, Paperclip, X, ArrowRight, Plus, ChevronDown, ChevronUp, MessageSquarePlus, Clock, Brain } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useLocale, useTranslations } from 'next-intl';
 import { toastError } from '@/lib/feedback';
@@ -60,19 +60,14 @@ interface PendingMutationApproval {
   expiresAt?: string;
 }
 
-interface ThinkingStep {
-  id: string;
-  tool: string;
-  status: 'running' | 'completed' | 'error';
-  message: string;
-}
-
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   imageUrl?: string;
-  thinkingSteps?: ThinkingStep[];
+  reasoningSteps?: ReasoningTraceStep[];
+  reasoningStartTime?: number;
+  reasoningEndTime?: number;
   source?: string;
   hasError?: boolean;
   createdAt?: string;
@@ -191,6 +186,66 @@ function getQuickSuggestions(
 
 function inferAssistantLanguage(locale: string): AssistantLanguage {
   return locale.toLowerCase().startsWith('ja') ? 'ja' : 'en';
+}
+
+function ReasoningAccordion({
+  message,
+  isLoading,
+  t,
+}: {
+  message: Message;
+  isLoading: boolean;
+  t: any;
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const steps = message.reasoningSteps || [];
+  if (steps.length === 0 && !isLoading) return null;
+
+  const durationSec = message.reasoningStartTime && message.reasoningEndTime
+    ? Math.round((message.reasoningEndTime - message.reasoningStartTime) / 1000)
+    : message.reasoningStartTime && isLoading
+      ? Math.round((Date.now() - message.reasoningStartTime) / 1000)
+      : 0;
+
+  const title = (isLoading && !message.reasoningEndTime)
+    ? t('cockpit.trace.thinking')
+    : durationSec > 0
+      ? t('cockpit.trace.thought_duration', { seconds: durationSec })
+      : t('cockpit.trace.thought');
+
+  return (
+    <div className="mb-3 border-l-2 border-border/40 pl-3 py-0.5">
+      <button
+        type="button"
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex items-center gap-2 text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors group"
+      >
+        <span className={`p-1 rounded-full bg-muted/50 group-hover:bg-muted transition-colors ${isLoading && !message.reasoningEndTime ? 'animate-pulse' : ''}`}>
+          <Brain className="w-3.5 h-3.5" />
+        </span>
+        <span>{title}</span>
+        {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+      </button>
+
+      {isExpanded && steps.length > 0 && (
+        <div className="mt-2 space-y-2 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200">
+          {steps.map((step) => (
+            <div key={step.stepId} className="text-[12px] leading-relaxed">
+              <div className="flex items-center gap-1.5 font-medium text-foreground/80">
+                <div className={`w-1.5 h-1.5 rounded-full ${step.status === 'completed' ? 'bg-green-500' : step.status === 'error' ? 'bg-red-500' : 'bg-amber-500 animate-pulse'}`} />
+                {step.title}
+              </div>
+              {step.detail && (
+                <p className="mt-0.5 text-muted-foreground pl-3 border-l border-border/30 ml-0.5">
+                  {step.detail}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
@@ -425,21 +480,23 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
               assistantVerbosity?: string;
             };
           };
-          const history: Message[] = (data.messages || []).map((m) => ({
-            id: m.id,
-            role: m.role === 'user' ? 'user' : 'assistant',
-            content: m.content,
-            createdAt: m.createdAt,
-          }));
+          const history: Message[] = (data.messages || []).map((m) => {
+            const isAssistant = m.role !== 'user';
+            const traceSummary = isAssistant ? extractTraceSummary(m.content) : null;
+            return {
+              id: m.id,
+              role: isAssistant ? 'assistant' : 'user',
+              content: m.content,
+              createdAt: m.createdAt,
+              reasoningSteps: traceSummary?.steps || undefined,
+            };
+          });
           setMessages(history);
           lastLoadedThreadIdRef.current = threadId;
 
-          const replayTraceSteps = (data.messages || [])
-            .filter((m) => m.role === 'assistant')
-            .flatMap((m) => {
-              const summary = extractTraceSummary(m.content);
-              return summary?.steps || [];
-            })
+          const replayTraceSteps = history
+            .filter((m) => m.role === 'assistant' && m.reasoningSteps)
+            .flatMap((m) => m.reasoningSteps!)
             .slice(-TRACE_EXPANDED_MAX_STEPS);
           setReasoningTraceSteps(replayTraceSteps);
 
@@ -680,7 +737,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
               && typeof event.sourceEvent === 'string'
               && typeof event.timestamp === 'string'
             ) {
-              pushReasoningTraceStep({
+              const step: ReasoningTraceStep = {
                 stepId: event.stepId,
                 phase: event.phase as ReasoningTraceStep['phase'],
                 status: event.status as ReasoningTraceStep['status'],
@@ -690,7 +747,23 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
                 confidence: typeof event.confidence === 'number' ? event.confidence : undefined,
                 sourceEvent: event.sourceEvent as ReasoningTraceStep['sourceEvent'],
                 timestamp: event.timestamp,
-              });
+              };
+
+              pushReasoningTraceStep(step);
+
+              setMessages(prev => prev.map(m => {
+                if (m.id !== assistantId) return m;
+                const newSteps = [...(m.reasoningSteps || []), step];
+
+                // Track start time on first step
+                const reasoningStartTime = m.reasoningStartTime || Date.now();
+                // If this step is completed/error, it might be the end, update end time
+                const reasoningEndTime = (step.status === 'completed' || step.status === 'error')
+                  ? Date.now()
+                  : m.reasoningEndTime;
+
+                return { ...m, reasoningSteps: newSteps, reasoningStartTime, reasoningEndTime };
+              }));
               continue;
             }
 
@@ -1215,6 +1288,13 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
                     : 'bg-secondary text-secondary-foreground rounded-2xl rounded-tl-md'
                   } ${isCompact ? 'text-sm' : 'text-base'}`}
               >
+                {message.role === 'assistant' && (
+                  <ReasoningAccordion
+                    message={message}
+                    isLoading={isLoading && message.id === messages[messages.length - 1]?.id}
+                    t={t}
+                  />
+                )}
                 {message.imageUrl && (
                   <div className="mb-2">
                     <img
@@ -1303,7 +1383,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
           </div>
         )}
 
-        {standoutMode && (activeHandshake || commandArtifacts.length > 0 || reasoningTraceSteps.length > 0) && (
+        {standoutMode && (activeHandshake || commandArtifacts.length > 0) && (
           <section className="space-y-2" data-testid="command-artifact-timeline">
             {activeHandshake && (
               <article
@@ -1332,53 +1412,6 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
               </article>
             )}
 
-            <article
-              data-testid="inference-trace-panel"
-              className="rounded-lg border border-border/80 bg-secondary/35 px-3 py-2 text-xs"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <p className="font-semibold">{t('cockpit.trace.title')}</p>
-                <button
-                  type="button"
-                  className="touch-target rounded-md border border-border/80 px-2 py-1 text-[11px] font-semibold hover:bg-secondary/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  disabled={isLoading}
-                  onClick={() => setTraceExpanded(prev => !prev)}
-                >
-                  {traceExpanded ? t('cockpit.trace.collapse') : t('cockpit.trace.expand')}
-                </button>
-              </div>
-              <p className="mt-1 text-[11px] text-muted-foreground" data-testid="inference-trace-summary">
-                {traceSummaryText}
-              </p>
-              {!isLoading && traceExpanded && traceStepsForRender.length > 0 && (
-                <div className="mt-2 space-y-1.5" data-testid="inference-trace-steps">
-                  {traceStepsForRender.map((step) => {
-                    const toneClass = step.status === 'error'
-                      ? 'status-critical'
-                      : step.status === 'completed'
-                        ? 'status-safe'
-                        : 'status-watch';
-                    return (
-                      <div
-                        key={step.stepId}
-                        className={`rounded-md border px-2 py-1 ${toneClass}`}
-                        data-testid="inference-trace-step"
-                      >
-                        <p className="font-semibold">
-                          {step.title}
-                        </p>
-                        <p className="text-[11px] opacity-80">
-                          {`${step.phase} · ${step.status}`}
-                        </p>
-                        {step.detail ? (
-                          <p className="mt-0.5 text-[11px] text-muted-foreground">{step.detail}</p>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </article>
 
             {commandArtifacts.map((artifact) => {
               const confidence = typeof artifact.metadata?.confidence === 'number'
@@ -1656,7 +1689,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
           </div>
         )}
       </div>
-    </div>
+    </div >
   );
 });
 

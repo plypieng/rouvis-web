@@ -735,6 +735,34 @@ export default function FieldMapCanvas({
   }, [fields, fitToRelevantBounds]);
 
   useEffect(() => {
+    if (!selectedFieldId || !mapInstanceRef.current || !mapInstanceRef.current.isStyleLoaded()) return;
+
+    const field = fields.find((f) => f.id === selectedFieldId);
+    if (!field) return;
+
+    const bounds = new LngLatBounds();
+    let hasBounds = false;
+
+    if (field.geometry) {
+      for (const [lon, lat] of field.geometry.coordinates[0]) {
+        bounds.extend([lon, lat]);
+        hasBounds = true;
+      }
+    } else if (field.centroid) {
+      bounds.extend([field.centroid.lon, field.centroid.lat]);
+      hasBounds = true;
+    }
+
+    if (hasBounds) {
+      mapInstanceRef.current.fitBounds(bounds, {
+        padding: 48,
+        maxZoom: 17,
+        duration: 450,
+      });
+    }
+  }, [selectedFieldId, fields]);
+
+  useEffect(() => {
     const query = searchQuery.trim();
 
     if (query.length < 2) {

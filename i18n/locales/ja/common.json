@@ -496,6 +496,8 @@
       "not_schedulable": "スケジューリング不可",
       "primary_summary": "主圃場: {name}",
       "primary_required": "少なくとも1つの圃場を選択してください。",
+      "switch_to_selection": "既存の圃場から選択",
+      "switch_to_creation": "新しい圃場を作成",
       "environment": {
         "open_field": "露地",
         "greenhouse": "ハウス",
@@ -1121,7 +1123,9 @@
         "collapse": "詳細を閉じる",
         "thinking": "思考中...",
         "empty": "まだトレースがありません。",
-        "summary": "トレース {count}件"
+        "summary": "トレース {count}件",
+        "thought_duration": "{seconds}秒間考えました",
+        "thought": "考えました"
       },
       "artifacts": {
         "plan_title": "変更プランを検出しました",

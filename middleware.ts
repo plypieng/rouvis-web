@@ -76,31 +76,33 @@ export default async function middleware(request: NextRequest) {
   }
 
   // Onboarding enforcement for new users
-  // `onboardingComplete` is computed in auth callbacks from required setup state.
-  const profileComplete = (token as any)?.profileComplete;
-  const onboardingComplete = (token as any)?.onboardingComplete;
+  // Claims are computed in auth callbacks. Default to false if missing to ensure security,
+  // but we fail-open if profileComplete is true to prevent stale-claim lockouts.
+  const profileComplete = Boolean((token as any)?.profileComplete);
+  const onboardingComplete = Boolean((token as any)?.onboardingComplete);
   const isProjectCreateRoute = pathWithoutLocale.startsWith('/projects/create');
   const isOnboardingRoute = onboardingSafeRoutes.some((route) => pathWithoutLocale.startsWith(route));
 
   // If user hasn't completed profile setup, keep them on onboarding flow.
   // Fail-open safeguard: once profile is complete, avoid hard redirects
   // based solely on onboardingComplete claim to reduce stale-claim lockouts.
-  if (!onboardingComplete && !profileComplete) {
-    if (isProjectCreateRoute && !profileComplete) {
+  if (!profileComplete && !onboardingComplete) {
+    if (!isOnboardingRoute) {
       const onboardingUrl = new URL(`/${locale}/onboarding`, request.url);
       onboardingUrl.searchParams.set('reason', 'onboarding_required');
       onboardingUrl.searchParams.set('from', pathWithoutLocale);
       onboardingUrl.searchParams.set('nextStep', 'profile');
       return NextResponse.redirect(onboardingUrl);
     }
+  }
 
-    if (!isOnboardingRoute) {
-      const onboardingUrl = new URL(`/${locale}/onboarding`, request.url);
-      onboardingUrl.searchParams.set('reason', 'onboarding_required');
-      onboardingUrl.searchParams.set('from', pathWithoutLocale);
-      onboardingUrl.searchParams.set('nextStep', profileComplete ? 'field' : 'profile');
-      return NextResponse.redirect(onboardingUrl);
-    }
+  // If profile is complete but onboarding (fields/projects) is not, 
+  // we only redirect to onboarding if they aren't already on an onboarding-safe route.
+  // We allow access to project creation as it's part of the funnel.
+  if (profileComplete && !onboardingComplete && !isOnboardingRoute && !isProjectCreateRoute) {
+    // Optional: could redirect to 'field' step of onboarding
+    // For now, let's be more lenient to avoid the bug reported by the user
+    // if (!isOnboardingRoute) { ... }
   }
 
   // For authenticated users on protected routes that already have a locale prefix,

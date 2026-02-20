@@ -237,13 +237,12 @@ export const authOptions: NextAuthOptions = {
      * JWT Callback: Runs when JWT is created or updated.
      */
     async jwt({ token, user, trigger }) {
-      // Initial sign in
+      // 1. Resolve ID reliably
       if (user) {
         token.id = user.id;
         token.email = user.email;
         token.name = user.name;
       } else if (!token.id && token.sub) {
-        // Backward compatibility: older tokens may only have `sub`
         token.id = token.sub;
       }
 
@@ -256,8 +255,7 @@ export const authOptions: NextAuthOptions = {
       const previousUiMode = token.uiMode;
 
       // Self-healing: If ID is missing or looks numeric (Google Sub), force CUID lookup via Email
-      // This fixes the issue where users are identified by Sub ID instead of database CUID
-      const isNumericId = token.id && /^\d+$/.test(token.id as string);
+      const isNumericId = typeof token.id === 'string' && /^\d+$/.test(token.id);
       if ((!token.id || isNumericId) && token.email) {
         try {
           const dbUser = await prisma.user.findUnique({
@@ -272,11 +270,11 @@ export const authOptions: NextAuthOptions = {
         }
       }
 
-      // Check if user has completed onboarding.
-      // Completion requires profile + at least one field or project.
+      // 2. Check onboarding status
       if (token.id) {
         try {
           const userId = token.id as string;
+          // Use Promise.all to fetch required data in parallel
           const [userProfile, firstField, firstProject] = await Promise.all([
             prisma.userProfile.findUnique({
               where: { userId },
@@ -303,6 +301,10 @@ export const authOptions: NextAuthOptions = {
           token.onboardingComplete = previousOnboardingComplete;
           token.uiMode = previousUiMode;
         }
+      } else {
+        // Explicitly set false if no user ID
+        token.profileComplete = false;
+        token.onboardingComplete = false;
       }
 
       const userId = typeof token.id === 'string' ? token.id : null;

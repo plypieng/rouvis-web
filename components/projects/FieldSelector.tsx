@@ -153,6 +153,7 @@ export default function FieldSelector({ value, onChange, onFieldsLoaded }: Field
   const [createError, setCreateError] = useState<string | null>(null);
   const [createDrawMode, setCreateDrawMode] = useState<DrawMode>('polygon');
   const [draft, setDraft] = useState<NewFieldDraft>(defaultDraft());
+  const [viewMode, setViewMode] = useState<'selection' | 'creation'>('selection');
 
   const fieldById = useMemo(() => {
     const map = new Map<string, FieldRecord>();
@@ -209,9 +210,16 @@ export default function FieldSelector({ value, onChange, onFieldsLoaded }: Field
         : [];
       setFields(nextFields);
       onFieldsLoaded?.(nextFields);
+
+      if (nextFields.length === 0) {
+        setViewMode('creation');
+      } else {
+        setViewMode('selection');
+      }
     } catch (nextError) {
       console.error('Failed to fetch fields', nextError);
       setError(nextError instanceof Error ? nextError.message : t('load_error_default'));
+      setViewMode('creation'); // Fallback to creation if fetch fails and no fields
     } finally {
       setLoading(false);
     }
@@ -361,6 +369,7 @@ export default function FieldSelector({ value, onChange, onFieldsLoaded }: Field
 
       toastSuccess(t('created_success'));
       resetCreateDraft();
+      setViewMode('selection');
     } catch (nextError) {
       console.error('Failed to create field in project flow', nextError);
       const message = nextError instanceof Error ? nextError.message : t('create_error_generic');
@@ -372,216 +381,47 @@ export default function FieldSelector({ value, onChange, onFieldsLoaded }: Field
   };
 
   return (
-    <div className="space-y-3 rounded-xl border border-border bg-card p-4">
+    <div className="space-y-4 rounded-xl border border-border bg-card p-4">
       <div className="flex items-center justify-between gap-2">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">{t('badge')}</p>
           <h3 className="text-sm font-semibold text-foreground">{t('title')}</h3>
         </div>
-        <span className="rounded-full border border-border bg-secondary px-2 py-1 text-[11px] font-semibold text-secondary-foreground">
-          {t('selected_count', { count: selectedFieldIds.length })}
-        </span>
-      </div>
-
-      <section
-        className="space-y-3 rounded-xl border border-brand-waterline/35 bg-brand-waterline/8 p-3"
-        data-testid="field-selector-create-panel"
-      >
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">{t('creator_badge')}</p>
-            <h4 className="text-sm font-semibold text-foreground">{t('creator_title')}</h4>
-            <p className="text-xs text-muted-foreground">{t('creator_hint')}</p>
-          </div>
-          <span className="rounded-full border border-border bg-card px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-            {t('map_engine')}
+        <div className="flex items-center gap-2">
+          {fields.length > 0 && viewMode === 'selection' && (
+            <button
+              type="button"
+              onClick={() => {
+                setViewMode('creation');
+                setCreateDrawMode('polygon');
+              }}
+              className="rounded-lg border border-brand-waterline/50 bg-brand-waterline/5 px-3 py-1 text-xs font-semibold text-brand-waterline hover:bg-brand-waterline/10"
+            >
+              + {t('switch_to_creation')}
+            </button>
+          )}
+          {viewMode === 'creation' && fields.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setViewMode('selection')}
+              className="rounded-lg border border-border bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground hover:bg-secondary/80"
+            >
+              ← {t('switch_to_selection')}
+            </button>
+          )}
+          <span className="rounded-full border border-border bg-secondary px-2 py-1 text-[11px] font-semibold text-secondary-foreground">
+            {t('selected_count', { count: selectedFieldIds.length })}
           </span>
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-          <label className="block">
-            <span className="mb-1 block text-xs font-semibold text-muted-foreground">{t('name_label')}</span>
-            <input
-              value={draft.name}
-              onChange={(event) => setDraft((prev) => ({ ...prev, name: event.target.value }))}
-              className="control-inset w-full rounded-lg border border-border px-3 py-2 text-sm"
-              placeholder={t('name_placeholder')}
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs font-semibold text-muted-foreground">{t('crop_label')}</span>
-            <input
-              value={draft.crop}
-              onChange={(event) => setDraft((prev) => ({ ...prev, crop: event.target.value }))}
-              className="control-inset w-full rounded-lg border border-border px-3 py-2 text-sm"
-              placeholder={t('crop_placeholder')}
-            />
-          </label>
-        </div>
-
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
-          <label className="block md:col-span-2">
-            <span className="mb-1 block text-xs font-semibold text-muted-foreground">{t('environment_label')}</span>
-            <select
-              value={draft.environmentType}
-              onChange={(event) => {
-                const environmentType = event.target.value as 'open_field' | 'greenhouse' | 'home_pot';
-                setDraft((prev) => ({
-                  ...prev,
-                  environmentType,
-                  containerCount: environmentType === 'home_pot'
-                    ? (prev.containerCount && prev.containerCount > 0 ? prev.containerCount : 1)
-                    : null,
-                }));
-
-                if (environmentType === 'open_field' && createDrawMode === 'none') {
-                  setCreateDrawMode('polygon');
-                }
-
-                if (environmentType === 'home_pot' && createDrawMode === 'polygon') {
-                  setCreateDrawMode('centroid');
-                }
-              }}
-              className="control-inset w-full rounded-lg border border-border px-3 py-2 text-sm"
-            >
-              <option value="open_field">{t('environment.open_field')}</option>
-              <option value="greenhouse">{t('environment.greenhouse')}</option>
-              <option value="home_pot">{t('environment.home_pot')}</option>
-            </select>
-          </label>
-
-          {draft.environmentType === 'home_pot' ? (
-            <label className="block md:col-span-1">
-              <span className="mb-1 block text-xs font-semibold text-muted-foreground">{t('pot_count_label')}</span>
-              <input
-                type="number"
-                min={1}
-                step={1}
-                value={draft.containerCount ?? ''}
-                onChange={(event) => setDraft((prev) => ({
-                  ...prev,
-                  containerCount: Number.isFinite(Number(event.target.value))
-                    ? Math.max(1, Math.floor(Number(event.target.value)))
-                    : null,
-                }))}
-                className="control-inset w-full rounded-lg border border-border px-3 py-2 text-sm"
-              />
-            </label>
-          ) : null}
-
-          <label className="block md:col-span-1">
-            <span className="mb-1 block text-xs font-semibold text-muted-foreground">{t('color_label')}</span>
-            <input
-              type="color"
-              value={draft.color}
-              onChange={(event) => setDraft((prev) => ({ ...prev, color: event.target.value }))}
-              className="h-10 w-full rounded-lg border border-border bg-card p-1"
-            />
-          </label>
-        </div>
-
-        <div className="rounded-lg border border-border bg-card p-2">
-          <p className="mb-2 text-xs font-semibold text-muted-foreground">{t('draw_mode_label')}</p>
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              type="button"
-              onClick={() => setCreateDrawMode('none')}
-              className={`rounded-md border px-2 py-1 text-xs font-semibold ${createDrawMode === 'none' ? 'border-brand-waterline/60 bg-brand-waterline/10' : 'border-border bg-card'}`}
-            >
-              {t('draw_mode_none')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setCreateDrawMode('centroid')}
-              className={`rounded-md border px-2 py-1 text-xs font-semibold ${createDrawMode === 'centroid' ? 'border-brand-waterline/60 bg-brand-waterline/10' : 'border-border bg-card'}`}
-            >
-              {t('draw_mode_pin')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setCreateDrawMode('polygon')}
-              disabled={draft.environmentType === 'home_pot'}
-              className={`rounded-md border px-2 py-1 text-xs font-semibold ${createDrawMode === 'polygon' ? 'border-brand-waterline/60 bg-brand-waterline/10' : 'border-border bg-card'} disabled:opacity-50`}
-            >
-              {t('draw_mode_boundary')}
-            </button>
-          </div>
-          <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
-            <span>
-              {draft.environmentType === 'open_field'
-                ? t('location_required_open_field')
-                : t('location_optional', { environment: environmentLabel(draft) })}
-            </span>
-            <span>{draft.areaSqm ? `${(draft.areaSqm / 10000).toFixed(2)} ha` : t('area_pending')}</span>
-          </div>
-        </div>
-
-        <div
-          data-testid="field-selector-create-map"
-          className="[&_[data-testid='field-map-canvas']]:min-h-0 [&_[data-testid='field-map-canvas']]:h-[340px] md:[&_[data-testid='field-map-canvas']]:h-[440px] xl:[&_[data-testid='field-map-canvas']]:h-[520px]"
-        >
-          <FieldMapCanvas
-            fields={fields}
-            selectedFieldId={primaryFieldId}
-            draftGeometry={draft.geometry}
-            draftCentroid={draft.centroid}
-            drawMode={createDrawMode}
-            riskByFieldId={{}}
-            onSelectField={(fieldId) => {
-              const field = fieldById.get(fieldId);
-              if (!field) return;
-              if (!isSelectable(field)) {
-                handleUnselectableField();
-                return;
-              }
-
-              if (selectedFieldIds.includes(fieldId)) {
-                setPrimary(fieldId);
-                return;
-              }
-
-              onChange({
-                fieldIds: [...selectedFieldIds, fieldId],
-                primaryFieldId: fieldId,
-              });
-            }}
-            onDraftGeometryChange={handleDraftGeometryChange}
-            onDraftCentroidChange={handleDraftCentroidChange}
-            onDrawModeChange={setCreateDrawMode}
-          />
-        </div>
-
-        {createError ? (
-          <p className="text-sm font-semibold text-red-700">{createError}</p>
-        ) : null}
-
-        <div className="flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={resetCreateDraft}
-            disabled={createSaving}
-            className="rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground"
-          >
-            {t('reset')}
-          </button>
-          <button
-            type="button"
-            onClick={handleCreateField}
-            disabled={createSaving}
-            className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
-          >
-            {createSaving ? t('creating') : t('create_submit')}
-          </button>
-        </div>
-      </section>
-
-      {loading ? (
+      {loading && (
         <div className="rounded-lg border border-border bg-secondary/35 px-3 py-4 text-sm text-muted-foreground">
           {t('loading_fields')}
         </div>
-      ) : null}
+      )}
 
-      {error ? (
+      {!loading && error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-700">
           {error}
           <button
@@ -592,15 +432,205 @@ export default function FieldSelector({ value, onChange, onFieldsLoaded }: Field
             {t('retry')}
           </button>
         </div>
-      ) : null}
+      )}
 
-      {!loading && !error && fields.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border bg-secondary/25 px-3 py-4 text-sm text-muted-foreground">
-          {t('empty_fields')}
-        </div>
-      ) : null}
+      {/* Creation Mode */}
+      {!loading && viewMode === 'creation' && (
+        <section
+          className="space-y-3 rounded-xl border border-brand-waterline/35 bg-brand-waterline/8 p-3"
+          data-testid="field-selector-create-panel"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">{t('creator_badge')}</p>
+              <h4 className="text-sm font-semibold text-foreground">{t('creator_title')}</h4>
+              <p className="text-xs text-muted-foreground">{t('creator_hint')}</p>
+            </div>
+            <span className="rounded-full border border-border bg-card px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+              {t('map_engine')}
+            </span>
+          </div>
 
-      {!loading && !error && fields.length > 0 ? (
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+            <label className="block">
+              <span className="mb-1 block text-xs font-semibold text-muted-foreground">{t('name_label')}</span>
+              <input
+                value={draft.name}
+                onChange={(event) => setDraft((prev) => ({ ...prev, name: event.target.value }))}
+                className="control-inset w-full rounded-lg border border-border px-3 py-2 text-sm"
+                placeholder={t('name_placeholder')}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-semibold text-muted-foreground">{t('crop_label')}</span>
+              <input
+                value={draft.crop}
+                onChange={(event) => setDraft((prev) => ({ ...prev, crop: event.target.value }))}
+                className="control-inset w-full rounded-lg border border-border px-3 py-2 text-sm"
+                placeholder={t('crop_placeholder')}
+              />
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
+            <label className="block md:col-span-2">
+              <span className="mb-1 block text-xs font-semibold text-muted-foreground">{t('environment_label')}</span>
+              <select
+                value={draft.environmentType}
+                onChange={(event) => {
+                  const environmentType = event.target.value as 'open_field' | 'greenhouse' | 'home_pot';
+                  setDraft((prev) => ({
+                    ...prev,
+                    environmentType,
+                    containerCount: environmentType === 'home_pot'
+                      ? (prev.containerCount && prev.containerCount > 0 ? prev.containerCount : 1)
+                      : null,
+                  }));
+
+                  if (environmentType === 'open_field' && createDrawMode === 'none') {
+                    setCreateDrawMode('polygon');
+                  }
+
+                  if (environmentType === 'home_pot' && createDrawMode === 'polygon') {
+                    setCreateDrawMode('centroid');
+                  }
+                }}
+                className="control-inset w-full rounded-lg border border-border px-3 py-2 text-sm"
+              >
+                <option value="open_field">{t('environment.open_field')}</option>
+                <option value="greenhouse">{t('environment.greenhouse')}</option>
+                <option value="home_pot">{t('environment.home_pot')}</option>
+              </select>
+            </label>
+
+            {draft.environmentType === 'home_pot' ? (
+              <label className="block md:col-span-1">
+                <span className="mb-1 block text-xs font-semibold text-muted-foreground">{t('pot_count_label')}</span>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={draft.containerCount ?? ''}
+                  onChange={(event) => setDraft((prev) => ({
+                    ...prev,
+                    containerCount: Number.isFinite(Number(event.target.value))
+                      ? Math.max(1, Math.floor(Number(event.target.value)))
+                      : null,
+                  }))}
+                  className="control-inset w-full rounded-lg border border-border px-3 py-2 text-sm"
+                />
+              </label>
+            ) : null}
+
+            <label className="block md:col-span-1">
+              <span className="mb-1 block text-xs font-semibold text-muted-foreground">{t('color_label')}</span>
+              <input
+                type="color"
+                value={draft.color}
+                onChange={(event) => setDraft((prev) => ({ ...prev, color: event.target.value }))}
+                className="h-10 w-full rounded-lg border border-border bg-card p-1"
+              />
+            </label>
+          </div>
+
+          <div className="rounded-lg border border-border bg-card p-2">
+            <p className="mb-2 text-xs font-semibold text-muted-foreground">{t('draw_mode_label')}</p>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setCreateDrawMode('none')}
+                className={`rounded-md border px-2 py-1 text-xs font-semibold ${createDrawMode === 'none' ? 'border-brand-waterline/60 bg-brand-waterline/10' : 'border-border bg-card'}`}
+              >
+                {t('draw_mode_none')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setCreateDrawMode('centroid')}
+                className={`rounded-md border px-2 py-1 text-xs font-semibold ${createDrawMode === 'centroid' ? 'border-brand-waterline/60 bg-brand-waterline/10' : 'border-border bg-card'}`}
+              >
+                {t('draw_mode_pin')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setCreateDrawMode('polygon')}
+                disabled={draft.environmentType === 'home_pot'}
+                className={`rounded-md border px-2 py-1 text-xs font-semibold ${createDrawMode === 'polygon' ? 'border-brand-waterline/60 bg-brand-waterline/10' : 'border-border bg-card'} disabled:opacity-50`}
+              >
+                {t('draw_mode_boundary')}
+              </button>
+            </div>
+            <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
+              <span>
+                {draft.environmentType === 'open_field'
+                  ? t('location_required_open_field')
+                  : t('location_optional', { environment: environmentLabel(draft) })}
+              </span>
+              <span>{draft.areaSqm ? `${(draft.areaSqm / 10000).toFixed(2)} ha` : t('area_pending')}</span>
+            </div>
+          </div>
+
+          <div
+            data-testid="field-selector-create-map"
+            className="[&_[data-testid='field-map-canvas']]:min-h-0 [&_[data-testid='field-map-canvas']]:h-[340px] md:[&_[data-testid='field-map-canvas']]:h-[440px] xl:[&_[data-testid='field-map-canvas']]:h-[520px]"
+          >
+            <FieldMapCanvas
+              fields={fields}
+              selectedFieldId={primaryFieldId}
+              draftGeometry={draft.geometry}
+              draftCentroid={draft.centroid}
+              drawMode={createDrawMode}
+              riskByFieldId={{}}
+              onSelectField={(fieldId) => {
+                const field = fieldById.get(fieldId);
+                if (!field) return;
+                if (!isSelectable(field)) {
+                  handleUnselectableField();
+                  return;
+                }
+
+                if (selectedFieldIds.includes(fieldId)) {
+                  setPrimary(fieldId);
+                  return;
+                }
+
+                onChange({
+                  fieldIds: [...selectedFieldIds, fieldId],
+                  primaryFieldId: fieldId,
+                });
+              }}
+              onDraftGeometryChange={handleDraftGeometryChange}
+              onDraftCentroidChange={handleDraftCentroidChange}
+              onDrawModeChange={setCreateDrawMode}
+            />
+          </div>
+
+          {createError ? (
+            <p className="text-sm font-semibold text-red-700">{createError}</p>
+          ) : null}
+
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={resetCreateDraft}
+              disabled={createSaving}
+              className="rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground"
+            >
+              {t('reset')}
+            </button>
+            <button
+              type="button"
+              onClick={handleCreateField}
+              disabled={createSaving}
+              className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+            >
+              {createSaving ? t('creating') : t('create_submit')}
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* Selection Mode */}
+      {!loading && viewMode === 'selection' && fields.length > 0 && (
         <div className="space-y-3">
           <div
             data-testid="field-selector-browse-map"
@@ -631,8 +661,8 @@ export default function FieldSelector({ value, onChange, onFieldsLoaded }: Field
                   primaryFieldId: fieldId,
                 });
               }}
-              onDraftGeometryChange={() => {}}
-              onDraftCentroidChange={() => {}}
+              onDraftGeometryChange={() => { }}
+              onDraftCentroidChange={() => { }}
             />
           </div>
 
@@ -706,7 +736,7 @@ export default function FieldSelector({ value, onChange, onFieldsLoaded }: Field
             })}
           </div>
         </div>
-      ) : null}
+      )}
 
       {selectedFieldIds.length > 0 && primaryFieldId ? (
         <p className="text-xs text-muted-foreground">

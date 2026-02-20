@@ -579,7 +579,9 @@
         "collapse": "Hide details",
         "thinking": "Thinking...",
         "empty": "No trace steps yet.",
-        "summary": "{count} trace steps"
+        "summary": "{count} trace steps",
+        "thought_duration": "Thought for {seconds} seconds",
+        "thought": "Thought"
       },
       "artifacts": {
         "plan_title": "Change plan detected",
@@ -1544,6 +1546,8 @@
       "not_schedulable": "Not schedulable",
       "primary_summary": "Primary field: {name}",
       "primary_required": "Select at least one field.",
+      "switch_to_selection": "Select from existing fields",
+      "switch_to_creation": "Create new field",
       "environment": {
         "open_field": "Open field",
         "greenhouse": "Greenhouse",
