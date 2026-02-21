@@ -559,8 +559,17 @@
         "reschedule": "Reworking schedule...",
         "task_update": "Updating task...",
         "activity_log": "Logging activity...",
+        "task_list": "Checking schedule...",
+        "project_summary": "Checking project info...",
+        "field_status": "Checking field status...",
+        "activity_search": "Searching past logs...",
+        "crop_knowledge": "Checking knowledge base...",
+        "diagnosis_agent": "Analyzing image...",
+        "reschedule_agent": "Rebuilding plan...",
+        "activity_agent": "Organizing logs...",
         "web_search": "Searching the web...",
-        "processing": "Processing..."
+        "processing": "Processing...",
+        "error": "Error"
       },
       "confirmations": {
         "task_created": "Added to schedule",

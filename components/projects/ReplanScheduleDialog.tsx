@@ -121,6 +121,7 @@ export default function ReplanScheduleDialog({
   const [submitting, setSubmitting] = useState(false);
   const [processingStatus, setProcessingStatus] = useState<ScheduleProcessingStatus | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [schedulingStartDate, setSchedulingStartDate] = useState(() => new Date().toISOString().split('T')[0]);
 
   const activeTemplates = useMemo(
     () => templates.filter((template) => (template.status ?? 'active') === 'active'),
@@ -287,7 +288,7 @@ export default function ReplanScheduleDialog({
             notes: project.notes,
           },
           plantingDate: startDate,
-          currentDate: new Date().toISOString().split('T')[0],
+          currentDate: schedulingStartDate,
         }
         : {
           projectId: project.id,
@@ -303,7 +304,7 @@ export default function ReplanScheduleDialog({
             targetHarvestDate: project.targetHarvestDate || '',
             notes: project.notes,
           },
-          currentDate: new Date().toISOString().split('T')[0],
+          currentDate: schedulingStartDate,
         };
 
       const generationResponse = await fetch(endpoint, {
@@ -442,6 +443,20 @@ export default function ReplanScheduleDialog({
                 placeholder={t('replan_dialog.note_placeholder')}
               />
             </label>
+          </div>
+
+          <div className="mb-4">
+            <label className="text-xs font-medium text-muted-foreground">
+              スケジュール開始日
+              <input
+                type="date"
+                value={schedulingStartDate}
+                onChange={(event) => setSchedulingStartDate(event.target.value)}
+                className="control-inset mt-1 w-full px-3 py-2 text-sm"
+                data-testid="replan-scheduling-start-date"
+              />
+            </label>
+            <p className="mt-1 text-xs text-muted-foreground">スケジュールの起点となる日付を選択できます（デフォルト：今日）</p>
           </div>
 
           <ScheduleConstraintForm

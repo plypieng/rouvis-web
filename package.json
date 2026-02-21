@@ -34,6 +34,7 @@
     "@turf/area": "^7.3.4",
     "@turf/boolean-point-in-polygon": "^7.3.4",
     "@turf/centroid": "^7.3.4",
+    "@vercel/blob": "^2.3.0",
     "ai": "^5.0.102",
     "autoprefixer": "^10.4.17",
     "axios": "^1.6.7",
@@ -71,10 +72,10 @@
     "eslint": "^9.39.1",
     "eslint-config-next": "^16.0.10",
     "playwright": "^1.56.1",
-    "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^4.0.16",
     "prisma": "5.22.0",
-    "typescript": "^5.2.2"
+    "typescript": "^5.2.2",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^4.0.16"
   },
   "optionalDependencies": {
     "@next/swc-darwin-arm64": "^16.0.10",

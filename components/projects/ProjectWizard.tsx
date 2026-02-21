@@ -338,6 +338,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
         () => normalizeAdvancedConstraints()
     );
     const [showAdvancedConstraints, setShowAdvancedConstraints] = useState(false);
+    const [schedulingStartDate, setSchedulingStartDate] = useState(() => new Date().toISOString().split('T')[0]);
 
     const activeTemplates = useMemo(
         () => preferenceTemplates.filter((template) => (template.status ?? 'active') === 'active'),
@@ -518,7 +519,7 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                     notes: cropAnalysis.notes,
                 },
                 plantingDate: effectivePlantingDate,
-                currentDate: new Date().toISOString().split('T')[0],
+                currentDate: schedulingStartDate,
             }
             : {
                 projectId,
@@ -528,11 +529,11 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                 cropAnalysis: {
                     crop: cropAnalysis.crop,
                     variety: cropAnalysis.variety,
-                    startDate: cropAnalysis.startDate || new Date().toISOString().split('T')[0],
+                    startDate: cropAnalysis.startDate || schedulingStartDate,
                     targetHarvestDate: cropAnalysis.targetHarvestDate || '',
                     notes: cropAnalysis.notes,
                 },
-                currentDate: new Date().toISOString().split('T')[0],
+                currentDate: schedulingStartDate,
             };
 
         const scheduleResponse = await fetch(endpoint, {
@@ -1089,6 +1090,19 @@ export default function ProjectWizard({ locale }: { locale: string }) {
                         setAvailableFields(fields);
                     }}
                 />
+                <div className="surface-base px-4 py-3">
+                    <label className="text-xs font-medium text-muted-foreground">
+                        スケジュール開始日
+                        <input
+                            type="date"
+                            value={schedulingStartDate}
+                            onChange={(e) => setSchedulingStartDate(e.target.value)}
+                            className="control-inset mt-1 w-full px-3 py-2 text-sm"
+                            data-testid="scheduling-start-date"
+                        />
+                    </label>
+                    <p className="mt-1 text-xs text-muted-foreground">スケジュールの起点となる日付を選択できます（デフォルト：今日）</p>
+                </div>
                 <ScheduleConstraintForm
                     templates={preferenceTemplates}
                     templatesLoading={templatesLoading}

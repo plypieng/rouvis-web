@@ -110,11 +110,24 @@ interface RouvisChatKitProps {
 const FRIENDLY_STATUS_KEYS: Record<string, string> = {
   'planner': 'cockpit.status.planner',
   'jma.getForecast': 'cockpit.status.weather',
+  'get_weather_forecast': 'cockpit.status.weather',
   'plant_doctor.diagnose': 'cockpit.status.diagnosis',
+  'run_plant_doctor': 'cockpit.status.diagnosis_agent',
+  'create_task': 'cockpit.status.task_create',
   'scheduler.createTask': 'cockpit.status.task_create',
+  'list_tasks': 'cockpit.status.task_list',
   'scheduler.reschedulePlan': 'cockpit.status.reschedule',
+  'run_reschedule_planner': 'cockpit.status.reschedule_agent',
+  'update_task': 'cockpit.status.task_update',
   'scheduler.updateTask': 'cockpit.status.task_update',
+  'log_activity': 'cockpit.status.activity_log',
   'activities.log': 'cockpit.status.activity_log',
+  'activities.analyzer': 'cockpit.status.activity_log',
+  'run_activity_analyzer': 'cockpit.status.activity_agent',
+  'get_project_summary': 'cockpit.status.project_summary',
+  'get_field_status': 'cockpit.status.field_status',
+  'search_activities': 'cockpit.status.activity_search',
+  'get_crop_knowledge': 'cockpit.status.crop_knowledge',
   'web_search': 'cockpit.status.web_search',
 };
 const TRACE_EXPANDED_MAX_STEPS = 5;
@@ -791,7 +804,18 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
             // Simple status update (no complex thinking UI)
             if (event.type === 'tool_call_delta' && event.delta?.tool) {
               const statusKey = FRIENDLY_STATUS_KEYS[event.delta.tool];
-              const friendlyStatus = statusKey ? t(statusKey) : t('cockpit.status.processing');
+              const isError = event.delta.status === 'error';
+
+              // Prefer backend message if it's an error or if no status key exists
+              let friendlyStatus = '';
+              if (isError) {
+                const base = statusKey ? t(statusKey) : t('cockpit.status.processing');
+                const detail = event.delta.message || t('cockpit.status.error');
+                friendlyStatus = `${base} (${detail})`;
+              } else {
+                friendlyStatus = statusKey ? t(statusKey) : (event.delta.message || t('cockpit.status.processing'));
+              }
+
               setCurrentStatus(prev => (prev === friendlyStatus ? prev : friendlyStatus));
             }
 
