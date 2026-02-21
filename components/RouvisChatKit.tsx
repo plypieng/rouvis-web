@@ -975,23 +975,6 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     t,
   ]);
 
-  const submitIntentFeedback = useCallback((feedbackType: 'misroute' | 'language' | 'verbosity') => {
-    if (feedbackType === 'misroute') {
-      void sendMessage('/feedback misroute ui-control', undefined, { skipUserMessage: true });
-      return;
-    }
-
-    if (feedbackType === 'language') {
-      const nextLanguage: AssistantLanguage = assistantLanguage === 'ja' ? 'en' : 'ja';
-      setAssistantLanguage(nextLanguage);
-      void sendMessage(`/feedback language ${nextLanguage}`, undefined, { skipUserMessage: true });
-      return;
-    }
-
-    setAssistantVerbosity('short');
-    void sendMessage('/feedback verbosity short', undefined, { skipUserMessage: true });
-  }, [assistantLanguage, sendMessage]);
-
   const confirmPendingMutation = useCallback(() => {
     if (!pendingMutationApproval || isLoading) return;
     void sendMessage('', undefined, {
@@ -1346,43 +1329,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
           </p>
         )}
 
-        {showIntentDebug && intentPolicyDebug && (
-          <div className="pl-1 text-[11px] text-muted-foreground space-y-1" data-testid="intent-policy-debug">
-            <span className="block">
-              policy={intentPolicyDebug.responsePolicy} intent={intentPolicyDebug.primaryIntent}
-              {typeof intentPolicyDebug.confidence === 'number'
-                ? ` confidence=${Math.round(intentPolicyDebug.confidence * 100)}%`
-                : ''}
-              {intentPolicyDebug.clarificationRequired ? ' clarify=true' : ''}
-            </span>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                className="underline hover:no-underline"
-                disabled={isLoading}
-                onClick={() => submitIntentFeedback('misroute')}
-              >
-                wrong intent
-              </button>
-              <button
-                type="button"
-                className="underline hover:no-underline"
-                disabled={isLoading}
-                onClick={() => submitIntentFeedback('language')}
-              >
-                {assistantLanguage === 'ja' ? 'switch to English' : '日本語に切替'}
-              </button>
-              <button
-                type="button"
-                className="underline hover:no-underline"
-                disabled={isLoading}
-                onClick={() => submitIntentFeedback('verbosity')}
-              >
-                too long
-              </button>
-            </div>
-          </div>
-        )}
+        {/* Removed Intent Policy Debug Block */}
 
         {standoutMode && (activeHandshake || commandArtifacts.length > 0) && (
           <section className="space-y-2" data-testid="command-artifact-timeline">
@@ -1492,34 +1439,6 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
 
       {/* Input Area */}
       <div className={`border-t border-border ${chatMode !== 'default' ? modeConfig.bg : ''}`}>
-        {messages.length > 0 && (
-          <div className="px-4 pt-3 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              disabled={isLoading}
-              onClick={() => submitIntentFeedback('misroute')}
-              className="rounded-full border border-border/70 px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-50"
-            >
-              {assistantLanguage === 'ja' ? '意図が違う' : 'Wrong intent'}
-            </button>
-            <button
-              type="button"
-              disabled={isLoading}
-              onClick={() => submitIntentFeedback('language')}
-              className="rounded-full border border-border/70 px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-50"
-            >
-              {assistantLanguage === 'ja' ? '英語で返答' : 'Reply in Japanese'}
-            </button>
-            <button
-              type="button"
-              disabled={isLoading}
-              onClick={() => submitIntentFeedback('verbosity')}
-              className="rounded-full border border-border/70 px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-50"
-            >
-              {assistantLanguage === 'ja' ? '短くして' : 'Too long'}
-            </button>
-          </div>
-        )}
 
         {pendingMutationApproval && (
           <div className="px-4 pt-3">
@@ -1574,9 +1493,9 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
           </div>
         )}
 
-        {/* Quick Suggestions (Compact Grid) */}
+        {/* Quick Suggestions (Vertical Stack) */}
         {(messages.length === 0 || customSuggestions) && !isLoading && (
-          <div className="grid grid-cols-2 gap-2 px-4 pt-3 pb-2">
+          <div className="flex flex-col gap-2 px-4 pt-3 pb-2">
             {suggestions.map((s) => (
               <button
                 key={s.label}
@@ -1601,11 +1520,11 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
                     setCustomSuggestions(null); // Clear after selection
                   }
                 }}
-                className={`w-full text-left px-3 py-2 text-xs font-medium bg-background border border-border/60 hover:border-primary/50 hover:bg-muted/50 rounded-md transition-all flex items-center justify-between group ${s.isCancel ? 'text-muted-foreground' : 'text-foreground'}`}
+                className={`w-full text-left px-4 py-2.5 text-xs font-medium bg-background border border-border/60 shadow-sm hover:border-primary/50 hover:bg-muted/50 rounded-lg transition-all flex items-center justify-between group ${s.isCancel ? 'text-muted-foreground' : 'text-foreground'}`}
               >
                 <span className="truncate">{s.label}</span>
                 {!s.isCancel && (
-                  <ArrowRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-primary transition-colors" />
+                  <ArrowRight className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-primary transition-colors" />
                 )}
               </button>
             ))}
