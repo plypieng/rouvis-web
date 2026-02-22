@@ -60,6 +60,13 @@ interface PendingMutationApproval {
   expiresAt?: string;
 }
 
+interface AgentYieldState {
+  token: string;
+  question: string;
+  options?: string[];
+  requiresConfirmation?: boolean;
+}
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -71,6 +78,7 @@ interface Message {
   source?: string;
   hasError?: boolean;
   createdAt?: string;
+  yieldState?: AgentYieldState;
 }
 
 type IntentPolicyDebugState = {
@@ -671,11 +679,13 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
       mutationApprovalToken?: string;
       allowMutations?: boolean;
       skipUserMessage?: boolean;
+      yieldToken?: string;
+      yieldAnswer?: string;
     }
   ) => {
     const trimmedContent = content.trim();
     const hasApprovalPayload = Boolean(options?.mutationApprovalToken);
-    if ((!trimmedContent && !selectedImage && !hasApprovalPayload) || isLoading) return;
+    if ((!trimmedContent && !selectedImage && !hasApprovalPayload && !options?.yieldToken) || isLoading) return;
     let assistantRawContent = '';
     let assistantFailed = false;
     lastAssistantRawRef.current = '';
@@ -755,6 +765,8 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
           assistantVerbosity,
           mutationApprovalToken: options?.mutationApprovalToken,
           allowMutations: options?.allowMutations === true,
+          yieldToken: options?.yieldToken,
+          yieldAnswer: options?.yieldAnswer,
         }),
       });
 
@@ -938,6 +950,22 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
               ));
             }
 
+            if (event.type === 'custom_ui' && event.data?.type === 'agent_yield') {
+              const rawOptions = event.data.options;
+              const yieldState: AgentYieldState = {
+                token: event.data.token || '',
+                question: event.data.question || '',
+                options: Array.isArray(rawOptions)
+                  ? rawOptions.map(opt => typeof opt === 'string' ? opt : (opt.label || opt.value || ''))
+                  : undefined,
+                requiresConfirmation: event.data.requiresConfirmation,
+              };
+
+              setMessages(prev => prev.map(m =>
+                m.id === assistantId ? { ...m, yieldState } : m
+              ));
+            }
+
             // Diagnosis Result
             if (event.type === 'diagnosis_result') {
               onDiagnosisComplete?.(event.result);
@@ -1070,6 +1098,20 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   const cancelPendingMutation = useCallback(() => {
     setPendingMutationApproval(null);
   }, []);
+
+  const handleYieldResponse = useCallback(async (token: string, answer: string) => {
+    // Clear the yield state from the assistant message that presented it
+    setMessages(prev => prev.map(m =>
+      m.yieldState && m.yieldState.token === token ? { ...m, yieldState: undefined } : m
+    ));
+    // Send the response back to the agent
+    await sendMessage('', undefined, {
+      skipUserMessage: true, // This is an agent response, not a new user message
+      yieldToken: token,
+      yieldAnswer: answer,
+      allowMutations: true,
+    });
+  }, [sendMessage]);
 
   const runRescheduleQuickApply = useCallback(async (
     options: { prompt: string; confirmMessage?: string }
@@ -1382,6 +1424,51 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
                     {stripHiddenBlocks(message.content)}
                   </ReactMarkdown>
                 </div>
+
+                {message.yieldState && !isLoading && (
+                  <div className="mt-4 p-4 rounded-xl glass-morphism border-primary/20 shadow-sm animate-scaleIn space-y-4">
+                    <div className="flex items-start gap-2.5">
+                      <div className="mt-1 p-1 bg-primary/10 rounded-full">
+                        <Brain className="w-3.5 h-3.5 text-primary" />
+                      </div>
+                      <p className="text-sm font-medium text-foreground leading-relaxed">
+                        {message.yieldState.question}
+                      </p>
+                    </div>
+
+                    {message.yieldState.options && message.yieldState.options.length > 0 && (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {message.yieldState.options.map((option, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => handleYieldResponse(message.yieldState!.token, option)}
+                            className="bg-primary/5 hover:bg-primary/15 text-primary text-xs font-semibold px-4 py-2 rounded-full border border-primary/20 transition-smooth hover-lift"
+                          >
+                            {option}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {message.yieldState.requiresConfirmation && (!message.yieldState.options || message.yieldState.options.length === 0) && (
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          onClick={() => handleYieldResponse(message.yieldState!.token, 'Confirm')}
+                          className="bg-primary hover:bg-primary-hover text-white text-xs font-bold px-5 py-2 rounded-lg transition-smooth hover-lift shadow-sm flex items-center gap-1.5"
+                        >
+                          {assistantLanguage === 'ja' ? '確定する' : 'Confirm'}
+                          <ArrowRight className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => handleYieldResponse(message.yieldState!.token, 'Cancel')}
+                          className="bg-secondary hover:bg-muted text-secondary-foreground text-xs font-semibold px-5 py-2 rounded-lg transition-smooth border border-border"
+                        >
+                          {assistantLanguage === 'ja' ? 'キャンセル' : 'Cancel'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Retry for errors */}
                 {message.hasError && !isLoading && (

@@ -47,6 +47,8 @@ export type ChatkitEvent = {
     summary?: string;
     expiresAt?: string;
     action?: string;
+    question?: string;
+    requiresConfirmation?: boolean;
     guidance?: string[];
     severity?: 'low' | 'medium' | 'high';
     responsePolicy?: 'casual' | 'assistive' | 'workflow' | 'deep';
