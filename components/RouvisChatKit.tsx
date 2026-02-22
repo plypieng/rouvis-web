@@ -993,6 +993,23 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
                   expiresAt: event.data.expiresAt,
                 });
               }
+              if (event.data.type === 'blackboard_update') {
+                const step: ReasoningTraceStep = {
+                  stepId: `blackboard_${Date.now()}`,
+                  phase: 'tooling',
+                  status: 'completed',
+                  title: assistantLanguage === 'ja' ? '記憶を更新しました (Blackboard)' : 'Memory Updated',
+                  detail: event.data.reason || JSON.stringify((event.data as any).updates),
+                  sourceEvent: 'tool_call_delta',
+                  timestamp: new Date().toISOString(),
+                };
+                pushReasoningTraceStep(step);
+                setMessages(prev => prev.map(m => {
+                  if (m.id !== assistantId) return m;
+                  const newSteps = [...(m.reasoningSteps || []), step];
+                  return { ...m, reasoningSteps: newSteps, reasoningEndTime: Date.now() };
+                }));
+              }
               if (event.data.type === 'diagnosis_retake_required') {
                 setCustomSuggestions([
                   {
