@@ -42,6 +42,7 @@ export type ReasoningTraceStep = {
   title: string;
   detail?: string;
   tool?: string;
+  toolCallId?: string;
   confidence?: number;
   sourceEvent: ReasoningTraceSourceEvent;
   timestamp: string;

@@ -61,6 +61,7 @@ export type ChatkitEvent = {
   title?: string;
   detail?: string;
   tool?: string;
+  toolCallId?: string;
   confidence?: number;
   sourceEvent?: ReasoningTraceSourceEvent;
   timestamp?: string;
@@ -156,6 +157,7 @@ function toReasoningTraceStep(event: ChatkitEvent): ReasoningTraceStep | null {
     title: event.title,
     detail: typeof event.detail === 'string' ? event.detail : undefined,
     tool: typeof event.tool === 'string' ? event.tool : undefined,
+    toolCallId: typeof event.toolCallId === 'string' ? event.toolCallId : undefined,
     confidence: typeof event.confidence === 'number' ? event.confidence : undefined,
     sourceEvent: event.sourceEvent,
     timestamp: coerceTraceTimestamp(event.timestamp),
@@ -240,6 +242,7 @@ export function traceSummaryToArtifacts(summary: ReasoningTraceSummary | null): 
       stepId: step.stepId,
       status: step.status,
       tool: step.tool,
+      toolCallId: step.toolCallId,
       sourceEvent: step.sourceEvent,
       confidence: step.confidence,
     },
@@ -292,6 +295,7 @@ export function createArtifactFromStreamEvent(event: ChatkitEvent): CommandArtif
         stepId: step.stepId,
         status: step.status,
         tool: step.tool,
+        toolCallId: step.toolCallId,
         sourceEvent: step.sourceEvent,
         confidence: step.confidence,
       },

@@ -241,20 +241,78 @@ function ReasoningAccordion({
       </button>
 
       {isExpanded && steps.length > 0 && (
-        <div className="mt-2 space-y-2 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200">
-          {steps.map((step) => (
-            <div key={step.stepId} className="text-[12px] leading-relaxed">
-              <div className="flex items-center gap-1.5 font-medium text-foreground/80">
-                <div className={`w-1.5 h-1.5 rounded-full ${step.status === 'completed' ? 'bg-green-500' : step.status === 'error' ? 'bg-red-500' : 'bg-amber-500 animate-pulse'}`} />
-                {step.title}
+        <div className="mt-2 space-y-3 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200">
+          {/* Grouping by toolCallId if many, or just list if few */}
+          {(() => {
+            const hasManyParallel = new Set(steps.map(s => s.toolCallId).filter(Boolean)).size > 1;
+
+            if (!hasManyParallel) {
+              return steps.map((step) => (
+                <div key={step.stepId} className="text-[12px] leading-relaxed">
+                  <div className="flex items-center gap-1.5 font-medium text-foreground/80">
+                    <div className={`w-1.5 h-1.5 rounded-full ${step.status === 'completed' ? 'bg-green-500' : step.status === 'error' ? 'bg-red-500' : 'bg-amber-500 animate-pulse'}`} />
+                    {step.title}
+                  </div>
+                  {step.detail && (
+                    <p className="mt-0.5 text-muted-foreground pl-3 border-l border-border/30 ml-0.5">
+                      {step.detail}
+                    </p>
+                  )}
+                </div>
+              ));
+            }
+
+            // Group by toolCallId for parallel visualization
+            const groups: Record<string, ReasoningTraceStep[]> = {};
+            const globalSteps: ReasoningTraceStep[] = [];
+
+            steps.forEach(s => {
+              if (s.toolCallId) {
+                if (!groups[s.toolCallId]) groups[s.toolCallId] = [];
+                groups[s.toolCallId].push(s);
+              } else {
+                globalSteps.push(s);
+              }
+            });
+
+            return (
+              <div className="space-y-3">
+                {globalSteps.map(step => (
+                  <div key={step.stepId} className="text-[12px]">
+                    <div className="flex items-center gap-1.5 font-medium">
+                      <div className={`w-1.5 h-1.5 rounded-full ${step.status === 'completed' ? 'bg-green-500' : 'bg-amber-500 animate-pulse'}`} />
+                      {step.title}
+                    </div>
+                  </div>
+                ))}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {Object.entries(groups).map(([id, groupSteps]) => {
+                    const lastStep = groupSteps[groupSteps.length - 1];
+                    const toolName = lastStep.tool || 'Agent';
+                    return (
+                      <div key={id} className="p-2 rounded bg-muted/30 border border-border/40">
+                        <div className="flex items-center gap-1.5 mb-1 px-1">
+                          <Brain className="w-3 h-3 text-muted-foreground" />
+                          <span className="text-[10px] uppercase tracking-wider font-bold opacity-60">{toolName}</span>
+                        </div>
+                        <div className="space-y-1.5">
+                          {groupSteps.slice(-2).map(step => (
+                            <div key={step.stepId} className="text-[11px] leading-tight">
+                              <div className="flex items-center gap-1.5 font-medium">
+                                <div className={`w-1 h-1 rounded-full ${step.status === 'completed' ? 'bg-green-500' : 'bg-amber-500 animate-pulse'}`} />
+                                <span className="truncate">{step.title}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-              {step.detail && (
-                <p className="mt-0.5 text-muted-foreground pl-3 border-l border-border/30 ml-0.5">
-                  {step.detail}
-                </p>
-              )}
-            </div>
-          ))}
+            );
+          })()}
         </div>
       )}
     </div>
@@ -758,6 +816,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
                 title: event.title,
                 detail: typeof event.detail === 'string' ? event.detail : undefined,
                 tool: typeof event.tool === 'string' ? event.tool : undefined,
+                toolCallId: typeof event.toolCallId === 'string' ? event.toolCallId : undefined,
                 confidence: typeof event.confidence === 'number' ? event.confidence : undefined,
                 sourceEvent: event.sourceEvent as ReasoningTraceStep['sourceEvent'],
                 timestamp: event.timestamp,
