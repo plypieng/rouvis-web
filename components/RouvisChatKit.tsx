@@ -67,6 +67,13 @@ interface AgentYieldState {
   requiresConfirmation?: boolean;
 }
 
+type BackgroundWorkerRun = {
+  id: string;
+  intent: string;
+  state: 'queued' | 'running' | 'succeeded' | 'failed';
+  queuedAt?: string;
+};
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -374,6 +381,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   const [assistantVerbosity, setAssistantVerbosity] = useState<AssistantVerbosity>('balanced');
   const [pendingMutationApproval, setPendingMutationApproval] = useState<PendingMutationApproval | null>(null);
   const [streamTokenSeq, setStreamTokenSeq] = useState(0);
+  const [pendingBackgroundRuns, setPendingBackgroundRuns] = useState<BackgroundWorkerRun[]>([]);
 
   const [threadList, setThreadList] = useState<ThreadInfo[]>([]);
   const [isThreadListOpen, setIsThreadListOpen] = useState(false);
@@ -515,6 +523,33 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     }
   }, [projectId]);
 
+  const refreshBackgroundWorkerRuns = useCallback(async (options?: { refresh?: boolean }) => {
+    if (!threadId) {
+      setPendingBackgroundRuns([]);
+      return;
+    }
+
+    try {
+      const params = new URLSearchParams();
+      params.set('threadId', threadId);
+      params.set('limit', '6');
+      if (options?.refresh) {
+        params.set('refresh', '1');
+      }
+
+      const res = await fetch(`/api/v1/agents/background-workers/runs?${params.toString()}`);
+      if (!res.ok) return;
+
+      const data = await res.json().catch(() => ({})) as { runs?: BackgroundWorkerRun[] };
+      const runs = Array.isArray(data.runs) ? data.runs : [];
+      setPendingBackgroundRuns(
+        runs.filter((run) => run.state === 'queued' || run.state === 'running')
+      );
+    } catch (error) {
+      console.warn('Failed to fetch background worker runs:', error);
+    }
+  }, [threadId]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -536,6 +571,22 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
       cancelled = true;
     };
   }, [fetchThreadList]);
+
+  useEffect(() => {
+    if (!threadId) {
+      setPendingBackgroundRuns([]);
+      return;
+    }
+
+    void refreshBackgroundWorkerRuns();
+    const timer = window.setInterval(() => {
+      void refreshBackgroundWorkerRuns({ refresh: true });
+    }, 15000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [refreshBackgroundWorkerRuns, threadId]);
 
   // Load chat history on mount
   useEffect(() => {
@@ -1021,6 +1072,9 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
                   },
                 ]);
               }
+              if (event.data.type === 'background_worker_queued') {
+                void refreshBackgroundWorkerRuns();
+              }
               if (event.data.type === 'refresh_tasks') {
                 onTaskUpdate?.();
               }
@@ -1072,6 +1126,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
       hasFirstAssistantTokenRef.current = false;
       lastAssistantRawRef.current = assistantRawContent;
       lastAssistantFailedRef.current = assistantFailed;
+      void refreshBackgroundWorkerRuns();
       setIsLoading(false);
       setTraceExpanded(false);
       setCurrentStatus('');
@@ -1095,6 +1150,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     onTaskUpdate,
     onDiagnosisComplete,
     onDraftCreate,
+    refreshBackgroundWorkerRuns,
     chatMode,
     publishHandshake,
     pushArtifact,
@@ -1514,6 +1570,47 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
           <p className="text-sm text-muted-foreground animate-pulse pl-1" data-testid="streaming-indicator">
             {currentStatus}
           </p>
+        )}
+
+        {pendingBackgroundRuns.length > 0 && (
+          <section
+            className="rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-900"
+            data-testid="pending-background-jobs"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-semibold">
+                {assistantLanguage === 'ja' ? '保留中ジョブ' : 'Pending jobs'}
+              </p>
+              <p className="text-[11px] font-semibold">
+                {pendingBackgroundRuns.length}
+              </p>
+            </div>
+            <div className="mt-2 space-y-1.5">
+              {pendingBackgroundRuns.slice(0, 3).map((run) => (
+                <div
+                  key={run.id}
+                  className="rounded-md border border-amber-200/80 bg-white/70 px-2 py-1.5"
+                  data-testid="pending-background-job"
+                >
+                  <p className="font-medium">{run.intent}</p>
+                  <p className="text-[11px] opacity-85">
+                    {assistantLanguage === 'ja' ? '実行状態' : 'Status'}: {run.state}
+                  </p>
+                  {run.queuedAt ? (
+                    <p className="text-[11px] opacity-75">
+                      {new Intl.DateTimeFormat(locale, {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      }).format(new Date(run.queuedAt))}
+                    </p>
+                  ) : null}
+                  <p className="text-[10px] opacity-65">#{run.id.slice(0, 8)}</p>
+                </div>
+              ))}
+            </div>
+          </section>
         )}
 
         {/* Removed Intent Policy Debug Block */}
