@@ -12,15 +12,19 @@ import {
   isToday,
   startOfMonth,
 } from 'date-fns';
-import { useMonthWeather } from '@/hooks/useMonthWeather';
+import {
+  getWeatherDayRisk,
+  weatherIconForDay,
+  type WeatherTimelineDayData,
+} from '@/lib/weather-timeline';
 import type { ProjectTaskItem } from '@/types/project-cockpit';
 
 interface MonthGridProps {
-  projectId?: string;
   currentDate: Date;
   selectedDate: Date;
   onSelectDate: (date: Date) => void;
   tasks: ProjectTaskItem[];
+  weatherData: Record<string, WeatherTimelineDayData>;
   startDate: string;
   targetHarvestDate?: string;
   activeDragTaskId?: string | null;
@@ -77,7 +81,7 @@ type DayCellProps = {
   dateKey: string;
   selectedDate: Date;
   onSelectDate: (date: Date) => void;
-  weather?: { temperature: { min: number; max: number } };
+  weatherDay?: WeatherTimelineDayData;
   isStart: boolean;
   isHarvest: boolean;
   dayTasks: ProjectTaskItem[];
@@ -91,7 +95,7 @@ function DayCell({
   dateKey,
   selectedDate,
   onSelectDate,
-  weather,
+  weatherDay,
   isStart,
   isHarvest,
   dayTasks,
@@ -106,17 +110,34 @@ function DayCell({
 
   const isSelected = isSameDay(day, selectedDate);
   const hasActiveDrag = Boolean(activeDragTaskId);
+  const weatherRisk = getWeatherDayRisk(weatherDay);
+  const weatherIcon = weatherIconForDay(weatherDay);
+  const hasRainRisk = weatherRisk === 'rainy';
+  const dragRingClass = hasActiveDrag && isOver
+    ? hasRainRisk
+      ? 'bg-destructive/10 ring-2 ring-destructive/50'
+      : 'bg-brand-seedling/15 ring-2 ring-brand-seedling/55'
+    : '';
+  const weatherOverlayClass = hasRainRisk
+    ? 'bg-brand-waterline/20 bg-[repeating-linear-gradient(-45deg,rgba(14,116,144,0.18)_0,rgba(14,116,144,0.18)_6px,rgba(255,255,255,0)_6px,rgba(255,255,255,0)_12px)]'
+    : weatherRisk === 'watch'
+      ? 'bg-brand-waterline/10'
+      : '';
 
   return (
     <button
       type="button"
       ref={setNodeRef}
+      data-testid="project-calendar-day"
+      data-date={dateKey}
+      data-weather-risk={weatherRisk}
+      data-weather-precip={weatherDay ? Math.round(weatherDay.precipProbability) : undefined}
       onClick={() => onSelectDate(day)}
       className={`flex min-h-[98px] flex-col border-b border-r border-border/70 p-1.5 text-left transition ${
         isSelected
           ? 'bg-brand-waterline/10 ring-1 ring-inset ring-brand-waterline/55'
           : 'bg-card hover:bg-secondary/40'
-      } ${isToday(day) ? 'border-brand-seedling/55' : ''} ${hasActiveDrag && isOver ? 'bg-brand-seedling/15 ring-2 ring-brand-seedling/55' : ''}`}
+      } ${weatherOverlayClass} ${isToday(day) ? 'border-brand-seedling/55' : ''} ${dragRingClass}`}
       aria-label={t('drop_target_label', { date: format(day, 'M/d') })}
     >
       <div className="mb-1 flex items-start justify-between gap-1">
@@ -133,10 +154,22 @@ function DayCell({
         </span>
 
         <div className="flex items-center gap-1">
-          {weather ? (
-            <span className="text-[10px] font-medium text-muted-foreground">
-              {Math.round(weather.temperature.max)}°/{Math.round(weather.temperature.min)}°
-            </span>
+          {weatherDay ? (
+            <>
+              <span className="material-symbols-outlined text-[13px] text-muted-foreground" data-testid="project-calendar-weather-icon">
+                {weatherIcon}
+              </span>
+              <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                hasRainRisk ? 'bg-destructive/15 text-destructive' : 'bg-secondary text-muted-foreground'
+              }`}>
+                {Math.round(weatherDay.precipProbability)}%
+              </span>
+              {weatherDay.temperature ? (
+                <span className="text-[10px] font-medium text-muted-foreground">
+                  {Math.round(weatherDay.temperature.max)}°/{Math.round(weatherDay.temperature.min)}°
+                </span>
+              ) : null}
+            </>
           ) : null}
           {isStart ? <span className="material-symbols-outlined text-[14px] text-brand-seedling" title={t('start_date')}>flag</span> : null}
           {isHarvest ? <span className="material-symbols-outlined text-[14px] text-risk-warning" title={t('harvest_date')}>agriculture</span> : null}
@@ -158,7 +191,9 @@ function DayCell({
           </p>
         ) : null}
         {hasActiveDrag && isOver ? (
-          <p className="text-[10px] font-semibold text-brand-seedling">{t('drop_hint')}</p>
+          <p className={`text-[10px] font-semibold ${hasRainRisk ? 'text-destructive' : 'text-brand-seedling'}`}>
+            {hasRainRisk ? t('drop_hint_rain') : t('drop_hint')}
+          </p>
         ) : null}
       </div>
     </button>
@@ -166,11 +201,11 @@ function DayCell({
 }
 
 export default function MonthGrid({
-  projectId,
   currentDate,
   selectedDate,
   onSelectDate,
   tasks,
+  weatherData,
   startDate,
   targetHarvestDate,
   activeDragTaskId = null,
@@ -185,10 +220,6 @@ export default function MonthGrid({
 
   const projectStart = new Date(startDate);
   const projectEnd = targetHarvestDate ? new Date(targetHarvestDate) : null;
-
-  const { data: weatherData } = useMonthWeather(monthStart.getFullYear(), monthStart.getMonth() + 1, {
-    projectId,
-  });
 
   const getTasksForDay = (day: Date) => (
     tasks.filter((task) => isSameDay(new Date(task.dueDate), day))
@@ -224,7 +255,7 @@ export default function MonthGrid({
               dateKey={dateKey}
               selectedDate={selectedDate}
               onSelectDate={onSelectDate}
-              weather={weatherData[dateKey]}
+              weatherDay={weatherData[dateKey]}
               isStart={isSameDay(day, projectStart)}
               isHarvest={projectEnd ? isSameDay(day, projectEnd) : false}
               dayTasks={dayTasks}

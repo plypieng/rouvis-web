@@ -20,6 +20,8 @@ type BackendTask = {
   status?: string;
 };
 
+type DebugCalendarMode = 'seeded';
+
 const FILTER_VALUES: CalendarFilterKey[] = ['all', 'overdue', 'today', 'next48h'];
 
 function sanitizeDateParam(value?: string): string | undefined {
@@ -33,6 +35,37 @@ function sanitizeFilterParam(value?: string): CalendarFilterKey {
   return FILTER_VALUES.includes(value as CalendarFilterKey)
     ? (value as CalendarFilterKey)
     : 'all';
+}
+
+function resolveDebugCalendarMode(value: unknown): DebugCalendarMode | null {
+  if (typeof value !== 'string') return null;
+  if (value === 'seeded') return value;
+  return null;
+}
+
+function buildDebugCalendarTasks(): BackendTask[] {
+  return [
+    {
+      id: 'task-debug-spray',
+      title: 'Fungicide spraying',
+      description: 'Sensitive spray pass for mildew control',
+      dueAt: '2026-02-14T06:00:00.000Z',
+      projectId: 'project-1',
+      projectName: 'Debug Project',
+      priority: 'high',
+      status: 'pending',
+    },
+    {
+      id: 'task-debug-scouting',
+      title: 'Canopy scouting',
+      description: 'Scout field health and photo notes',
+      dueAt: '2026-02-15T06:00:00.000Z',
+      projectId: 'project-1',
+      projectName: 'Debug Project',
+      priority: 'medium',
+      status: 'pending',
+    },
+  ];
 }
 
 async function getTasks() {
@@ -64,14 +97,17 @@ async function getTasks() {
 
 export default async function CalendarPage(props: {
   params: Promise<{ locale: string }>;
-  searchParams?: Promise<{ date?: string; filter?: string; project?: string }>;
+  searchParams?: Promise<{ date?: string; filter?: string; project?: string; debugMockCalendar?: string }>;
 }) {
   const params = await props.params;
   const searchParams = props.searchParams ? await props.searchParams : undefined;
   const { locale } = params;
+  const debugMockCalendar = resolveDebugCalendarMode(searchParams?.debugMockCalendar);
 
   const session = await getServerSessionFromToken();
-  const backendTasks = await getTasks();
+  const backendTasks = process.env.NODE_ENV !== 'production' && debugMockCalendar
+    ? buildDebugCalendarTasks()
+    : await getTasks();
 
   const user = (session?.user || {}) as {
     uiMode?: string | null;

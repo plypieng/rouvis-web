@@ -36,6 +36,14 @@ import { CSS } from '@dnd-kit/utilities';
 
 import TrackedEventLink from './TrackedEventLink';
 import { toastError, toastSuccess } from '@/lib/feedback';
+import { useWeatherTimeline } from '@/hooks/useWeatherTimeline';
+import {
+  getWeatherDayRisk,
+  isRainRiskDay,
+  isWeatherSensitiveTask,
+  weatherIconForDay,
+  type WeatherTimelineDayData,
+} from '@/lib/weather-timeline';
 import type { FarmerUiMode } from '@/types/farmer-ui-mode';
 import type {
   CalendarFilterKey,
@@ -59,6 +67,13 @@ type CalendarViewProps = {
 type MoveTaskOptions = {
   silent?: boolean;
   refresh?: boolean;
+};
+
+type PendingWeatherMove = {
+  taskId: string;
+  toDate: string;
+  taskTitle: string;
+  precipProbability: number;
 };
 
 function parseDate(value?: string): Date | null {
@@ -193,6 +208,7 @@ function DayCell({
   selectedDate,
   onSelectDate,
   dayTasks,
+  weatherDay,
   activeDragTaskId,
   maxChips,
   t,
@@ -202,6 +218,7 @@ function DayCell({
   selectedDate: Date;
   onSelectDate: (day: Date) => void;
   dayTasks: StandaloneCalendarTask[];
+  weatherDay?: WeatherTimelineDayData;
   activeDragTaskId: string | null;
   maxChips: number;
   t: (key: string, values?: Record<string, string | number>) => string;
@@ -212,11 +229,28 @@ function DayCell({
     id: `day:${dayKey}`,
     data: { date: dayKey },
   });
+  const weatherRisk = getWeatherDayRisk(weatherDay);
+  const weatherIcon = weatherIconForDay(weatherDay);
+  const hasRainRisk = weatherRisk === 'rainy';
+  const dragHintClass = hasRainRisk ? 'text-destructive' : 'text-brand-seedling';
+  const dragRingClass = activeDragTaskId && isOver
+    ? hasRainRisk
+      ? 'bg-destructive/10 ring-2 ring-destructive/50'
+      : 'bg-brand-seedling/15 ring-2 ring-brand-seedling/55'
+    : '';
+  const weatherOverlayClass = hasRainRisk
+    ? 'bg-brand-waterline/20 bg-[repeating-linear-gradient(-45deg,rgba(14,116,144,0.18)_0,rgba(14,116,144,0.18)_6px,rgba(255,255,255,0)_6px,rgba(255,255,255,0)_12px)]'
+    : weatherRisk === 'watch'
+      ? 'bg-brand-waterline/10'
+      : '';
 
   return (
     <div
       ref={setNodeRef}
       data-testid="calendar-date"
+      data-date={dayKey}
+      data-weather-risk={weatherRisk}
+      data-weather-precip={weatherDay ? Math.round(weatherDay.precipProbability) : undefined}
       onClick={() => onSelectDate(day)}
       role="button"
       tabIndex={0}
@@ -232,9 +266,7 @@ function DayCell({
           : isSameMonth(day, currentMonth)
             ? 'bg-card hover:bg-secondary/45'
             : 'bg-secondary/25 hover:bg-secondary/45'
-      } ${isToday(day) ? 'border-brand-seedling/55' : ''} ${
-        activeDragTaskId && isOver ? 'bg-brand-seedling/15 ring-2 ring-brand-seedling/55' : ''
-      }`}
+      } ${weatherOverlayClass} ${isToday(day) ? 'border-brand-seedling/55' : ''} ${dragRingClass}`}
       aria-label={t('drop_target_label', { date: format(day, 'M/d') })}
     >
       <div className="mb-1 flex items-center justify-between gap-1">
@@ -249,11 +281,25 @@ function DayCell({
         >
           {format(day, 'd')}
         </span>
-        {dayTasks.length > 0 ? (
-          <span className="rounded-full border border-border bg-secondary px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
-            {dayTasks.length}
-          </span>
-        ) : null}
+        <div className="flex items-center gap-1">
+          {weatherDay ? (
+            <>
+              <span className="material-symbols-outlined text-[13px] text-muted-foreground" data-testid="calendar-weather-icon">
+                {weatherIcon}
+              </span>
+              <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                hasRainRisk ? 'bg-destructive/15 text-destructive' : 'bg-secondary text-muted-foreground'
+              }`}>
+                {Math.round(weatherDay.precipProbability)}%
+              </span>
+            </>
+          ) : null}
+          {dayTasks.length > 0 ? (
+            <span className="rounded-full border border-border bg-secondary px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+              {dayTasks.length}
+            </span>
+          ) : null}
+        </div>
       </div>
 
       <div className="space-y-1">
@@ -268,7 +314,9 @@ function DayCell({
         ) : null}
 
         {activeDragTaskId && isOver ? (
-          <p className="text-[10px] font-semibold text-brand-seedling">{t('drop_hint')}</p>
+          <p className={`text-[10px] font-semibold ${dragHintClass}`}>
+            {hasRainRisk ? t('drop_hint_rain') : t('drop_hint')}
+          </p>
         ) : null}
       </div>
     </div>
@@ -395,6 +443,7 @@ export function CalendarView({
   const [projectFilter, setProjectFilter] = useState(initialProjectId || 'all');
   const [localTasks, setLocalTasks] = useState<StandaloneCalendarTask[]>(tasks);
   const [activeDragTaskId, setActiveDragTaskId] = useState<string | null>(null);
+  const [pendingWeatherMove, setPendingWeatherMove] = useState<PendingWeatherMove | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [applyState, setApplyState] = useState<{ status: 'idle' | 'running' | 'success' | 'error'; message?: string }>({
     status: 'idle',
@@ -554,6 +603,17 @@ export function CalendarView({
   const gridStart = startOfWeek(monthStart, { weekStartsOn: 0 });
   const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
   const days = eachDayOfInterval({ start: gridStart, end: gridEnd });
+  const weatherStartDate = format(gridStart, 'yyyy-MM-dd');
+  const weatherEndDate = format(gridEnd, 'yyyy-MM-dd');
+  const { data: weatherTimeline } = useWeatherTimeline(
+    undefined,
+    undefined,
+    weatherStartDate,
+    weatherEndDate,
+    {
+      projectId: projectFilter !== 'all' ? projectFilter : undefined,
+    },
+  );
 
   const weekdayLabels = [
     t('weekday_sun'),
@@ -749,14 +809,47 @@ export function CalendarView({
       const toDate = overId.replace(/^day:/, '');
       if (!toDate || (fromDate && fromDate === toDate)) return;
 
+      const targetTask = localTasks.find((task) => task.id === taskId);
+      const weatherDay = weatherTimeline[toDate];
+      if (
+        targetTask
+        && isRainRiskDay(weatherDay)
+        && isWeatherSensitiveTask({ title: targetTask.title, description: targetTask.description })
+      ) {
+        setPendingWeatherMove({
+          taskId,
+          toDate,
+          taskTitle: targetTask.title,
+          precipProbability: weatherDay?.precipProbability || 0,
+        });
+        return;
+      }
+
       void moveTaskToDate({
         taskId,
         toDate,
         idempotencyKey: `calendar-dnd:${taskId}:${Date.now()}`,
       });
     },
-    [moveTaskToDate],
+    [localTasks, moveTaskToDate, weatherTimeline],
   );
+
+  const handleCancelWeatherMove = useCallback(() => {
+    setPendingWeatherMove(null);
+  }, []);
+
+  const handleConfirmWeatherMove = useCallback(() => {
+    if (!pendingWeatherMove) return;
+
+    const payload: CalendarReschedulePayload = {
+      taskId: pendingWeatherMove.taskId,
+      toDate: pendingWeatherMove.toDate,
+      idempotencyKey: `calendar-dnd-force:${pendingWeatherMove.taskId}:${Date.now()}`,
+    };
+
+    setPendingWeatherMove(null);
+    void moveTaskToDate(payload);
+  }, [moveTaskToDate, pendingWeatherMove]);
 
   return (
     <div data-testid="calendar-view" className="space-y-3 sm:space-y-4">
@@ -938,6 +1031,7 @@ export function CalendarView({
                     selectedDate={selectedDate}
                     onSelectDate={handleDaySelect}
                     dayTasks={dayTasks}
+                    weatherDay={weatherTimeline[dayKey]}
                     activeDragTaskId={activeDragTaskId}
                     maxChips={mode === 'veteran_farmer' ? 3 : 2}
                     t={t}
@@ -996,6 +1090,46 @@ export function CalendarView({
               onMove={handleMoveByDelta}
               t={t}
             />
+          </div>
+        </div>
+      ) : null}
+
+      {pendingWeatherMove ? (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/35 px-4"
+          role="dialog"
+          aria-modal="true"
+          data-testid="weather-drop-warning-dialog"
+        >
+          <div className="surface-overlay w-full max-w-md p-4 sm:p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-destructive">
+              {t('weather_drop_warning_title')}
+            </p>
+            <p className="mt-2 text-sm text-foreground" data-testid="weather-drop-warning-message">
+              {t('weather_drop_warning_body', {
+                probability: Math.round(pendingWeatherMove.precipProbability),
+                task: pendingWeatherMove.taskTitle,
+              })}
+            </p>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={handleCancelWeatherMove}
+                className="rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground hover:bg-secondary"
+                data-testid="weather-drop-warning-cancel"
+              >
+                {t('weather_drop_warning_cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmWeatherMove}
+                className="rounded-lg bg-destructive px-3 py-2 text-xs font-semibold text-destructive-foreground hover:opacity-90"
+                data-testid="weather-drop-warning-confirm"
+              >
+                {t('weather_drop_warning_confirm')}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

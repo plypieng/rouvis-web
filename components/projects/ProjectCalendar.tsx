@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
-import { format, addMonths, subMonths, addYears, subYears } from 'date-fns';
+import { format, addMonths, subMonths, addYears, subYears, startOfMonth, endOfMonth } from 'date-fns';
 import {
   DndContext,
   type DragEndEvent,
@@ -18,6 +18,8 @@ import MonthGrid from './calendar/MonthGrid';
 import ProjectYearView from './ProjectYearView';
 import TaskSidePanel from './calendar/TaskSidePanel';
 import ProjectInsightsPanel from './ProjectInsightsPanel';
+import { useWeatherTimeline } from '@/hooks/useWeatherTimeline';
+import { isRainRiskDay, isWeatherSensitiveTask } from '@/lib/weather-timeline';
 import type {
   CommandHandshake,
   ProjectTaskItem,
@@ -55,6 +57,13 @@ type LocalNotice = {
   message: string;
 } | null;
 
+type PendingWeatherMove = {
+  taskId: string;
+  toDate: string;
+  taskTitle: string;
+  precipProbability: number;
+};
+
 function mergeDateKeepingTime(fromIso: string, toDate: string): string {
   const from = new Date(fromIso);
   const [year, month, day] = toDate.split('-').map((part) => Number.parseInt(part, 10));
@@ -87,6 +96,7 @@ export default function ProjectCalendar({
   const [rescheduleSuggestion, setRescheduleSuggestion] = useState<RescheduleSuggestion | null>(null);
   const [calendarTasks, setCalendarTasks] = useState<ProjectTaskItem[]>(tasks);
   const [activeDragTaskId, setActiveDragTaskId] = useState<string | null>(null);
+  const [pendingWeatherMove, setPendingWeatherMove] = useState<PendingWeatherMove | null>(null);
   const [localNotice, setLocalNotice] = useState<LocalNotice>(null);
 
   const quickApplyErrorMessage = useCallback((reason?: string) => {
@@ -164,6 +174,19 @@ export default function ProjectCalendar({
     else setCurrentDate((prev) => addYears(prev, 1));
   };
 
+  const weatherStartDate = format(startOfMonth(currentDate), 'yyyy-MM-dd');
+  const weatherEndDate = format(endOfMonth(currentDate), 'yyyy-MM-dd');
+  const { data: weatherData } = useWeatherTimeline(
+    undefined,
+    undefined,
+    weatherStartDate,
+    weatherEndDate,
+    {
+      projectId: project.id,
+      disabled: view !== 'month',
+    },
+  );
+
   const handleTaskMove = useCallback(async ({ taskId, toDate }: TaskMovePayload) => {
     const movingTask = calendarTasks.find((task) => task.id === taskId);
     if (!movingTask) return;
@@ -222,8 +245,38 @@ export default function ProjectCalendar({
     const fromDate = event.active.data.current?.fromDate as string | undefined;
     if (!toDate || (fromDate && fromDate === toDate)) return;
 
+    const targetTask = calendarTasks.find((task) => task.id === taskId);
+    const weatherDay = weatherData[toDate];
+    if (
+      targetTask
+      && isRainRiskDay(weatherDay)
+      && isWeatherSensitiveTask({ title: targetTask.title, description: targetTask.description })
+    ) {
+      setPendingWeatherMove({
+        taskId,
+        toDate,
+        taskTitle: targetTask.title,
+        precipProbability: weatherDay?.precipProbability || 0,
+      });
+      return;
+    }
+
     void handleTaskMove({ taskId, toDate });
   };
+
+  const handleCancelWeatherMove = useCallback(() => {
+    setPendingWeatherMove(null);
+  }, []);
+
+  const handleConfirmWeatherMove = useCallback(() => {
+    if (!pendingWeatherMove) return;
+    const movePayload: TaskMovePayload = {
+      taskId: pendingWeatherMove.taskId,
+      toDate: pendingWeatherMove.toDate,
+    };
+    setPendingWeatherMove(null);
+    void handleTaskMove(movePayload);
+  }, [handleTaskMove, pendingWeatherMove]);
 
   const handleQuickApply = async () => {
     if (!rescheduleSuggestion?.prompt || !onQuickApplyRequest) return;
@@ -365,11 +418,11 @@ export default function ProjectCalendar({
             <div className="min-h-0 flex-1">
               {view === 'month' ? (
                 <MonthGrid
-                  projectId={project.id}
                   currentDate={currentDate}
                   selectedDate={selectedDate}
                   onSelectDate={setSelectedDate}
                   tasks={calendarTasks}
+                  weatherData={weatherData}
                   startDate={startDate}
                   targetHarvestDate={targetHarvestDate}
                   activeDragTaskId={activeDragTaskId}
@@ -402,6 +455,45 @@ export default function ProjectCalendar({
           </div>
         </div>
       </DndContext>
+
+      {pendingWeatherMove ? (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/35 px-4"
+          role="dialog"
+          aria-modal="true"
+          data-testid="weather-drop-warning-dialog"
+        >
+          <div className="surface-overlay w-full max-w-md p-4 sm:p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-destructive">
+              {t('weather_drop_warning_title')}
+            </p>
+            <p className="mt-2 text-sm text-foreground" data-testid="weather-drop-warning-message">
+              {t('weather_drop_warning_body', {
+                probability: Math.round(pendingWeatherMove.precipProbability),
+                task: pendingWeatherMove.taskTitle,
+              })}
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={handleCancelWeatherMove}
+                className="rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground hover:bg-secondary"
+                data-testid="weather-drop-warning-cancel"
+              >
+                {t('weather_drop_warning_cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmWeatherMove}
+                className="rounded-lg bg-destructive px-3 py-2 text-xs font-semibold text-destructive-foreground hover:opacity-90"
+                data-testid="weather-drop-warning-confirm"
+              >
+                {t('weather_drop_warning_confirm')}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {showAdvice ? (
         <div
