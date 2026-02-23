@@ -9,6 +9,7 @@ vi.mock('next/headers', () => ({
 import { getServerAppBaseUrl } from './server-app-base-url';
 
 describe('getServerAppBaseUrl', () => {
+  const mutableEnv = process.env as Record<string, string | undefined>;
   const originalEnv = {
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
@@ -21,14 +22,14 @@ describe('getServerAppBaseUrl', () => {
     delete process.env.NEXT_PUBLIC_APP_URL;
     delete process.env.NEXTAUTH_URL;
     delete process.env.VERCEL_URL;
-    process.env.NODE_ENV = 'test';
+    mutableEnv.NODE_ENV = 'test';
   });
 
   afterAll(() => {
     process.env.NEXT_PUBLIC_APP_URL = originalEnv.NEXT_PUBLIC_APP_URL;
     process.env.NEXTAUTH_URL = originalEnv.NEXTAUTH_URL;
     process.env.VERCEL_URL = originalEnv.VERCEL_URL;
-    process.env.NODE_ENV = originalEnv.NODE_ENV;
+    mutableEnv.NODE_ENV = originalEnv.NODE_ENV;
   });
 
   it('prefers current request host over configured env host', async () => {
@@ -50,7 +51,7 @@ describe('getServerAppBaseUrl', () => {
 
   it('falls back to localhost in non-production when no host info is available', async () => {
     headersMock.mockResolvedValueOnce(new Headers());
-    process.env.NODE_ENV = 'development';
+    mutableEnv.NODE_ENV = 'development';
 
     await expect(getServerAppBaseUrl()).resolves.toBe('http://localhost:3000');
   });
