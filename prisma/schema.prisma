@@ -4,13 +4,16 @@
 // 1. Datasource: Specifies your database connection.
 // We're using PostgreSQL. The URL is loaded from the .env file.
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [vector]
 }
 
 // 2. Generator: Specifies that you want to generate Prisma Client.
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 // 3. NextAuth.js Models: These are required for the Prisma adapter.
