@@ -11,6 +11,7 @@ import { Providers } from '../../components/Providers';
 import FeedbackButton from '../../components/FeedbackButton';
 import OnboardingTour from '../../components/OnboardingTour';
 import AlertToastBridge from '../../components/AlertToastBridge';
+import BackgroundWorkerNotifier from '../../components/BackgroundWorkerNotifier';
 import { getServerSessionFromToken } from '../../lib/server-auth';
 import type { Locale } from '../../i18n/config';
 import type { AppShellProps } from '@/types/ui-shell';
@@ -104,6 +105,7 @@ export default async function RootLayout(props: {
             </div>
           )}
 
+          <BackgroundWorkerNotifier />
           <AlertToastBridge />
         </div>
       </Providers>

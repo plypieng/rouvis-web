@@ -264,19 +264,21 @@ export default function ProjectCalendar({
     )));
 
     try {
-      const idempotencyKey = `task-move:${taskId}:${Date.now()}`;
-      const response = await fetch(`/api/v1/tasks/${taskId}`, {
-        method: 'PATCH',
+      const response = await fetch(`/api/v1/projects/${project.id}/cascade-reschedule`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Idempotency-Key': idempotencyKey,
-          'X-Idempotency-Key': idempotencyKey,
         },
-        body: JSON.stringify({ dueAt: mergedDueAt }),
+        body: JSON.stringify({ triggerTaskId: taskId, toDate: mergedDueAt }),
       });
 
       if (!response.ok) {
         throw new Error(t('task_move_failed'));
+      }
+
+      const data = await response.json();
+      if (data.suggestion) {
+        setRescheduleSuggestion(data.suggestion);
       }
 
       setLocalNotice({
@@ -292,7 +294,7 @@ export default function ProjectCalendar({
         message: t('task_move_failed'),
       });
     }
-  }, [calendarTasks, router, t]);
+  }, [calendarTasks, project.id, router, t]);
 
   const handleDragStart = (event: DragStartEvent) => {
     const taskId = event.active.data.current?.taskId as string | undefined;

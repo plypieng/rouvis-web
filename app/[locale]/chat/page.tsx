@@ -180,6 +180,7 @@ export default function ChatPage() {
   const chatKitRef = useRef<RouvisChatKitRef | null>(null);
 
   const contextProjectId = searchParams.get('projectId') || undefined;
+  const requestedThreadId = searchParams.get('threadId') || undefined;
   const contextPrompt = searchParams.get('prompt');
   const contextIntent = searchParams.get('intent');
   const contextDate = searchParams.get('date');
@@ -247,8 +248,12 @@ export default function ChatPage() {
   useEffect(() => {
     if (hasContextEntry) {
       setSelectedThreadId(undefined);
+      return;
     }
-  }, [contextEntryKey, hasContextEntry]);
+    if (requestedThreadId) {
+      setSelectedThreadId(requestedThreadId);
+    }
+  }, [contextEntryKey, hasContextEntry, requestedThreadId]);
 
   useEffect(() => {
     if (!hasContextEntry) {
@@ -354,7 +359,18 @@ export default function ChatPage() {
           }
 
           contextThreadSeedRef.current = '';
-          setSelectedThreadId(prev => prev ?? listedThreads[0]?.id);
+          setSelectedThreadId((prev) => {
+            if (requestedThreadId) {
+              return listedThreads.some((thread) => thread.id === requestedThreadId)
+                ? requestedThreadId
+                : listedThreads[0]?.id;
+            }
+
+            if (prev && listedThreads.some((thread) => thread.id === prev)) {
+              return prev;
+            }
+            return listedThreads[0]?.id;
+          });
         }
       } catch (e) {
         console.error('Failed to load threads', e);
@@ -382,6 +398,7 @@ export default function ChatPage() {
     contextPrompt,
     forceFreshThread,
     hasContextEntry,
+    requestedThreadId,
     t,
     threadReloadToken,
   ]);

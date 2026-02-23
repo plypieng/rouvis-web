@@ -337,7 +337,8 @@ export function createArtifactFromStreamEvent(event: ChatkitEvent): CommandArtif
   }
 
   if (eventType === 'tool_call_delta' && event.delta?.tool) {
-    const isQueue = event.delta.tool === 'scheduler.queue';
+    const isQueue = event.delta.tool === 'scheduler.queue'
+      || event.delta.tool === 'spawn_background_worker';
     const status = event.delta.status || 'running';
     const tone: CommandRiskTone = status === 'error'
       ? 'critical'

@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import LanguageSwitcher from '../../../components/LanguageSwitcher';
+import MemoryVault from '../../../components/MemoryVault';
 import { useState, useEffect, useCallback, use } from 'react';
 import type { FarmerUiMode } from '@/types/farmer-ui-mode';
 import { resolveFarmerUiMode } from '@/lib/farmerUiMode';
@@ -153,11 +154,10 @@ export default function SettingsPage({ params }: { params: Promise<{ locale: str
                                 void saveFarmerMode('new_farmer');
                             }}
                             disabled={farmerModeSaving || farmerModeLoading}
-                            className={`rounded-xl border px-4 py-3 text-left transition ${
-                                farmerMode === 'new_farmer'
+                            className={`rounded-xl border px-4 py-3 text-left transition ${farmerMode === 'new_farmer'
                                     ? 'border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-500 dark:bg-emerald-900/20 dark:text-emerald-100'
                                     : 'border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600'
-                            } disabled:opacity-60`}
+                                } disabled:opacity-60`}
                         >
                             <p className="text-sm font-semibold">{t('farmer_mode_new_title')}</p>
                             <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">{t('farmer_mode_new_desc')}</p>
@@ -169,11 +169,10 @@ export default function SettingsPage({ params }: { params: Promise<{ locale: str
                                 void saveFarmerMode('veteran_farmer');
                             }}
                             disabled={farmerModeSaving || farmerModeLoading}
-                            className={`rounded-xl border px-4 py-3 text-left transition ${
-                                farmerMode === 'veteran_farmer'
+                            className={`rounded-xl border px-4 py-3 text-left transition ${farmerMode === 'veteran_farmer'
                                     ? 'border-sky-300 bg-sky-50 text-sky-900 dark:border-sky-500 dark:bg-sky-900/20 dark:text-sky-100'
                                     : 'border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600'
-                            } disabled:opacity-60`}
+                                } disabled:opacity-60`}
                         >
                             <p className="text-sm font-semibold">{t('farmer_mode_veteran_title')}</p>
                             <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">{t('farmer_mode_veteran_desc')}</p>
@@ -238,6 +237,9 @@ export default function SettingsPage({ params }: { params: Promise<{ locale: str
                         </div>
                     </div>
                 </div>
+
+                {/* Farmer DNA Vault */}
+                <MemoryVault />
             </div>
         </div>
     );

@@ -178,10 +178,12 @@ async function openChat(page: Page) {
 }
 
 async function sendPrompt(page: Page, prompt: string) {
-  const input = page.locator('input[type="text"]');
-  const submit = page.locator('button[type="submit"]');
+  const composer = page.locator('form').filter({ has: page.locator('button[type="submit"]') }).last();
+  const input = composer.locator('input[type="text"]');
+  const submit = composer.locator('button[type="submit"]');
   await expect(input).toBeVisible();
   await input.fill(prompt);
+  await expect(submit).toBeEnabled();
   await submit.click();
 }
 
@@ -241,6 +243,67 @@ test.describe('Chat Interface with /api/chatkit', () => {
     await expect(actionCard).toBeVisible();
     await expect(actionCard).toContainText(/更新|Updated/);
     await expect(actionCard.getByRole('button', { name: /取り消す|Undo/ })).toBeVisible();
+  });
+
+  test('shows queued background worker artifacts and pending job panel', async ({ page }) => {
+    await page.route('**/api/v1/agents/background-workers/runs**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          runs: [
+            {
+              id: 'bg-run-12345678',
+              intent: 'run_reschedule_planner',
+              state: 'queued',
+              queuedAt: '2026-02-23T08:00:00.000Z',
+            },
+          ],
+          total: 1,
+          queueDepth: 1,
+          generatedAt: '2026-02-23T08:00:00.000Z',
+        }),
+      });
+    });
+
+    await mockChatkit(page, {
+      streamForPrompt: () => createStream([
+        `e:${JSON.stringify({
+          type: 'tool_call_delta',
+          delta: {
+            tool: 'spawn_background_worker',
+            status: 'running',
+            message: 'Queueing long-running task...',
+          },
+        })}`,
+        `e:${JSON.stringify({
+          type: 'tool_call_delta',
+          delta: {
+            tool: 'spawn_background_worker',
+            status: 'completed',
+            message: 'Queued as bg-run-12345678',
+          },
+        })}`,
+        `e:${JSON.stringify({
+          type: 'custom_ui',
+          data: {
+            type: 'background_worker_queued',
+            runId: 'bg-run-12345678',
+            intent: 'run_reschedule_planner',
+          },
+        })}`,
+        `0:${JSON.stringify('重い処理をバックグラウンドで開始しました。完了後に通知します。')}`,
+      ]),
+    });
+
+    await openChat(page);
+    await sendPrompt(page, '10年分の気象データで今季スケジュールを再計算して');
+
+    await expect(page.getByTestId('command-artifact-queue').first()).toBeVisible();
+    const pendingPanel = page.getByTestId('pending-background-jobs');
+    await expect(pendingPanel).toBeVisible();
+    await expect(pendingPanel).toContainText('run_reschedule_planner');
+    await expect(page.getByTestId('pending-background-job').first()).toContainText('bg-run-1');
   });
 
   test('shows loading indicator while waiting for stream response', async ({ page }) => {
@@ -653,5 +716,120 @@ test.describe('Chat Interface with /api/chatkit', () => {
 
     const assistantMessage = page.locator('.message-assistant').last();
     await expect(assistantMessage).toContainText('セルトレイは苗を育てるための穴あき容器です。');
+  });
+
+  test('shows global background completion toast outside chat and deep-links into thread', async ({ page }) => {
+    let runPollCount = 0;
+
+    await page.route('**/api/v1/agents/background-workers/runs**', async (route) => {
+      runPollCount += 1;
+      const state = runPollCount >= 2 ? 'succeeded' : 'running';
+      const now = new Date().toISOString();
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          runs: [
+            {
+              id: 'bg-run-1',
+              state,
+              title: 'Background schedule replan',
+              summary: state === 'succeeded' ? 'Background schedule replan completed.' : 'Running in the background.',
+              errorMessage: null,
+              threadId: 'thread-bg-1',
+              projectId: null,
+              source: 'schedule_generation',
+              createdAt: now,
+              startedAt: now,
+              completedAt: state === 'succeeded' ? now : null,
+            },
+          ],
+          total: 1,
+          generatedAt: now,
+        }),
+      });
+    });
+
+    await page.route('**/api/chatkit**', async (route) => {
+      const request = route.request();
+      if (request.method() === 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ messages: [] }),
+        });
+        return;
+      }
+
+      let body: ChatRequestBody = {};
+      try {
+        body = JSON.parse(request.postData() || '{}') as ChatRequestBody;
+      } catch {
+        body = {};
+      }
+
+      if (body.action === 'chatkit.list_threads') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            threads: [
+              {
+                id: 'thread-bg-1',
+                title: 'Background Thread',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              },
+            ],
+          }),
+        });
+        return;
+      }
+
+      if (body.action === 'chatkit.create_thread') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            thread: {
+              id: 'thread-created',
+              title: body.payload?.title || 'New Conversation',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            },
+          }),
+        });
+        return;
+      }
+
+      if (body.action === 'chatkit.undo') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ ok: true }),
+        });
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/plain; charset=utf-8',
+        body: createStream([`0:${JSON.stringify('ok')}`]),
+      });
+    });
+
+    await page.goto('http://localhost:3002/ja/terms');
+    await page.waitForLoadState('networkidle');
+
+    await expect.poll(() => runPollCount, { timeout: 25_000 }).toBeGreaterThanOrEqual(2);
+
+    const toast = page.getByRole('status').filter({
+      hasText: /Background schedule replan|バックグラウンド|完了しました|completed/i,
+    }).last();
+    await expect(toast).toBeVisible({ timeout: 15_000 });
+
+    await page.getByRole('button', { name: /チャットを開く|Open chat/ }).click();
+    await expect(page).toHaveURL(/\/ja\/chat\?threadId=thread-bg-1/);
   });
 });

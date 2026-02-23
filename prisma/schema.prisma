@@ -4,13 +4,16 @@
 // 1. Datasource: Specifies your database connection.
 // We're using PostgreSQL. The URL is loaded from the .env file.
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [vector]
 }
 
 // 2. Generator: Specifies that you want to generate Prisma Client.
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 // 3. NextAuth.js Models: These are required for the Prisma adapter.
@@ -63,6 +66,7 @@ model User {
   userPlan      UserPlan?
   billingWebhookEvents BillingWebhookEvent[]
   aiUsageMeterEvents AiUsageMeterEvent[]
+  userMemories  UserMemory[]
 }
 
 model UserProfile {
@@ -221,6 +225,9 @@ model Project {
   name              String
   crop              String
   variety           String?
+  cropKnowledgeId   String?
+  cropKnowledge     CropKnowledge?   @relation(fields: [cropKnowledgeId], references: [id])
+  activeRuleSetId   String?
   fieldId           String?
   startDate         DateTime
   targetHarvestDate DateTime?
@@ -335,6 +342,8 @@ model CropKnowledge {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  projects    Project[]
+
   @@unique([cropName, variety, region])
 }
 
@@ -446,4 +455,18 @@ model ProductKnowledge {
   updatedAt          DateTime @updatedAt
 
   @@index([type])
+}
+
+model UserMemory {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fact      String   @db.Text
+  category  String?  // e.g. 'preference', 'equipment', 'constraint'
+  embedding Unsupported("vector(1536)")? // Supabase native semantic vector
+  source    String?  // e.g. 'chat:1234'
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
