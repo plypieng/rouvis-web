@@ -30,7 +30,10 @@ import {
   useDroppable,
   useSensor,
   useSensors,
+  DragOverEvent,
 } from '@dnd-kit/core';
+import { motion, AnimatePresence } from 'framer-motion';
+import { differenceInDays } from 'date-fns';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
@@ -165,9 +168,11 @@ function timeLabel(raw: string, locale: string, fallback: string): string {
 function DayTaskChip({
   task,
   maxTitle,
+  isDownstream,
 }: {
   task: StandaloneCalendarTask;
   maxTitle: number;
+  isDownstream?: boolean;
 }) {
   const parsed = parseDate(task.dueAt);
   const fromDate = parsed ? dateKey(parsed) : '';
@@ -183,22 +188,22 @@ function DayTaskChip({
   });
 
   return (
-    <button
+    <motion.button
       type="button"
+      layout
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform) }}
       {...attributes}
       {...listeners}
       data-testid="scheduled-item"
-      className={`w-full truncate rounded-md border px-1.5 py-0.5 text-left text-[10px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 ${
-        task.status === 'completed'
-          ? 'border-border bg-secondary text-muted-foreground line-through'
-          : 'border-border/90 bg-card text-foreground hover:border-brand-seedling/50'
-      } ${isDragging ? 'opacity-65 shadow-lift1' : ''}`}
+      className={`w-full truncate rounded-md border px-1.5 py-0.5 text-left text-[10px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 ${task.status === 'completed'
+        ? 'border-border bg-secondary text-muted-foreground line-through'
+        : 'border-border/90 bg-card text-foreground hover:border-brand-seedling/50'
+        } ${isDragging ? 'opacity-65 shadow-lift1' : ''} ${isDownstream ? 'border-brand-waterline/60 ring-1 ring-brand-waterline/20' : ''}`}
       title={task.title}
     >
       {task.title.length > maxTitle ? `${task.title.slice(0, maxTitle - 1)}…` : task.title}
-    </button>
+    </motion.button>
   );
 }
 
@@ -210,6 +215,7 @@ function DayCell({
   dayTasks,
   weatherDay,
   activeDragTaskId,
+  downstreamIds,
   maxChips,
   t,
 }: {
@@ -220,6 +226,7 @@ function DayCell({
   dayTasks: StandaloneCalendarTask[];
   weatherDay?: WeatherTimelineDayData;
   activeDragTaskId: string | null;
+  downstreamIds: Set<string>;
   maxChips: number;
   t: (key: string, values?: Record<string, string | number>) => string;
 }) {
@@ -260,24 +267,22 @@ function DayCell({
           onSelectDate(day);
         }
       }}
-      className={`calendar-date flex min-h-[108px] flex-col border-b border-r border-border/70 p-1.5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-        isSelected
-          ? 'selected bg-brand-waterline/10 ring-1 ring-inset ring-brand-waterline/55'
-          : isSameMonth(day, currentMonth)
-            ? 'bg-card hover:bg-secondary/45'
-            : 'bg-secondary/25 hover:bg-secondary/45'
-      } ${weatherOverlayClass} ${isToday(day) ? 'border-brand-seedling/55' : ''} ${dragRingClass}`}
+      className={`calendar-date flex min-h-[108px] flex-col border-b border-r border-border/70 p-1.5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${isSelected
+        ? 'selected bg-brand-waterline/10 ring-1 ring-inset ring-brand-waterline/55'
+        : isSameMonth(day, currentMonth)
+          ? 'bg-card hover:bg-secondary/45'
+          : 'bg-secondary/25 hover:bg-secondary/45'
+        } ${weatherOverlayClass} ${isToday(day) ? 'border-brand-seedling/55' : ''} ${dragRingClass}`}
       aria-label={t('drop_target_label', { date: format(day, 'M/d') })}
     >
       <div className="mb-1 flex items-center justify-between gap-1">
         <span
-          className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold ${
-            isSelected
-              ? 'bg-brand-waterline text-primary-foreground'
-              : isToday(day)
-                ? 'bg-brand-seedling/20 text-brand-seedling'
-                : 'bg-secondary text-secondary-foreground'
-          }`}
+          className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold ${isSelected
+            ? 'bg-brand-waterline text-primary-foreground'
+            : isToday(day)
+              ? 'bg-brand-seedling/20 text-brand-seedling'
+              : 'bg-secondary text-secondary-foreground'
+            }`}
         >
           {format(day, 'd')}
         </span>
@@ -287,9 +292,8 @@ function DayCell({
               <span className="material-symbols-outlined text-[13px] text-muted-foreground" data-testid="calendar-weather-icon">
                 {weatherIcon}
               </span>
-              <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
-                hasRainRisk ? 'bg-destructive/15 text-destructive' : 'bg-secondary text-muted-foreground'
-              }`}>
+              <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${hasRainRisk ? 'bg-destructive/15 text-destructive' : 'bg-secondary text-muted-foreground'
+                }`}>
                 {Math.round(weatherDay.precipProbability)}%
               </span>
             </>
@@ -304,7 +308,12 @@ function DayCell({
 
       <div className="space-y-1">
         {dayTasks.slice(0, maxChips).map((task) => (
-          <DayTaskChip key={`day-chip-${task.id}`} task={task} maxTitle={modeBasedChipTitle(maxChips)} />
+          <DayTaskChip
+            key={`day-chip-${task.id}`}
+            task={task}
+            maxTitle={modeBasedChipTitle(maxChips)}
+            isDownstream={downstreamIds.has(task.id)}
+          />
         ))}
 
         {dayTasks.length > maxChips ? (
@@ -443,6 +452,14 @@ export function CalendarView({
   const [projectFilter, setProjectFilter] = useState(initialProjectId || 'all');
   const [localTasks, setLocalTasks] = useState<StandaloneCalendarTask[]>(tasks);
   const [activeDragTaskId, setActiveDragTaskId] = useState<string | null>(null);
+  const [dragDeltaDays, setDragDeltaDays] = useState(0);
+  const [downstreamIds, setDownstreamIds] = useState<Set<string>>(new Set());
+  const [pendingCascade, setPendingCascade] = useState<{
+    triggerTaskId: string;
+    toDate: string;
+    proposals: Array<{ id: string; title: string; dueDate: string }>;
+    summary: string;
+  } | null>(null);
   const [pendingWeatherMove, setPendingWeatherMove] = useState<PendingWeatherMove | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [applyState, setApplyState] = useState<{ status: 'idle' | 'running' | 'success' | 'error'; message?: string }>({
@@ -561,10 +578,27 @@ export function CalendarView({
     [projectScopedTasks, activeFilter],
   );
 
+  const tasksWithSliding = useMemo(() => {
+    if (!activeDragTaskId || dragDeltaDays === 0) return projectScopedTasks;
+
+    return projectScopedTasks.map((task) => {
+      if (task.id === activeDragTaskId || downstreamIds.has(task.id)) {
+        try {
+          const nextDate = addDays(new Date(task.dueAt), dragDeltaDays);
+          return { ...task, dueAt: nextDate.toISOString() };
+        } catch {
+          return task;
+        }
+      }
+      return task;
+    });
+  }, [projectScopedTasks, activeDragTaskId, dragDeltaDays, downstreamIds]);
+
   const tasksByDay = useMemo(() => {
     const grouped = new Map<string, StandaloneCalendarTask[]>();
 
-    for (const task of filteredTasks) {
+    for (const task of tasksWithSliding) {
+      if (activeFilter !== 'all' && !inFilterRange(task, activeFilter)) continue;
       const parsed = parseDate(task.dueAt);
       if (!parsed) continue;
 
@@ -579,7 +613,7 @@ export function CalendarView({
     }
 
     return grouped;
-  }, [filteredTasks]);
+  }, [tasksWithSliding, activeFilter]);
 
   const selectedDateKey = dateKey(selectedDate);
   const selectedDayTasks = useMemo(
@@ -792,17 +826,48 @@ export function CalendarView({
   );
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
-    const taskId = event.active.data.current?.taskId as string | undefined;
-    setActiveDragTaskId(taskId || null);
+    const taskId = event.active.data.current?.taskId as string;
+    setActiveDragTaskId(taskId);
+
+    // Find downstream tasks (recursive)
+    const downstream = new Set<string>();
+    const stack = [taskId];
+    while (stack.length > 0) {
+      const currentId = stack.pop()!;
+      for (const t of localTasks) {
+        if (t.dependsOnTaskId === currentId && !downstream.has(t.id)) {
+          downstream.add(t.id);
+          stack.push(t.id);
+        }
+      }
+    }
+    setDownstreamIds(downstream);
+  }, [localTasks]);
+
+  const handleDragOver = useCallback((event: DragOverEvent) => {
+    const overId = String(event.over?.id || '');
+    if (!overId.startsWith('day:')) {
+      setDragDeltaDays(0);
+      return;
+    }
+
+    const fromDate = event.active.data.current?.fromDate as string;
+    const toDate = overId.replace(/^day:/, '');
+
+    if (fromDate && toDate) {
+      setDragDeltaDays(differenceInDays(new Date(toDate), new Date(fromDate)));
+    }
   }, []);
 
   const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      setActiveDragTaskId(null);
-
+    async (event: DragEndEvent) => {
       const taskId = event.active.data.current?.taskId as string | undefined;
       const fromDate = event.active.data.current?.fromDate as string | undefined;
       const overId = String(event.over?.id || '');
+
+      setActiveDragTaskId(null);
+      setDragDeltaDays(0);
+      setDownstreamIds(new Set());
 
       if (!taskId || !overId.startsWith('day:')) return;
 
@@ -810,10 +875,36 @@ export function CalendarView({
       if (!toDate || (fromDate && fromDate === toDate)) return;
 
       const targetTask = localTasks.find((task) => task.id === taskId);
+      if (!targetTask) return;
+
+      // Check for cascading effect via API preview
+      try {
+        const res = await fetch(`/api/v1/projects/${targetTask.projectId}/cascade-reschedule`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ triggerTaskId: taskId, toDate, commit: false }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.suggestion && data.suggestion.affectedTasks.length > 1) {
+            setPendingCascade({
+              triggerTaskId: taskId,
+              toDate,
+              proposals: data.suggestion.affectedTasks,
+              summary: data.suggestion.summary,
+            });
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Cascade preview failed, falling back to simple move', err);
+      }
+
+      // Simple move or weather check if no complex cascade
       const weatherDay = weatherTimeline[toDate];
       if (
-        targetTask
-        && isRainRiskDay(weatherDay)
+        isRainRiskDay(weatherDay)
         && isWeatherSensitiveTask({ title: targetTask.title, description: targetTask.description })
       ) {
         setPendingWeatherMove({
@@ -833,6 +924,32 @@ export function CalendarView({
     },
     [localTasks, moveTaskToDate, weatherTimeline],
   );
+
+  const handleConfirmCascade = useCallback(async () => {
+    if (!pendingCascade) return;
+    const { triggerTaskId, toDate } = pendingCascade;
+    const task = localTasks.find(t => t.id === triggerTaskId);
+    if (!task) return;
+
+    setApplyState({ status: 'running' });
+    try {
+      const res = await fetch(`/api/v1/projects/${task.projectId}/cascade-reschedule`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ triggerTaskId, toDate, commit: true }),
+      });
+
+      if (!res.ok) throw new Error();
+
+      toastSuccess(tw('calendar.quick_apply_success'));
+      setPendingCascade(null);
+      setApplyState({ status: 'success' });
+      router.refresh();
+    } catch {
+      toastError(tw('calendar.quick_apply_error_generic'));
+      setApplyState({ status: 'idle' });
+    }
+  }, [localTasks, pendingCascade, router, tw]);
 
   const handleCancelWeatherMove = useCallback(() => {
     setPendingWeatherMove(null);
@@ -921,9 +1038,8 @@ export function CalendarView({
         </div>
         {applyState.message ? (
           <p
-            className={`mt-2 text-xs ${
-              applyState.status === 'error' ? 'text-destructive' : 'text-muted-foreground'
-            }`}
+            className={`mt-2 text-xs ${applyState.status === 'error' ? 'text-destructive' : 'text-muted-foreground'
+              }`}
           >
             {applyState.message}
           </p>
@@ -972,11 +1088,10 @@ export function CalendarView({
               type="button"
               aria-pressed={activeFilter === filterKey}
               onClick={() => setActiveFilter(filterKey)}
-              className={`touch-target rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                activeFilter === filterKey
-                  ? 'border-brand-waterline/60 bg-brand-waterline/15 text-foreground'
-                  : 'border-border bg-card text-muted-foreground hover:text-foreground'
-              }`}
+              className={`touch-target rounded-full border px-3 py-1.5 text-xs font-semibold transition ${activeFilter === filterKey
+                ? 'border-brand-waterline/60 bg-brand-waterline/15 text-foreground'
+                : 'border-border bg-card text-muted-foreground hover:text-foreground'
+                }`}
             >
               {t(`filter_${filterKey}`)} ({filterCounts[filterKey]})
             </button>
@@ -1003,16 +1118,84 @@ export function CalendarView({
         </div>
       </section>
 
-      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <AnimatePresence>
+        {pendingCascade && (
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="surface-raised fixed bottom-8 left-1/2 z-50 flex w-[90%] max-w-xl -translate-x-1/2 flex-col border-brand-waterline/40 p-4 shadow-lift2 sm:p-5"
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="flex items-center gap-2 text-sm font-bold text-foreground">
+                  <span className="material-symbols-outlined text-brand-waterline text-[18px]">alt_route</span>
+                  {t('handshake_title')}
+                </h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {pendingCascade.summary}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPendingCascade(null)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+
+            <div className="mt-4 flex max-h-32 flex-col gap-1.5 overflow-y-auto pr-1">
+              {pendingCascade.proposals.slice(0, 5).map(p => (
+                <div key={p.id} className="flex items-center justify-between rounded bg-secondary/30 px-2 py-1.5 text-[10px]">
+                  <span className="font-medium text-foreground">{p.title}</span>
+                  <span className="font-mono text-muted-foreground">{p.dueDate}</span>
+                </div>
+              ))}
+              {pendingCascade.proposals.length > 5 && (
+                <p className="text-center text-[9px] text-muted-foreground">
+                  + {pendingCascade.proposals.length - 5} {t('more_tasks', { count: pendingCascade.proposals.length - 5 })}
+                </p>
+              )}
+            </div>
+
+            <div className="mt-5 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setPendingCascade(null)}
+                className="touch-target px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground"
+              >
+                {t('reschedule_suggestion_cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleConfirmCascade()}
+                disabled={applyState.status === 'running'}
+                className="touch-target flex items-center gap-2 rounded-lg bg-brand-waterline px-4 py-2 text-xs font-bold text-white shadow-sm hover:brightness-110 disabled:opacity-50"
+              >
+                {applyState.status === 'running' ? (
+                  <>
+                    <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+                    {t('handshake_apply_running')}
+                  </>
+                ) : (
+                  t('handshake_apply')
+                )}
+              </button>
+            </div>
+          </motion.section>
+        )}
+      </AnimatePresence>
+
+      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
         <div className="grid min-h-0 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(340px,1fr)]">
           <section className="surface-raised min-h-[560px] overflow-hidden">
             <div className="grid grid-cols-7 border-b border-border bg-secondary/45">
               {weekdayLabels.map((label, index) => (
                 <p
                   key={label}
-                  className={`py-2 text-center text-[11px] font-semibold ${
-                    index === 0 ? 'text-risk-critical' : index === 6 ? 'text-brand-waterline' : 'text-muted-foreground'
-                  }`}
+                  className={`py-2 text-center text-[11px] font-semibold ${index === 0 ? 'text-risk-critical' : index === 6 ? 'text-brand-waterline' : 'text-muted-foreground'
+                    }`}
                 >
                   {label}
                 </p>
@@ -1033,6 +1216,7 @@ export function CalendarView({
                     dayTasks={dayTasks}
                     weatherDay={weatherTimeline[dayKey]}
                     activeDragTaskId={activeDragTaskId}
+                    downstreamIds={downstreamIds}
                     maxChips={mode === 'veteran_farmer' ? 3 : 2}
                     t={t}
                   />

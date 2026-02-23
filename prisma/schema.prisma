@@ -261,6 +261,10 @@ model Task {
   projectId String?
   project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
   
+  dependsOnTaskId String?
+  parentTask    Task?    @relation("TaskDependencies", fields: [dependsOnTaskId], references: [id])
+  dependentTasks Task[]   @relation("TaskDependencies")
+
   fieldId   String?
 
   @@index([projectId])

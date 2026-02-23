@@ -18,6 +18,7 @@ type BackendTask = {
   projectName?: string | null;
   priority?: 'low' | 'medium' | 'high' | string;
   status?: string;
+  dependsOnTaskId?: string | null;
 };
 
 type DebugCalendarMode = 'seeded';
@@ -139,6 +140,7 @@ export default async function CalendarPage(props: {
           task.status === 'completed' || task.status === 'scheduled' || task.status === 'cancelled'
             ? task.status
             : 'pending',
+        dependsOnTaskId: task.dependsOnTaskId ?? undefined,
       }];
     });
 

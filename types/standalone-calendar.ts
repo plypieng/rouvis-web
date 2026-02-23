@@ -12,6 +12,7 @@ export interface StandaloneCalendarTask {
   projectName?: string;
   priority?: 'low' | 'medium' | 'high';
   status: 'pending' | 'scheduled' | 'cancelled' | 'completed';
+  dependsOnTaskId?: string;
 }
 
 export interface CalendarOpsSnapshot {
