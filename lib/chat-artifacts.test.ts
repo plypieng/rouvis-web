@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createArtifactFromStreamEvent,
+  extractCommandHandshakeFromContent,
   extractTraceSummary,
   stripHiddenBlocks,
   traceSummaryToArtifacts,
@@ -86,5 +87,43 @@ describe('chat-artifacts reasoning trace helpers', () => {
         tone: 'critical',
       }),
     ]);
+  });
+
+  it('extracts phenology metadata from RESCHEDULE_PLAN handshake', () => {
+    const content = `確認してください\n[[RESCHEDULE_PLAN: ${JSON.stringify({
+      generatedAt: '2026-02-23T00:00:00.000Z',
+      proposalId: 'pp-123',
+      source: 'phenology',
+      triggerType: 'photo_upload',
+      evidenceSummary: 'Stage drift +4d',
+      items: [
+        {
+          id: 'task-1',
+          title: 'Irrigation',
+          from: '2026-02-25T00:00:00.000Z',
+          to: '2026-02-27T00:00:00.000Z',
+        },
+      ],
+    })}]]`;
+
+    const handshake = extractCommandHandshakeFromContent({
+      content,
+      promptFallback: 'Apply this update.',
+      source: 'chat',
+    });
+
+    expect(handshake).toMatchObject({
+      proposalId: 'pp-123',
+      proposalSource: 'phenology',
+      triggerType: 'photo_upload',
+      evidenceSummary: 'Stage drift +4d',
+      summary: 'Stage drift +4d',
+      affectedTasks: [
+        expect.objectContaining({
+          id: 'task-1',
+          title: 'Irrigation',
+        }),
+      ],
+    });
   });
 });

@@ -1035,11 +1035,14 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
         source: 'chat',
       });
       if (handshake) {
+        const localizedSummary = handshake.proposalSource === 'phenology' && handshake.evidenceSummary
+          ? handshake.evidenceSummary
+          : t('cockpit.handshake.summary_detected', {
+            count: handshake.affectedTasks.length,
+          });
         const localizedHandshake: CommandHandshake = {
           ...handshake,
-          summary: t('cockpit.handshake.summary_detected', {
-            count: handshake.affectedTasks.length,
-          }),
+          summary: localizedSummary,
         };
         publishHandshake(localizedHandshake);
         pushArtifact({

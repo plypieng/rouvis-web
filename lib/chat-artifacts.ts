@@ -3,6 +3,7 @@ import type {
   CommandHandshake,
   CommandHandshakeTask,
   CommandRiskTone,
+  PhenologyTriggerType,
   ReasoningTracePhase,
   ReasoningTraceSourceEvent,
   ReasoningTraceStatus,
@@ -22,6 +23,10 @@ type ReschedulePlanItem = {
 type ReschedulePlanPayload = {
   generatedAt?: unknown;
   items?: unknown;
+  proposalId?: unknown;
+  source?: unknown;
+  triggerType?: unknown;
+  evidenceSummary?: unknown;
 };
 
 const TRACE_SUMMARY_PATTERN = /\[\[TRACE_SUMMARY:\s*([\s\S]*?)\]\]/;
@@ -85,6 +90,24 @@ function toDateLabel(value: unknown): string | undefined {
   const parsed = new Date(value);
   if (!Number.isFinite(parsed.getTime())) return undefined;
   return parsed.toISOString();
+}
+
+function toNonEmptyString(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed || undefined;
+}
+
+function toPhenologyTriggerType(value: unknown): PhenologyTriggerType | undefined {
+  if (
+    value === 'photo_upload'
+    || value === 'gdd_threshold'
+    || value === 'harvest_drift_threshold'
+    || value === 'manual'
+  ) {
+    return value;
+  }
+  return undefined;
 }
 
 function toTask(item: ReschedulePlanItem): CommandHandshakeTask | null {
@@ -266,16 +289,25 @@ export function extractCommandHandshakeFromContent(params: {
   const items = Array.isArray(payload.items) ? (payload.items as ReschedulePlanItem[]) : [];
   const tasks = items.map(toTask).filter(Boolean) as CommandHandshakeTask[];
   if (tasks.length === 0) return null;
+  const proposalId = toNonEmptyString(payload.proposalId);
+  const proposalSource = payload.source === 'phenology' ? 'phenology' : undefined;
+  const triggerType = toPhenologyTriggerType(payload.triggerType);
+  const evidenceSummary = toNonEmptyString(payload.evidenceSummary);
+  const fallbackSummary = tasks.length === 1 ? tasks[0].title : String(tasks.length);
 
   return {
     id: buildId('handshake'),
     source: params.source || 'chat',
-    summary: params.summaryFallback || (tasks.length === 1 ? tasks[0].title : String(tasks.length)),
+    summary: params.summaryFallback || evidenceSummary || fallbackSummary,
     prompt: params.promptFallback,
     affectedTasks: tasks,
     createdAt: toIsoDate(payload.generatedAt) || new Date().toISOString(),
     planRaw: matched[0],
     riskTone: riskToneFromPlan(tasks),
+    proposalId,
+    proposalSource,
+    triggerType,
+    evidenceSummary,
   };
 }
 
