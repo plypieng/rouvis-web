@@ -654,4 +654,115 @@ test.describe('Chat Interface with /api/chatkit', () => {
     const assistantMessage = page.locator('.message-assistant').last();
     await expect(assistantMessage).toContainText('セルトレイは苗を育てるための穴あき容器です。');
   });
+
+  test('shows global background completion toast outside chat and deep-links into thread', async ({ page }) => {
+    let runPollCount = 0;
+
+    await page.route('**/api/v1/agents/background-workers/runs**', async (route) => {
+      runPollCount += 1;
+      const state = runPollCount >= 2 ? 'succeeded' : 'running';
+      const now = new Date().toISOString();
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          runs: [
+            {
+              id: 'bg-run-1',
+              state,
+              title: 'Background schedule replan',
+              summary: state === 'succeeded' ? 'Background schedule replan completed.' : 'Running in the background.',
+              errorMessage: null,
+              threadId: 'thread-bg-1',
+              projectId: null,
+              source: 'schedule_generation',
+              createdAt: now,
+              startedAt: now,
+              completedAt: state === 'succeeded' ? now : null,
+            },
+          ],
+          total: 1,
+          generatedAt: now,
+        }),
+      });
+    });
+
+    await page.route('**/api/chatkit**', async (route) => {
+      const request = route.request();
+      if (request.method() === 'GET') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ messages: [] }),
+        });
+        return;
+      }
+
+      let body: ChatRequestBody = {};
+      try {
+        body = JSON.parse(request.postData() || '{}') as ChatRequestBody;
+      } catch {
+        body = {};
+      }
+
+      if (body.action === 'chatkit.list_threads') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            threads: [
+              {
+                id: 'thread-bg-1',
+                title: 'Background Thread',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              },
+            ],
+          }),
+        });
+        return;
+      }
+
+      if (body.action === 'chatkit.create_thread') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            thread: {
+              id: 'thread-created',
+              title: body.payload?.title || 'New Conversation',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            },
+          }),
+        });
+        return;
+      }
+
+      if (body.action === 'chatkit.undo') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ ok: true }),
+        });
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/plain; charset=utf-8',
+        body: createStream([`0:${JSON.stringify('ok')}`]),
+      });
+    });
+
+    await page.goto('http://localhost:3002/ja/terms');
+    await page.waitForLoadState('networkidle');
+
+    const toast = page.getByRole('status').filter({ hasText: /Background schedule replan|バックグラウンド/ }).last();
+    await expect(toast).toBeVisible({ timeout: 15_000 });
+
+    await page.getByRole('button', { name: /チャットを開く|Open chat/ }).click();
+    await expect(page).toHaveURL(/\/ja\/chat\?threadId=thread-bg-1/);
+  });
 });
