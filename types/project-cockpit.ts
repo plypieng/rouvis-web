@@ -62,6 +62,20 @@ export type CommandHandshakeTask = {
   reason?: string;
 };
 
+export type PhenologyProposalSource = 'phenology';
+export type PhenologyTriggerType =
+  | 'photo_upload'
+  | 'gdd_threshold'
+  | 'harvest_drift_threshold'
+  | 'manual';
+export type PhenologyFeedbackReason =
+  | 'field_immature'
+  | 'field_more_advanced'
+  | 'local_weather_differs'
+  | 'labor_constraint'
+  | 'input_error'
+  | 'other';
+
 export type CommandHandshake = {
   id: string;
   source: 'chat' | 'calendar';
@@ -71,6 +85,10 @@ export type CommandHandshake = {
   createdAt: string;
   planRaw?: string;
   riskTone?: CommandRiskTone;
+  proposalId?: string;
+  proposalSource?: PhenologyProposalSource;
+  triggerType?: PhenologyTriggerType;
+  evidenceSummary?: string;
 };
 
 export type CommandArtifactKind =

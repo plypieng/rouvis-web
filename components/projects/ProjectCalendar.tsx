@@ -22,6 +22,7 @@ import { useWeatherTimeline } from '@/hooks/useWeatherTimeline';
 import { isRainRiskDay, isWeatherSensitiveTask } from '@/lib/weather-timeline';
 import type {
   CommandHandshake,
+  PhenologyFeedbackReason,
   ProjectTaskItem,
   QuickApplyResult,
   QuickApplyState,
@@ -50,6 +51,10 @@ type RescheduleSuggestion = {
   summary: string;
   prompt: string;
   affectedTasks?: Array<{ id: string; title: string; dueDate: string }>;
+  proposalId?: string;
+  proposalSource?: 'phenology';
+  triggerType?: 'photo_upload' | 'gdd_threshold' | 'harvest_drift_threshold' | 'manual';
+  evidenceSummary?: string;
 };
 
 type LocalNotice = {
@@ -57,12 +62,55 @@ type LocalNotice = {
   message: string;
 } | null;
 
+type ChallengeSubmissionState = {
+  status: 'idle' | 'submitting' | 'success' | 'error';
+  message?: string;
+};
+
 type PendingWeatherMove = {
   taskId: string;
   toDate: string;
   taskTitle: string;
   precipProbability: number;
 };
+
+const PHENOLOGY_CHALLENGE_REASONS: PhenologyFeedbackReason[] = [
+  'field_immature',
+  'field_more_advanced',
+  'local_weather_differs',
+  'labor_constraint',
+  'input_error',
+  'other',
+];
+
+const PHENOLOGY_REASON_LABEL_KEY: Record<PhenologyFeedbackReason, string> = {
+  field_immature: 'phenology_reason_field_immature',
+  field_more_advanced: 'phenology_reason_field_more_advanced',
+  local_weather_differs: 'phenology_reason_local_weather_differs',
+  labor_constraint: 'phenology_reason_labor_constraint',
+  input_error: 'phenology_reason_input_error',
+  other: 'phenology_reason_other',
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function toIsoDateString(value: unknown): string | null {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const parsed = new Date(value);
+  if (!Number.isFinite(parsed.getTime())) return null;
+  return parsed.toISOString();
+}
+
+function toPhenologyTriggerType(value: unknown): RescheduleSuggestion['triggerType'] {
+  return (
+    value === 'photo_upload'
+    || value === 'gdd_threshold'
+    || value === 'harvest_drift_threshold'
+    || value === 'manual'
+  ) ? value : undefined;
+}
 
 function mergeDateKeepingTime(fromIso: string, toDate: string): string {
   const from = new Date(fromIso);
@@ -98,6 +146,10 @@ export default function ProjectCalendar({
   const [activeDragTaskId, setActiveDragTaskId] = useState<string | null>(null);
   const [pendingWeatherMove, setPendingWeatherMove] = useState<PendingWeatherMove | null>(null);
   const [localNotice, setLocalNotice] = useState<LocalNotice>(null);
+  const [challengeExpanded, setChallengeExpanded] = useState(false);
+  const [challengeReason, setChallengeReason] = useState<PhenologyFeedbackReason | null>(null);
+  const [challengeComment, setChallengeComment] = useState('');
+  const [challengeState, setChallengeState] = useState<ChallengeSubmissionState>({ status: 'idle' });
 
   const quickApplyErrorMessage = useCallback((reason?: string) => {
     if (reason === 'in_flight') return t('quick_apply_error_in_flight');
@@ -132,6 +184,10 @@ export default function ProjectCalendar({
           title: task.title,
           dueDate: task.dueDate,
         })),
+        proposalId: externalHandshake.proposalId,
+        proposalSource: externalHandshake.proposalSource,
+        triggerType: externalHandshake.triggerType,
+        evidenceSummary: externalHandshake.evidenceSummary,
       });
       return;
     }
@@ -158,6 +214,14 @@ export default function ProjectCalendar({
     () => new Set((rescheduleSuggestion?.affectedTasks || []).map((task) => task.id)),
     [rescheduleSuggestion?.affectedTasks]
   );
+  const isPhenologySuggestion = rescheduleSuggestion?.proposalSource === 'phenology' && Boolean(rescheduleSuggestion?.proposalId);
+
+  useEffect(() => {
+    setChallengeExpanded(false);
+    setChallengeReason(null);
+    setChallengeComment('');
+    setChallengeState({ status: 'idle' });
+  }, [rescheduleSuggestion?.proposalId, rescheduleSuggestion?.proposalSource]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -291,6 +355,92 @@ export default function ProjectCalendar({
     }
   };
 
+  const handlePhenologyChallengeSubmit = useCallback(async () => {
+    if (!rescheduleSuggestion?.proposalId || !challengeReason) return;
+    setChallengeState({ status: 'submitting' });
+
+    try {
+      const response = await fetch(`/api/v1/projects/${project.id}/phenology/challenge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          proposalId: rescheduleSuggestion.proposalId,
+          reasonCode: challengeReason,
+          comment: challengeComment.trim() || undefined,
+        }),
+      });
+
+      const payloadRaw = await response.json().catch(() => ({}));
+      const payload = isRecord(payloadRaw) ? payloadRaw : {};
+      if (!response.ok) {
+        const message = typeof payload.message === 'string'
+          ? payload.message
+          : typeof payload.error === 'string'
+            ? payload.error
+            : t('phenology_challenge_error');
+        throw new Error(message);
+      }
+
+      const revisedGenerated = payload.revisedProposalGenerated === true;
+      const revisedPlan = isRecord(payload.plan) ? payload.plan : null;
+      const revisedPlanItems = revisedPlan && Array.isArray(revisedPlan.items) ? revisedPlan.items : [];
+      if (revisedGenerated && revisedPlan) {
+        const affectedTasks = revisedPlanItems
+          .map((item) => {
+            if (!isRecord(item)) return null;
+            const id = typeof item.id === 'string' && item.id.trim()
+              ? item.id
+              : null;
+            const title = typeof item.title === 'string' && item.title.trim()
+              ? item.title
+              : id;
+            const dueDate = toIsoDateString(item.to) || toIsoDateString(item.dueDate);
+            if (!id || !title || !dueDate) return null;
+            return { id, title, dueDate };
+          })
+          .filter((task): task is { id: string; title: string; dueDate: string } => Boolean(task));
+
+        const revisedProposalId = typeof payload.proposalId === 'string'
+          ? payload.proposalId
+          : (typeof revisedPlan.proposalId === 'string' ? revisedPlan.proposalId : rescheduleSuggestion.proposalId);
+        const revisedEvidence = typeof revisedPlan.evidenceSummary === 'string'
+          ? revisedPlan.evidenceSummary
+          : rescheduleSuggestion.evidenceSummary;
+        const revisedTriggerType = toPhenologyTriggerType(revisedPlan.triggerType) || rescheduleSuggestion.triggerType;
+        const revisedSummary = revisedEvidence
+          || (typeof payload.revisedMessage === 'string' ? payload.revisedMessage : rescheduleSuggestion.summary);
+
+        setRescheduleSuggestion((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            summary: revisedSummary,
+            affectedTasks: affectedTasks.length > 0 ? affectedTasks : prev.affectedTasks,
+            proposalId: revisedProposalId,
+            proposalSource: 'phenology',
+            triggerType: revisedTriggerType,
+            evidenceSummary: revisedEvidence,
+          };
+        });
+      }
+
+      const successMessage = revisedGenerated
+        ? t('phenology_challenge_success_revised')
+        : t('phenology_challenge_success');
+      setChallengeState({ status: 'success', message: successMessage });
+      setLocalNotice({ tone: 'safe', message: successMessage });
+      setChallengeExpanded(false);
+      setChallengeReason(null);
+      setChallengeComment('');
+    } catch (error) {
+      const message = error instanceof Error && error.message
+        ? error.message
+        : t('phenology_challenge_error');
+      setChallengeState({ status: 'error', message });
+      setLocalNotice({ tone: 'critical', message });
+    }
+  }, [challengeComment, challengeReason, project.id, rescheduleSuggestion?.proposalId, t]);
+
   const calendarLocale = locale === 'ja' ? 'ja-JP' : locale;
   const monthLabelFormatter = useMemo(
     () => new Intl.DateTimeFormat(calendarLocale, { year: 'numeric', month: 'long' }),
@@ -325,6 +475,16 @@ export default function ProjectCalendar({
               <p className="text-xs text-muted-foreground" data-testid="calendar-handshake-affected">
                 {t('handshake_affected', { count: rescheduleSuggestion.affectedTasks?.length || 0 })}
               </p>
+              {isPhenologySuggestion ? (
+                <p className="mt-1 inline-flex rounded-full border border-brand-seedling/40 bg-brand-seedling/10 px-2 py-0.5 text-[11px] font-semibold text-brand-seedling">
+                  {t('phenology_badge')}
+                </p>
+              ) : null}
+              {rescheduleSuggestion.evidenceSummary ? (
+                <p className="mt-1 text-xs text-muted-foreground" data-testid="calendar-handshake-evidence">
+                  {t('phenology_evidence_label')}: {rescheduleSuggestion.evidenceSummary}
+                </p>
+              ) : null}
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <button
@@ -344,12 +504,92 @@ export default function ProjectCalendar({
               >
                 {quickApplyState?.status === 'running' ? t('handshake_apply_running') : t('handshake_apply')}
               </button>
+              {isPhenologySuggestion ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setChallengeExpanded(prev => !prev);
+                    setChallengeState({ status: 'idle' });
+                  }}
+                  className="touch-target rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+                  data-testid="calendar-handshake-challenge"
+                >
+                  {challengeExpanded ? t('phenology_challenge_hide') : t('phenology_challenge_show')}
+                </button>
+              ) : null}
             </div>
           </div>
           {selectedQuickApplyText ? (
             <p className={`mt-2 text-xs ${quickApplyState?.status === 'error' ? 'text-destructive' : 'text-muted-foreground'}`}>
               {selectedQuickApplyText}
             </p>
+          ) : null}
+          {isPhenologySuggestion && challengeExpanded ? (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/60 p-3" data-testid="calendar-phenology-challenge-panel">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-amber-800">
+                {t('phenology_challenge_title')}
+              </p>
+              <p className="mt-1 text-xs text-amber-900">
+                {t('phenology_challenge_hint')}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {PHENOLOGY_CHALLENGE_REASONS.map((reason) => (
+                  <button
+                    key={reason}
+                    type="button"
+                    onClick={() => setChallengeReason(reason)}
+                    className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${
+                      challengeReason === reason
+                        ? 'border-amber-500 bg-amber-200 text-amber-900'
+                        : 'border-amber-300 bg-white text-amber-800 hover:bg-amber-100'
+                    }`}
+                    data-testid={`calendar-phenology-reason-${reason}`}
+                  >
+                    {t(PHENOLOGY_REASON_LABEL_KEY[reason])}
+                  </button>
+                ))}
+              </div>
+              <label className="mt-2 block text-[11px] font-medium text-amber-900">
+                {t('phenology_comment_label')}
+                <textarea
+                  value={challengeComment}
+                  onChange={(event) => setChallengeComment(event.target.value)}
+                  placeholder={t('phenology_comment_placeholder')}
+                  rows={2}
+                  maxLength={800}
+                  className="mt-1 w-full rounded-md border border-amber-300 bg-white px-2 py-1.5 text-xs text-foreground outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
+                  data-testid="calendar-phenology-comment"
+                />
+              </label>
+              <div className="mt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setChallengeExpanded(false);
+                    setChallengeState({ status: 'idle' });
+                  }}
+                  className="rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+                >
+                  {t('phenology_challenge_cancel')}
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePhenologyChallengeSubmit}
+                  disabled={!challengeReason || challengeState.status === 'submitting'}
+                  className="rounded-md bg-amber-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-800 disabled:opacity-55"
+                  data-testid="calendar-phenology-submit"
+                >
+                  {challengeState.status === 'submitting'
+                    ? t('phenology_challenge_submitting')
+                    : t('phenology_challenge_submit')}
+                </button>
+              </div>
+              {challengeState.status === 'error' || challengeState.status === 'success' ? (
+                <p className={`mt-2 text-xs ${challengeState.status === 'error' ? 'text-destructive' : 'text-emerald-700'}`}>
+                  {challengeState.message}
+                </p>
+              ) : null}
+            </div>
           ) : null}
         </section>
       ) : null}
