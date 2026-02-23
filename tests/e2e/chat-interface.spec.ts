@@ -178,10 +178,12 @@ async function openChat(page: Page) {
 }
 
 async function sendPrompt(page: Page, prompt: string) {
-  const input = page.locator('input[type="text"]');
-  const submit = page.locator('button[type="submit"]');
+  const composer = page.locator('form').filter({ has: page.locator('button[type="submit"]') }).last();
+  const input = composer.locator('input[type="text"]');
+  const submit = composer.locator('button[type="submit"]');
   await expect(input).toBeVisible();
   await input.fill(prompt);
+  await expect(submit).toBeEnabled();
   await submit.click();
 }
 
@@ -241,6 +243,67 @@ test.describe('Chat Interface with /api/chatkit', () => {
     await expect(actionCard).toBeVisible();
     await expect(actionCard).toContainText(/更新|Updated/);
     await expect(actionCard.getByRole('button', { name: /取り消す|Undo/ })).toBeVisible();
+  });
+
+  test('shows queued background worker artifacts and pending job panel', async ({ page }) => {
+    await page.route('**/api/v1/agents/background-workers/runs**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          runs: [
+            {
+              id: 'bg-run-12345678',
+              intent: 'run_reschedule_planner',
+              state: 'queued',
+              queuedAt: '2026-02-23T08:00:00.000Z',
+            },
+          ],
+          total: 1,
+          queueDepth: 1,
+          generatedAt: '2026-02-23T08:00:00.000Z',
+        }),
+      });
+    });
+
+    await mockChatkit(page, {
+      streamForPrompt: () => createStream([
+        `e:${JSON.stringify({
+          type: 'tool_call_delta',
+          delta: {
+            tool: 'spawn_background_worker',
+            status: 'running',
+            message: 'Queueing long-running task...',
+          },
+        })}`,
+        `e:${JSON.stringify({
+          type: 'tool_call_delta',
+          delta: {
+            tool: 'spawn_background_worker',
+            status: 'completed',
+            message: 'Queued as bg-run-12345678',
+          },
+        })}`,
+        `e:${JSON.stringify({
+          type: 'custom_ui',
+          data: {
+            type: 'background_worker_queued',
+            runId: 'bg-run-12345678',
+            intent: 'run_reschedule_planner',
+          },
+        })}`,
+        `0:${JSON.stringify('重い処理をバックグラウンドで開始しました。完了後に通知します。')}`,
+      ]),
+    });
+
+    await openChat(page);
+    await sendPrompt(page, '10年分の気象データで今季スケジュールを再計算して');
+
+    await expect(page.getByTestId('command-artifact-queue').first()).toBeVisible();
+    const pendingPanel = page.getByTestId('pending-background-jobs');
+    await expect(pendingPanel).toBeVisible();
+    await expect(pendingPanel).toContainText('run_reschedule_planner');
+    await expect(page.getByTestId('pending-background-job').first()).toContainText('bg-run-1');
   });
 
   test('shows loading indicator while waiting for stream response', async ({ page }) => {
