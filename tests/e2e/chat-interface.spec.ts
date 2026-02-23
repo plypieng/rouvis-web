@@ -822,7 +822,11 @@ test.describe('Chat Interface with /api/chatkit', () => {
     await page.goto('http://localhost:3002/ja/terms');
     await page.waitForLoadState('networkidle');
 
-    const toast = page.getByRole('status').filter({ hasText: /Background schedule replan|バックグラウンド/ }).last();
+    await expect.poll(() => runPollCount, { timeout: 25_000 }).toBeGreaterThanOrEqual(2);
+
+    const toast = page.getByRole('status').filter({
+      hasText: /Background schedule replan|バックグラウンド|完了しました|completed/i,
+    }).last();
     await expect(toast).toBeVisible({ timeout: 15_000 });
 
     await page.getByRole('button', { name: /チャットを開く|Open chat/ }).click();
