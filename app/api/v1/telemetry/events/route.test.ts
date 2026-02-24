@@ -128,6 +128,21 @@ describe('/api/v1/telemetry/events POST', () => {
     });
   });
 
+  it('skips persistence when no authenticated user is present', async () => {
+    getServerSessionFromTokenMock.mockResolvedValue(null);
+
+    const response = await POST(makeRequest({
+      event: 'dashboard_next_best_action_viewed',
+      properties: {
+        mode: 'new_farmer',
+      },
+    }));
+
+    expect(response.status).toBe(204);
+    expect(auditEventCreateMock).not.toHaveBeenCalled();
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+  });
+
   it('rejects KPI events when required retention fields are missing', async () => {
     const response = await POST(makeRequest({
       event: 'schedule_generated',

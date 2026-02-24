@@ -60,6 +60,10 @@ export async function POST(req: NextRequest) {
 
   const session = await getServerSessionFromToken();
   const userId = session?.user?.id || null;
+  if (!userId) {
+    // Skip anonymous persistence to avoid noisy Prisma failures before auth/session is ready.
+    return new NextResponse(null, { status: 204 });
+  }
 
   try {
     await authPrisma.auditEvent.create({

@@ -4,6 +4,7 @@ import { forwardRef, useImperativeHandle, useRef, useEffect, useState, useCallba
 import { Send, Loader2, RefreshCw, Undo2, Paperclip, X, ArrowRight, Plus, ChevronDown, ChevronUp, MessageSquarePlus, Clock, Brain } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useLocale, useTranslations } from 'next-intl';
+import { useSession } from 'next-auth/react';
 import { toastError } from '@/lib/feedback';
 import { trackUXEvent } from '@/lib/analytics';
 import {
@@ -359,6 +360,8 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
 }, ref) => {
   const locale = useLocale();
   const t = useTranslations('chat');
+  const { status: sessionStatus } = useSession();
+  const isAuthenticated = sessionStatus === 'authenticated';
   const defaultAssistantLanguage = inferAssistantLanguage(locale);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState(initialInput || '');
@@ -463,6 +466,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   }, [onCommandHandshakeChange]);
 
   const ensureThreadId = useCallback(async (): Promise<string | undefined> => {
+    if (!isAuthenticated) return undefined;
     if (threadId) return threadId;
     if (!autoCreateThread) return undefined;
 
@@ -500,9 +504,14 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
 
     const createdThreadId = await createThreadPromiseRef.current;
     return createdThreadId || undefined;
-  }, [autoCreateThread, projectId, threadId]);
+  }, [autoCreateThread, isAuthenticated, projectId, threadId]);
 
   const fetchThreadList = useCallback(async () => {
+    if (!isAuthenticated) {
+      setThreadList([]);
+      return [];
+    }
+
     try {
       const listThreadsPayload = projectId
         ? { action: 'chatkit.list_threads', payload: { projectId } }
@@ -521,10 +530,10 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
       console.warn('Failed to load thread list:', error);
       return [];
     }
-  }, [projectId]);
+  }, [isAuthenticated, projectId]);
 
   const refreshBackgroundWorkerRuns = useCallback(async (options?: { refresh?: boolean }) => {
-    if (!threadId) {
+    if (!isAuthenticated || !threadId) {
       setPendingBackgroundRuns([]);
       return;
     }
@@ -548,9 +557,14 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     } catch (error) {
       console.warn('Failed to fetch background worker runs:', error);
     }
-  }, [threadId]);
+  }, [isAuthenticated, threadId]);
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setThreadList([]);
+      return;
+    }
+
     let cancelled = false;
 
     const initThreads = async () => {
@@ -570,10 +584,10 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     return () => {
       cancelled = true;
     };
-  }, [fetchThreadList]);
+  }, [fetchThreadList, isAuthenticated]);
 
   useEffect(() => {
-    if (!threadId) {
+    if (!isAuthenticated || !threadId) {
       setPendingBackgroundRuns([]);
       return;
     }
@@ -586,10 +600,12 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     return () => {
       window.clearInterval(timer);
     };
-  }, [refreshBackgroundWorkerRuns, threadId]);
+  }, [isAuthenticated, refreshBackgroundWorkerRuns, threadId]);
 
   // Load chat history on mount
   useEffect(() => {
+    if (!isAuthenticated) return;
+
     const loadHistory = async () => {
       if (!threadId) return;
       if (isLoading) return;
@@ -650,7 +666,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     };
 
     void loadHistory();
-  }, [threadId, isLoading]);
+  }, [isAuthenticated, threadId, isLoading]);
 
   useEffect(() => {
     if (!initialMode) return;

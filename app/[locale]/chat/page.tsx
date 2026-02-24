@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
+import { useSession } from 'next-auth/react';
 import { ErrorBoundary } from '../../../components/ErrorBoundary';
 import {
   RouvisChatKit,
@@ -165,6 +166,8 @@ export default function ChatPage() {
   const t = useTranslations('chat');
   const locale = useLocale();
   const searchParams = useSearchParams();
+  const { status: sessionStatus } = useSession();
+  const isAuthenticated = sessionStatus === 'authenticated';
   const [threads, setThreads] = useState<Thread[]>([]);
   const [selectedThreadId, setSelectedThreadId] = useState<string | undefined>(undefined);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -276,6 +279,14 @@ export default function ChatPage() {
   }, [contextDate, contextEntryKey, contextIntent, contextProjectId, contextPrompt, forceFreshThread, hasContextEntry]);
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setThreads([]);
+      setSelectedThreadId(undefined);
+      setThreadLoadError(null);
+      contextThreadSeedRef.current = '';
+      return;
+    }
+
     let cancelled = false;
 
     const loadThreads = async () => {
@@ -398,12 +409,18 @@ export default function ChatPage() {
     contextPrompt,
     forceFreshThread,
     hasContextEntry,
+    isAuthenticated,
     requestedThreadId,
     t,
     threadReloadToken,
   ]);
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setIntentMetrics(null);
+      return;
+    }
+
     let cancelled = false;
     const loadMetrics = async () => {
       try {
@@ -427,9 +444,11 @@ export default function ChatPage() {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [metricsWindow]);
+  }, [isAuthenticated, metricsWindow]);
 
   const handleNewChat = async () => {
+    if (!isAuthenticated) return;
+
     try {
       const res = await fetch('/api/chatkit', {
         method: 'POST',
