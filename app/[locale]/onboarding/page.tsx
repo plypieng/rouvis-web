@@ -818,41 +818,43 @@ export default function OnboardingPage() {
               </span>
             </div>
 
-            <FieldMapCanvas
-              fields={[]}
-              selectedFieldId={null}
-              draftGeometry={fieldData.geometry || null}
-              draftCentroid={fieldData.centroid || null}
-              drawMode={fieldEntryMode === 'quick' ? 'centroid' : 'polygon'}
-              riskByFieldId={{}}
-              onSelectField={() => { }}
-              onDraftGeometryChange={(geometry) => {
-                const areaHa = geometryAreaHa(geometry);
-                setFieldData((prev) => ({
-                  ...prev,
-                  geometry,
-                  area: areaHa ?? prev.area,
-                }));
-                setErrors((prev) => {
-                  if (!prev.location) return prev;
-                  const next = { ...prev };
-                  delete next.location;
-                  return next;
-                });
-              }}
-              onDraftCentroidChange={(centroid) => {
-                setFieldData((prev) => ({
-                  ...prev,
-                  centroid,
-                }));
-                setErrors((prev) => {
-                  if (!prev.location) return prev;
-                  const next = { ...prev };
-                  delete next.location;
-                  return next;
-                });
-              }}
-            />
+            <div className="[&_[data-testid='field-map-canvas']]:h-[64vh] [&_[data-testid='field-map-canvas']]:min-h-[420px] md:[&_[data-testid='field-map-canvas']]:h-[70vh]">
+              <FieldMapCanvas
+                fields={[]}
+                selectedFieldId={null}
+                draftGeometry={fieldData.geometry || null}
+                draftCentroid={fieldData.centroid || null}
+                drawMode={fieldEntryMode === 'quick' ? 'centroid' : 'polygon'}
+                riskByFieldId={{}}
+                onSelectField={() => { }}
+                onDraftGeometryChange={(geometry) => {
+                  const areaHa = geometryAreaHa(geometry);
+                  setFieldData((prev) => ({
+                    ...prev,
+                    geometry,
+                    area: areaHa ?? prev.area,
+                  }));
+                  setErrors((prev) => {
+                    if (!prev.location) return prev;
+                    const next = { ...prev };
+                    delete next.location;
+                    return next;
+                  });
+                }}
+                onDraftCentroidChange={(centroid) => {
+                  setFieldData((prev) => ({
+                    ...prev,
+                    centroid,
+                  }));
+                  setErrors((prev) => {
+                    if (!prev.location) return prev;
+                    const next = { ...prev };
+                    delete next.location;
+                    return next;
+                  });
+                }}
+              />
+            </div>
             {errors.location ? <p className="mt-2 text-sm text-red-600">{errors.location}</p> : null}
           </div>
 

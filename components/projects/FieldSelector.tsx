@@ -571,7 +571,7 @@ export default function FieldSelector({ value, onChange, onFieldsLoaded }: Field
 
           <div
             data-testid="field-selector-create-map"
-            className="[&_[data-testid='field-map-canvas']]:min-h-0 [&_[data-testid='field-map-canvas']]:h-[340px] md:[&_[data-testid='field-map-canvas']]:h-[440px] xl:[&_[data-testid='field-map-canvas']]:h-[520px]"
+            className="[&_[data-testid='field-map-canvas']]:min-h-0 [&_[data-testid='field-map-canvas']]:h-[420px] md:[&_[data-testid='field-map-canvas']]:h-[520px] xl:[&_[data-testid='field-map-canvas']]:h-[620px]"
           >
             <FieldMapCanvas
               fields={fields}
@@ -634,7 +634,7 @@ export default function FieldSelector({ value, onChange, onFieldsLoaded }: Field
         <div className="space-y-3">
           <div
             data-testid="field-selector-browse-map"
-            className="[&_[data-testid='field-map-canvas']]:min-h-0 [&_[data-testid='field-map-canvas']]:h-[300px] md:[&_[data-testid='field-map-canvas']]:h-[360px] xl:[&_[data-testid='field-map-canvas']]:h-[420px]"
+            className="[&_[data-testid='field-map-canvas']]:min-h-0 [&_[data-testid='field-map-canvas']]:h-[360px] md:[&_[data-testid='field-map-canvas']]:h-[460px] xl:[&_[data-testid='field-map-canvas']]:h-[540px]"
           >
             <FieldMapCanvas
               fields={fields}

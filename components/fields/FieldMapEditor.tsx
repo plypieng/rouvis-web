@@ -214,7 +214,7 @@ export default function FieldMapEditor({ onFieldChange, initialPolygon }: FieldM
                     書き直す
                 </button>
 
-                <div ref={mapRef} className="h-[400px] w-full rounded-xl border border-border" />
+                <div ref={mapRef} className="h-[520px] w-full rounded-xl border border-border md:h-[580px]" />
             </div>
 
             <p className="text-center text-xs text-muted-foreground">

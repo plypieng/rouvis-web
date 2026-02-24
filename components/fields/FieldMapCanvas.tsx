@@ -847,7 +847,7 @@ export default function FieldMapCanvas({
   return (
     <div
       data-testid="field-map-canvas"
-      className="relative h-[56vh] min-h-[360px] w-full overflow-hidden rounded-2xl border border-border bg-slate-100"
+      className="relative h-[62vh] min-h-[420px] w-full overflow-hidden rounded-2xl border border-border bg-slate-100 md:h-[68vh] xl:max-h-[820px]"
     >
       <div ref={mapRef} className="h-full w-full" data-testid="maplibre-canvas" />
 

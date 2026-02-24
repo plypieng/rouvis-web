@@ -301,7 +301,7 @@ export default function FieldStudio() {
 
       <div className="flex min-h-[320px] flex-1 flex-col gap-4">
         {loading ? (
-          <div className="surface-base flex h-[56vh] min-h-[360px] items-center justify-center">
+          <div className="surface-base flex h-[62vh] min-h-[420px] items-center justify-center md:h-[68vh] xl:max-h-[820px]">
             <div className="text-sm text-muted-foreground">圃場データを読み込み中...</div>
           </div>
         ) : (
