@@ -7,7 +7,7 @@ vi.mock('../../../lib/backend-proxy-auth', () => ({
   getBackendAuth: getBackendAuthMock,
 }));
 
-import { POST } from './route';
+import { GET, POST } from './route';
 
 function makeRequest(requestId: string, body: unknown): NextRequest {
   return new NextRequest('http://localhost:3000/api/chatkit', {
@@ -17,6 +17,16 @@ function makeRequest(requestId: string, body: unknown): NextRequest {
       'x-request-id': requestId,
     },
     body: JSON.stringify(body),
+  });
+}
+
+function makeGetRequest(requestId: string, query = ''): NextRequest {
+  const suffix = query ? `?${query}` : '';
+  return new NextRequest(`http://localhost:3000/api/chatkit${suffix}`, {
+    method: 'GET',
+    headers: {
+      'x-request-id': requestId,
+    },
   });
 }
 
@@ -223,5 +233,78 @@ describe('/api/chatkit POST', () => {
     expect(response.headers.get('x-request-id')).toBe('upstream-req-stream-2');
     const body = await response.text();
     expect(body).toContain(`e:${JSON.stringify(reasoningEvent)}`);
+  });
+});
+
+describe('/api/chatkit GET', () => {
+  const originalBackendUrl = process.env.BACKEND_URL;
+  const originalPublicApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+  const fetchMock = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.BACKEND_URL = 'http://backend.local';
+    process.env.NEXT_PUBLIC_API_BASE_URL = '';
+    getBackendAuthMock.mockResolvedValue({
+      headers: {
+        Authorization: 'Bearer token',
+      },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    process.env.BACKEND_URL = originalBackendUrl;
+    process.env.NEXT_PUBLIC_API_BASE_URL = originalPublicApiBaseUrl;
+    vi.unstubAllGlobals();
+  });
+
+  it('returns thread history preserving structured image content payload', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({
+      thread: {
+        messages: [
+          {
+            id: 'msg-1',
+            role: 'user',
+            content: JSON.stringify([
+              { type: 'text', text: 'leaf issue' },
+              { type: 'image_url', image_url: { url: 'https://blob.example/leaf.png' } },
+            ]),
+          },
+        ],
+      },
+    }), {
+      status: 200,
+      headers: {
+        'content-type': 'application/json',
+      },
+    }));
+
+    const response = await GET(makeGetRequest('req-chatkit-get-1', 'thread_id=thread-1'));
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://backend.local/api/v1/threads/thread-1',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer token',
+        }),
+      }),
+    );
+
+    const payload = await response.json();
+    expect(payload).toEqual({
+      messages: [
+        {
+          id: 'msg-1',
+          role: 'user',
+          content: JSON.stringify([
+            { type: 'text', text: 'leaf issue' },
+            { type: 'image_url', image_url: { url: 'https://blob.example/leaf.png' } },
+          ]),
+        },
+      ],
+      preferences: undefined,
+    });
   });
 });

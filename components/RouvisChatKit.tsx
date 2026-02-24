@@ -5,8 +5,11 @@ import { Send, Loader2, RefreshCw, Undo2, Paperclip, X, ArrowRight, Plus, Chevro
 import ReactMarkdown from 'react-markdown';
 import { useLocale, useTranslations } from 'next-intl';
 import { useSession } from 'next-auth/react';
+import { upload } from '@vercel/blob/client';
 import { toastError } from '@/lib/feedback';
 import { trackUXEvent } from '@/lib/analytics';
+import { buildChatImageBlobPath, validateChatImageFile } from '@/lib/chat-image-upload';
+import { parseStoredChatMessageContent } from '@/lib/chat-message-content';
 import {
   createArtifactFromStreamEvent,
   extractCommandHandshakeFromContent,
@@ -217,6 +220,11 @@ function inferAssistantLanguage(locale: string): AssistantLanguage {
   return locale.toLowerCase().startsWith('ja') ? 'ja' : 'en';
 }
 
+function resolveSessionUserId(session: unknown): string | null {
+  const maybeId = (session as { user?: { id?: unknown } } | null)?.user?.id;
+  return typeof maybeId === 'string' && maybeId.trim().length > 0 ? maybeId : null;
+}
+
 function ReasoningAccordion({
   message,
   isLoading,
@@ -360,8 +368,9 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
 }, ref) => {
   const locale = useLocale();
   const t = useTranslations('chat');
-  const { status: sessionStatus } = useSession();
+  const { status: sessionStatus, data: sessionData } = useSession();
   const isAuthenticated = sessionStatus === 'authenticated';
+  const sessionUserId = resolveSessionUserId(sessionData);
   const defaultAssistantLanguage = inferAssistantLanguage(locale);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState(initialInput || '');
@@ -374,7 +383,8 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   const [traceExpanded, setTraceExpanded] = useState(false);
   const [activeHandshake, setActiveHandshake] = useState<CommandHandshake | null>(null);
   const [weather, setWeather] = useState<{ condition?: string } | undefined>();
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [selectedImagePreviewUrl, setSelectedImagePreviewUrl] = useState<string | null>(null);
   const [isUserNearBottom, setIsUserNearBottom] = useState(true);
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
   const [chatMode, setChatModeState] = useState<ChatMode>('default'); // New state
@@ -618,7 +628,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
             messages?: Array<{
               id: string;
               role: string;
-              content: string;
+              content: unknown;
               createdAt?: string;
             }>;
             preferences?: {
@@ -628,11 +638,13 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
           };
           const history: Message[] = (data.messages || []).map((m) => {
             const isAssistant = m.role !== 'user';
-            const traceSummary = isAssistant ? extractTraceSummary(m.content) : null;
+            const parsed = parseStoredChatMessageContent(m.content);
+            const traceSummary = isAssistant ? extractTraceSummary(parsed.contentText) : null;
             return {
               id: m.id,
               role: isAssistant ? 'assistant' : 'user',
-              content: m.content,
+              content: parsed.contentText,
+              imageUrl: parsed.imageUrl,
               createdAt: m.createdAt,
               reasoningSteps: traceSummary?.steps || undefined,
             };
@@ -700,23 +712,36 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
+      const validation = validateChatImageFile(file);
+      if (!validation.ok) {
         toastError(t('cockpit.errors.image_size'));
         return;
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setSelectedImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+
+      if (selectedImagePreviewUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(selectedImagePreviewUrl);
+      }
+
+      setSelectedImageFile(file);
+      setSelectedImagePreviewUrl(URL.createObjectURL(file));
     }
     // Reset input so same file can be selected again if needed
     e.target.value = '';
   };
 
   const handleRemoveImage = () => {
-    setSelectedImage(null);
+    if (selectedImagePreviewUrl?.startsWith('blob:')) {
+      URL.revokeObjectURL(selectedImagePreviewUrl);
+    }
+    setSelectedImageFile(null);
+    setSelectedImagePreviewUrl(null);
   };
+
+  useEffect(() => () => {
+    if (selectedImagePreviewUrl?.startsWith('blob:')) {
+      URL.revokeObjectURL(selectedImagePreviewUrl);
+    }
+  }, [selectedImagePreviewUrl]);
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
     if (messagesContainerRef.current) {
@@ -752,14 +777,37 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   ) => {
     const trimmedContent = content.trim();
     const hasApprovalPayload = Boolean(options?.mutationApprovalToken);
-    if ((!trimmedContent && !selectedImage && !hasApprovalPayload && !options?.yieldToken) || isLoading) return;
+    const shouldAttachImage = !options?.skipUserMessage && Boolean(selectedImageFile);
+    if ((!trimmedContent && !shouldAttachImage && !hasApprovalPayload && !options?.yieldToken) || isLoading) return;
     let assistantRawContent = '';
     let assistantFailed = false;
     lastAssistantRawRef.current = '';
     lastAssistantFailedRef.current = false;
 
-    // Capture image before clearing state
-    const currentImageUrl = selectedImage;
+    let uploadedImageUrl: string | undefined;
+    if (shouldAttachImage && selectedImageFile) {
+      if (!sessionUserId) {
+        toastError('Failed to upload image. Please sign in again.');
+        return;
+      }
+
+      try {
+        const pathname = buildChatImageBlobPath({
+          userId: sessionUserId,
+          fileName: selectedImageFile.name,
+        });
+        const blob = await upload(pathname, selectedImageFile, {
+          access: 'public',
+          handleUploadUrl: '/api/upload',
+          contentType: selectedImageFile.type || undefined,
+        });
+        uploadedImageUrl = blob.url;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to upload image';
+        toastError(message);
+        return;
+      }
+    }
 
     const userMessage: Message | null = options?.skipUserMessage
       ? null
@@ -767,7 +815,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
         id: `user-${Date.now()}`,
         role: 'user',
         content: trimmedContent,
-        imageUrl: currentImageUrl || undefined,
+        imageUrl: uploadedImageUrl,
       };
 
     // Build API messages array BEFORE clearing state.
@@ -786,9 +834,6 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
       setMessages(prev => [...prev, userMessage]);
     }
     setInput('');
-    if (!options?.skipUserMessage) {
-      setSelectedImage(null);
-    }
     setIsLoading(true);
     setTraceExpanded(false);
     setCurrentStatus('');
@@ -839,6 +884,14 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
 
       if (!response.ok) throw new Error('Failed to send message');
       if (!response.body) throw new Error('No response body');
+
+      if (!options?.skipUserMessage && uploadedImageUrl) {
+        if (selectedImagePreviewUrl?.startsWith('blob:')) {
+          URL.revokeObjectURL(selectedImagePreviewUrl);
+        }
+        setSelectedImageFile(null);
+        setSelectedImagePreviewUrl(null);
+      }
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -1165,7 +1218,9 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     sessionActorId,
     threadId,
     isLoading,
-    selectedImage,
+    selectedImageFile,
+    selectedImagePreviewUrl,
+    sessionUserId,
     onTaskUpdate,
     onDiagnosisComplete,
     onDraftCreate,
@@ -1835,11 +1890,11 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
         )}
 
         {/* Image Preview */}
-        {selectedImage && (
+        {selectedImagePreviewUrl && (
           <div className="px-4 pt-3">
             <div className="relative inline-block">
               <img
-                src={selectedImage}
+                src={selectedImagePreviewUrl}
                 alt={t('cockpit.images.preview_alt')}
                 className="h-20 w-20 object-cover rounded-lg border border-border"
               />
@@ -1882,7 +1937,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
             />
             <button
               type="submit"
-              disabled={isLoading || (!input.trim() && !selectedImage)}
+              disabled={isLoading || (!input.trim() && !selectedImageFile)}
               className={`text-primary-foreground rounded-full p-3 min-w-[44px] min-h-[44px] flex items-center justify-center hover:opacity-90 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed transition-all ${chatMode !== 'default' ? chatMode === 'reschedule' ? 'bg-amber-600' : chatMode === 'diagnosis' ? 'bg-teal-600' : 'bg-blue-600' : 'bg-primary'}`}
             >
               {isLoading ? (

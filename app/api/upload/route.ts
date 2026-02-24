@@ -1,9 +1,8 @@
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-
-// Optional: you can import your auth config if you want strictly authenticated uploads
-// import { authOptions } from "@/lib/auth";
+import { authOptions } from '@/lib/auth-config';
+import { CHAT_IMAGE_ALLOWED_CONTENT_TYPES, CHAT_IMAGE_MAX_BYTES } from '@/lib/chat-image-upload';
 
 export async function POST(request: Request): Promise<NextResponse> {
     const body = (await request.json()) as HandleUploadBody;
@@ -16,36 +15,32 @@ export async function POST(request: Request): Promise<NextResponse> {
                 pathname: string,
                 /* clientPayload?: string, */
             ) => {
-                // Generate a client token for the browser to upload the file
-                // ⚠️ Authenticate and authorize users before generating the token.
-                // Otherwise, you're allowing anonymous uploads.
-
-                const session = await getServerSession();
-                if (!session) {
+                const session = await getServerSession(authOptions);
+                const userId = typeof session?.user?.id === 'string' ? session.user.id.trim() : '';
+                if (!userId) {
                     throw new Error('Unauthorized');
                 }
 
+                const expectedPrefix = `chat/${userId}/`;
+                if (!pathname.startsWith(expectedPrefix)) {
+                    throw new Error('Invalid upload path');
+                }
+
                 return {
-                    allowedContentTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+                    allowedContentTypes: [...CHAT_IMAGE_ALLOWED_CONTENT_TYPES],
+                    maximumSizeInBytes: CHAT_IMAGE_MAX_BYTES,
+                    addRandomSuffix: false,
                     tokenPayload: JSON.stringify({
-                        userId: session.user?.id,
+                        userId,
+                        scope: 'chat',
                     }),
                 };
             },
             onUploadCompleted: async ({ blob, tokenPayload }) => {
-                // Get notified of client upload completion
-                // ⚠️ This will not work on `localhost` websites,
-                // Use ngrok or similar to get the full upload flow
-
-                console.log('blob upload completed', blob, tokenPayload);
-
-                try {
-                    // Run any logic after the file has been uploaded
-                    // const { userId } = JSON.parse(tokenPayload);
-                    // await prisma.user.update({ where: { id: userId }, data: { avatar: blob.url } });
-                } catch (error) {
-                    throw new Error('Could not update user');
-                }
+                console.log('chat image blob upload completed', {
+                    pathname: blob.pathname,
+                    tokenPayload,
+                });
             },
         });
 
