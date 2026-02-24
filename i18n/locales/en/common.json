@@ -893,7 +893,7 @@
       "terms": "By signing in, you agree to our Terms of Service and Privacy Policy.",
       "brandTagline": "Farming command center",
       "panelBadge": "Live Beta",
-      "panelBadgeGuest": "Pitch Day Mode",
+      "panelBadgeGuest": "Demo Mode",
       "panelTitle": "Run farming operations from one professional workspace",
       "panelSubtitle": "Capture work, plan with AI, and keep the team aligned without setup friction.",
       "panelCard1Label": "Operations",
@@ -902,7 +902,7 @@
       "panelCard2Body": "Generate next actions and schedule updates directly from farm context.",
       "panelCard3Label": "Traceability",
       "panelCard3Body": "Keep a clean timeline of activities, decisions, and field outcomes.",
-      "panelChecklistLabel": "What visitors can test",
+      "panelChecklistLabel": "What you can test",
       "panelChecklist1": "Open a live demo workspace instantly",
       "panelChecklist2": "Try AI chat planning with real project context",
       "panelChecklist3": "Review task and activity flow end-to-end"

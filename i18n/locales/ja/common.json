@@ -1470,7 +1470,7 @@
       "terms": "ログインすることで、利用規約とプライバシーポリシーに同意したものとみなされます。",
       "brandTagline": "農業オペレーション管理",
       "panelBadge": "ライブベータ",
-      "panelBadgeGuest": "ピッチデーモード",
+      "panelBadgeGuest": "デモモード",
       "panelTitle": "農業オペレーションを1つのプロ向けワークスペースで",
       "panelSubtitle": "作業記録、AI計画、チーム連携をセットアップ負担なく体験できます。",
       "panelCard1Label": "オペレーション",
@@ -1479,7 +1479,7 @@
       "panelCard2Body": "圃場コンテキストを使って次アクションと予定調整を提案。",
       "panelCard3Label": "トレーサビリティ",
       "panelCard3Body": "作業履歴、意思決定、圃場結果を時系列で記録。",
-      "panelChecklistLabel": "来場者が試せること",
+      "panelChecklistLabel": "すぐに試せること",
       "panelChecklist1": "ライブデモ環境をすぐに開始",
       "panelChecklist2": "プロジェクト文脈でAIチャット計画を体験",
       "panelChecklist3": "タスクと活動記録の流れを一連で確認"
