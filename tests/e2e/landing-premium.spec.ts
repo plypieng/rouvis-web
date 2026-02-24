@@ -5,8 +5,14 @@ test.describe('Premium landing flow', () => {
     await page.goto('/ja/login');
 
     const backToLanding = page.getByTestId('login-back-to-landing');
+    const googleCta = page.getByTestId('login-google-cta');
     await expect(backToLanding).toBeVisible();
     await expect(backToLanding).toHaveAttribute('href', '/ja');
+    await expect(googleCta).toBeVisible();
+
+    if (process.env.NEXT_PUBLIC_GUEST_SIGNIN_ENABLED === 'true') {
+      await expect(page.getByTestId('login-guest-cta')).toBeVisible();
+    }
 
     await backToLanding.click();
     await expect(page).toHaveURL(/\/ja$/);

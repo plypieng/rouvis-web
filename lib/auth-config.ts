@@ -24,12 +24,13 @@ const debugLog = (label: string, data: any) => {
 const normalizeEnvValue = (value?: string) => value?.replace(/\\[rn]/g, '').trim();
 const googleClientId = normalizeEnvValue(process.env.GOOGLE_CLIENT_ID);
 const googleClientSecret = normalizeEnvValue(process.env.GOOGLE_CLIENT_SECRET);
-const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true' && process.env.NODE_ENV === 'development';
+const isGuestSignInEnabled = process.env.NEXT_PUBLIC_GUEST_SIGNIN_ENABLED === 'true';
 const hasGoogleOAuth = !!googleClientId && !!googleClientSecret;
 const isProduction = process.env.NODE_ENV === 'production';
+const hasAtLeastOneSignInMethod = hasGoogleOAuth || isGuestSignInEnabled;
 
-if (!hasGoogleOAuth && !isDemoMode) {
-  throw new Error('Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET');
+if (!hasAtLeastOneSignInMethod) {
+  throw new Error('Missing sign-in provider configuration. Set Google OAuth credentials or enable guest sign-in.');
 }
 
 const baseAdapter = PrismaAdapter(authPrisma);
@@ -85,7 +86,7 @@ export const authOptions: NextAuthOptions = {
         })
       ]
       : []),
-    ...(isDemoMode ? [
+    ...(isGuestSignInEnabled ? [
       CredentialsProvider({
         id: "demo-device",
         name: "Demo Device",

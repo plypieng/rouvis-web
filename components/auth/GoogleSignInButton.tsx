@@ -7,11 +7,15 @@ import { useTranslations } from 'next-intl';
 interface GoogleSignInButtonProps {
   callbackUrl?: string;
   className?: string;
+  buttonClassName?: string;
+  dataTestId?: string;
 }
 
 export function GoogleSignInButton({
   callbackUrl = '/onboarding',
-  className = ''
+  className = '',
+  buttonClassName = '',
+  dataTestId,
 }: GoogleSignInButtonProps) {
   const t = useTranslations('auth.signIn');
   const [isLoading, setIsLoading] = useState(false);
@@ -38,9 +42,11 @@ export function GoogleSignInButton({
   return (
     <div className={className}>
       <button
+        type="button"
         onClick={handleSignIn}
         disabled={isLoading}
-        className="w-full flex items-center justify-center gap-3 px-6 py-3 bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+        data-testid={dataTestId}
+        className={`w-full flex items-center justify-center gap-3 rounded-xl border border-slate-300 bg-white px-6 py-3.5 font-medium text-slate-800 transition-colors hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 ${buttonClassName}`}
       >
         {/* Google Logo SVG */}
         <svg className="w-6 h-6" viewBox="0 0 24 24">
@@ -63,7 +69,7 @@ export function GoogleSignInButton({
         </svg>
 
         <span className="text-gray-700 font-medium">
-          {isLoading ? t('loading') : t('googleButton')}
+          {isLoading ? t('googleLoading') : t('googleButton')}
         </span>
       </button>
 
