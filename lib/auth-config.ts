@@ -110,7 +110,7 @@ export const authOptions: NextAuthOptions = {
             user = await prisma.user.create({
               data: {
                 email,
-                name: `Demo User (${deviceId.slice(0, 4)})`,
+                name: `ゲストユーザー (${deviceId.slice(0, 4)})`,
                 image: `https://api.dicebear.com/7.x/shapes/svg?seed=${deviceId}`,
               },
             });
@@ -127,15 +127,26 @@ export const authOptions: NextAuthOptions = {
                   farmingType: 'conventional',
                   experienceLevel: 'beginner',
                   uiMode: 'new_farmer',
-                  region: 'Demo Region',
+                  region: '日本',
+                }
+              });
+
+              const field = await prisma.field.create({
+                data: {
+                  userId: user.id,
+                  name: 'デモ圃場A',
+                  area: 1200,
+                  crop: 'コシヒカリ',
+                  environmentType: 'open_field',
                 }
               });
 
               const project = await prisma.project.create({
                 data: {
                   userId: user.id,
-                  name: 'Demo Farm 2025',
-                  crop: 'Rice',
+                  fieldId: field.id,
+                  name: 'デモ農場プロジェクト',
+                  crop: 'コシヒカリ',
                   startDate: today,
                   targetHarvestDate: targetHarvest,
                   status: 'active',
@@ -145,7 +156,8 @@ export const authOptions: NextAuthOptions = {
               await prisma.task.create({
                 data: {
                   projectId: project.id,
-                  title: 'Check water level',
+                  fieldId: field.id,
+                  title: '水位を確認',
                   dueDate: today,
                   status: 'pending',
                   priority: 'high',
@@ -155,8 +167,9 @@ export const authOptions: NextAuthOptions = {
               await prisma.activity.create({
                 data: {
                   projectId: project.id,
+                  fieldId: field.id,
                   type: 'inspection',
-                  note: 'Initial demo inspection',
+                  note: '初回デモ点検',
                   performedAt: today,
                 }
               });
