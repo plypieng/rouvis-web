@@ -23,6 +23,9 @@ function LoginPageContent() {
   const errorReason = searchParams.get('reason');
   const isAdmissionDenied = errorCode === 'AccessDenied' && errorReason === 'admission_denied';
   const isGuestSignInEnabled = process.env.NEXT_PUBLIC_GUEST_SIGNIN_ENABLED === 'true';
+  const subtitle = isGuestSignInEnabled ? t('subtitleGuest') : t('subtitle');
+  const securityBody = isGuestSignInEnabled ? t('securityBodyGuest') : t('securityBody');
+  const panelBadge = isGuestSignInEnabled ? t('panelBadgeGuest') : t('panelBadge');
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -67,7 +70,7 @@ function LoginPageContent() {
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_24px_70px_-45px_rgba(15,23,42,0.45)] sm:p-8">
               <div className="mb-6">
                 <h2 className="text-2xl font-semibold tracking-tight text-slate-900">{t('title')}</h2>
-                <p className="mt-2 text-sm leading-relaxed text-slate-600">{t('subtitle')}</p>
+                <p className="mt-2 text-sm leading-relaxed text-slate-600">{subtitle}</p>
               </div>
 
               {isAdmissionDenied && (
@@ -115,7 +118,7 @@ function LoginPageContent() {
 
               <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                 <p className="font-medium text-slate-800">{t('securityTitle')}</p>
-                <p className="mt-1">{t('securityBody')}</p>
+                <p className="mt-1">{securityBody}</p>
               </div>
 
               <div className="mt-5 text-xs text-slate-500">
@@ -132,7 +135,7 @@ function LoginPageContent() {
           <div className="relative z-10 flex w-full flex-col justify-between p-10 xl:p-14">
             <div>
               <p className="inline-flex items-center rounded-full border border-blue-200 bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-700">
-                {t('panelBadge')}
+                {panelBadge}
               </p>
               <h3 className="mt-4 text-3xl font-semibold leading-tight text-slate-900">
                 {t('panelTitle')}
