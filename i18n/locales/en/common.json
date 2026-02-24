@@ -876,7 +876,7 @@
       "subtitle": "Sign in with your Google account to access the live beta.",
       "subtitleGuest": "Choose how you want to enter the demo.",
       "guestButton": "Continue as Guest",
-      "guestHint": "Fastest way to try the app at pitching day.",
+      "guestHint": "Continue as guest for a quick trial.",
       "guestLoading": "Entering guest demo...",
       "guestError": "Guest sign in failed. Please try again.",
       "googleButton": "Continue with Google",

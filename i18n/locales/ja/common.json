@@ -1453,7 +1453,7 @@
       "subtitle": "ライブベータにアクセスするGoogleアカウントでログインしてください。",
       "subtitleGuest": "デモの開始方法を選択してください。",
       "guestButton": "ゲストで続ける",
-      "guestHint": "ピッチ当日に最速で体験を始める方法です。",
+      "guestHint": "すぐに試す場合はゲストで続けてください。",
       "guestLoading": "ゲストデモに入室中...",
       "guestError": "ゲストログインに失敗しました。もう一度お試しください。",
       "googleButton": "Googleでログイン",
