@@ -179,13 +179,13 @@ export default function LandingPage({ locale }: LandingPageProps) {
               {t('hero.cta_login')}
             </TrackedEventLink>
             <TrackedEventLink
-              href={buildWaitlistHref('landing_header')}
-              eventName="landing_cta_waitlist_clicked"
-              eventProperties={{ surface: 'header', destination: 'signup' }}
+              href={buildSignInHref('landing_header_demo')}
+              eventName="landing_cta_sign_in_clicked"
+              eventProperties={{ surface: 'header_demo', destination: 'login' }}
               className="inline-flex min-h-[44px] items-center rounded-full bg-[#1a7c44] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#136236] sm:px-6"
               data-testid="landing-cta-apply-header"
             >
-              {isClosedBeta ? t('hero.cta_beta') : t('hero.cta_start')}
+              {t('hero.cta_demo')}
             </TrackedEventLink>
           </div>
         </div>

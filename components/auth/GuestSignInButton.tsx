@@ -57,6 +57,18 @@ export function GuestSignInButton({
     try {
       setIsLoading(true);
       setError(null);
+      // Let loading UI paint before NextAuth redirects/navigation starts.
+      if (typeof window !== 'undefined') {
+        await new Promise<void>((resolve) => {
+          if (typeof window.requestAnimationFrame !== 'function') {
+            window.setTimeout(resolve, 0);
+            return;
+          }
+          window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => resolve());
+          });
+        });
+      }
       const deviceId = resolveDemoDeviceId();
       await signIn('demo-device', { callbackUrl, deviceId });
     } catch (err) {
