@@ -135,17 +135,6 @@ export default function LandingPage({ locale }: LandingPageProps) {
 
   const activeFeatureKey = workflowToFeatureMap[activeStep];
 
-  const handleHowItWorksCta = () => {
-    const anchor = document.getElementById('how-it-works');
-    void trackUXEvent('landing_cta_see_how_clicked', { surface: 'hero', destination: 'how_it_works' });
-    if (anchor) {
-      anchor.scrollIntoView({
-        behavior: prefersReducedMotion ? 'auto' : 'smooth',
-        block: 'start',
-      });
-    }
-  };
-
   const handleStepSelect = (step: WorkflowKey) => {
     setActiveStep(step);
     void trackUXEvent('landing_how_it_works_step_selected', { step });
@@ -226,11 +215,10 @@ export default function LandingPage({ locale }: LandingPageProps) {
             </div>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <motion.button
-                type="button"
-                onClick={handleHowItWorksCta}
-                whileHover={prefersReducedMotion ? undefined : { y: -2, scale: 1.01 }}
-                whileTap={{ scale: 0.98 }}
+              <TrackedEventLink
+                href={buildSignInHref('landing_hero_primary')}
+                eventName="landing_cta_sign_in_clicked"
+                eventProperties={{ surface: 'hero_primary', destination: 'login' }}
                 className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-full bg-[#1a7c44] px-7 py-3 text-base font-semibold text-white shadow-lg shadow-[#1a7c44]/25 transition hover:bg-[#136236]"
                 data-testid="landing-cta-see-how"
               >
@@ -241,7 +229,7 @@ export default function LandingPage({ locale }: LandingPageProps) {
                 >
                   <ArrowRight className="h-4 w-4" />
                 </motion.span>
-              </motion.button>
+              </TrackedEventLink>
               <TrackedEventLink
                 href={buildWaitlistHref('landing_hero_secondary')}
                 eventName="landing_cta_waitlist_clicked"
