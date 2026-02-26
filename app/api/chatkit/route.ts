@@ -170,6 +170,9 @@ export async function POST(req: NextRequest) {
 
     // Regular chat message - forward to agents/run
     const { messages, threadId, projectId, mode } = body;
+    const idempotencyKey = typeof body.idempotencyKey === 'string' && body.idempotencyKey.trim()
+      ? body.idempotencyKey.trim()
+      : requestId;
 
     const response = await fetch(`${backendUrl}/api/v1/agents/run`, {
       method: 'POST',
@@ -200,6 +203,7 @@ export async function POST(req: NextRequest) {
         assistantVerbosity: typeof body.assistantVerbosity === 'string' ? body.assistantVerbosity : undefined,
         mutationApprovalToken: typeof body.mutationApprovalToken === 'string' ? body.mutationApprovalToken : undefined,
         allowMutations: body.allowMutations === true,
+        idempotencyKey,
       }),
     });
 
