@@ -468,7 +468,7 @@ export default function ProjectDetailClient({
     ) : null;
 
     const chatPane = (
-        <div id="project-chat-kit" className="flex h-full min-h-0 flex-col">
+        <div id="project-chat-kit" data-testid="project-cockpit-chat-pane" className="flex h-full min-h-0 flex-col">
             <RouvisChatKit
                 ref={chatRef}
                 className="surface-base h-full flex-1 overflow-hidden"
@@ -485,7 +485,7 @@ export default function ProjectDetailClient({
     );
 
     const planningPane = hasTasks ? (
-        <div className="flex h-full min-h-0 flex-col gap-3">
+        <div data-testid="project-cockpit-calendar-pane" className="flex h-full min-h-0 flex-col gap-3">
             {generationProgressPanel}
             <div className="surface-base h-full min-h-0 overflow-hidden">
                 <ProjectCalendar
@@ -503,13 +503,13 @@ export default function ProjectDetailClient({
             </div>
         </div>
     ) : generationRunId ? (
-        <div className="surface-base flex h-full min-h-0 items-center justify-center px-6 py-8">
+        <div data-testid="project-cockpit-calendar-pane" className="surface-base flex h-full min-h-0 items-center justify-center px-6 py-8">
             <div className="w-full max-w-2xl">
                 {generationProgressPanel}
             </div>
         </div>
     ) : (
-        <div className="surface-base flex h-full min-h-0 flex-col items-center justify-center px-6 py-8 text-center">
+        <div data-testid="project-cockpit-calendar-pane" className="surface-base flex h-full min-h-0 flex-col items-center justify-center px-6 py-8 text-center">
             <div className="max-w-md space-y-3" data-testid="project-empty-replan-state">
                 <p className="text-sm font-semibold uppercase tracking-[0.08em] text-muted-foreground">{t('schedule_empty_badge')}</p>
                 <h3 className="text-xl font-semibold text-foreground">{t('schedule_empty_title')}</h3>
@@ -535,21 +535,28 @@ export default function ProjectDetailClient({
         </div>
     );
 
+    const mobileTabOptions: Array<{ mode: ProjectTabMode; icon: string; label: string }> = [
+        { mode: 'cockpit', icon: 'dashboard_customize', label: t('tabs.cockpit') },
+        { mode: 'ledger', icon: 'receipt_long', label: t('tabs.ledger') },
+        { mode: 'analytics', icon: 'query_stats', label: t('tabs.analytics') },
+        { mode: 'settings', icon: 'tune', label: t('tabs.settings') },
+    ];
+
     return (
         <div className="min-h-[calc(100vh-64px)] shell-canvas flex flex-col">
             <div className="shell-main py-3 flex-1 flex flex-col">
                 {/* Top Bar: Back Link + Compact ProjectHeader */}
-                <div className="mb-3 flex flex-none items-start gap-3">
+                <div className="mb-3 flex flex-none flex-col gap-3 sm:flex-row sm:items-start">
                     <Link
                         href={`/${locale}/projects`}
-                        className="mt-1 inline-flex flex-none items-center gap-1 rounded-md px-2 py-1 text-sm font-semibold text-muted-foreground transition hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="inline-flex w-fit flex-none items-center gap-1 rounded-md px-2 py-1 text-sm font-semibold text-muted-foreground transition hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:mt-1"
                     >
                         <span className="material-symbols-outlined text-lg">arrow_back</span>
                         <span className="hidden sm:inline">{t('back_to_projects')}</span>
                     </Link>
 
                     {/* Compact Status Bar (Grow) */}
-                    <div className="flex-1">
+                    <div className="min-w-0 flex-1">
                         <ProjectHeader
                             project={project}
                             compact={true}
@@ -582,55 +589,94 @@ export default function ProjectDetailClient({
                     </div>
                 )}
 
-                <div className="mb-4 flex-none border-b border-border px-2">
-                    <nav className="-mb-px flex space-x-6" aria-label="Tabs">
-                        <button
-                            type="button"
-                            onClick={() => updateTabQuery('cockpit')}
-                            className={`whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium transition ${tabMode === 'cockpit'
-                                ? 'border-primary text-primary'
-                                : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
-                                }`}
+                <div className="mb-4 flex-none">
+                    <div className="sm:hidden">
+                        <div
+                            data-testid="project-mobile-section-switcher"
+                            className="grid grid-cols-2 gap-2"
+                            role="tablist"
+                            aria-label={t('mobile_section_switcher')}
                         >
-                            {t('tabs.cockpit')}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => updateTabQuery('ledger')}
-                            className={`whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium transition ${tabMode === 'ledger'
-                                ? 'border-primary text-primary'
-                                : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
-                                }`}
-                        >
-                            {t('tabs.ledger')}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => updateTabQuery('analytics')}
-                            className={`whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium transition ${tabMode === 'analytics'
-                                ? 'border-primary text-primary'
-                                : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
-                                }`}
-                        >
-                            {t('tabs.analytics')}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => updateTabQuery('settings')}
-                            className={`whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium transition ${tabMode === 'settings'
-                                ? 'border-primary text-primary'
-                                : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
-                                }`}
-                        >
-                            {t('tabs.settings')}
-                        </button>
-                    </nav>
+                            {mobileTabOptions.map((option) => {
+                                const active = tabMode === option.mode;
+                                return (
+                                    <button
+                                        key={option.mode}
+                                        type="button"
+                                        role="tab"
+                                        aria-selected={active}
+                                        onClick={() => updateTabQuery(option.mode)}
+                                        data-testid={`project-mobile-section-${option.mode}`}
+                                        className={`min-h-[56px] rounded-xl border px-3 py-3 text-left transition ${active
+                                            ? 'border-primary bg-primary text-primary-foreground shadow-sm'
+                                            : 'border-border bg-card text-foreground hover:bg-secondary'
+                                            }`}
+                                    >
+                                        <span className="material-symbols-outlined mb-1 block text-[18px]">
+                                            {option.icon}
+                                        </span>
+                                        <span className="text-sm font-semibold">{option.label}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    <div className="hidden border-b border-border px-2 sm:block">
+                        <nav className="-mb-px flex space-x-6" aria-label="Tabs">
+                            <button
+                                type="button"
+                                onClick={() => updateTabQuery('cockpit')}
+                                className={`whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium transition ${tabMode === 'cockpit'
+                                    ? 'border-primary text-primary'
+                                    : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
+                                    }`}
+                            >
+                                {t('tabs.cockpit')}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => updateTabQuery('ledger')}
+                                className={`whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium transition ${tabMode === 'ledger'
+                                    ? 'border-primary text-primary'
+                                    : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
+                                    }`}
+                            >
+                                {t('tabs.ledger')}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => updateTabQuery('analytics')}
+                                className={`whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium transition ${tabMode === 'analytics'
+                                    ? 'border-primary text-primary'
+                                    : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
+                                    }`}
+                            >
+                                {t('tabs.analytics')}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => updateTabQuery('settings')}
+                                className={`whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium transition ${tabMode === 'settings'
+                                    ? 'border-primary text-primary'
+                                    : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
+                                    }`}
+                            >
+                                {t('tabs.settings')}
+                            </button>
+                        </nav>
+                    </div>
                 </div>
 
-                <div className={tabMode === 'cockpit' ? 'contents' : 'hidden'}>
+                <div data-testid="project-tab-cockpit" className={tabMode === 'cockpit' ? 'contents' : 'hidden'}>
                     <div className="mb-2 lg:hidden">
-                        <div className="surface-base mb-3 p-1">
-                            <div className="grid grid-cols-2 gap-1" role="tablist" aria-label={t('calendar.mobile_panel_switcher')}>
+                        <div className="surface-base mb-3 rounded-2xl p-1.5">
+                            <div
+                                data-testid="project-mobile-panel-switcher"
+                                className="grid grid-cols-2 gap-1"
+                                role="tablist"
+                                aria-label={t('calendar.mobile_panel_switcher')}
+                            >
                                 <button
                                     type="button"
                                     role="tab"
@@ -666,7 +712,7 @@ export default function ProjectDetailClient({
                             </div>
                         </div>
 
-                        <div className="h-[calc(100vh-210px)] min-h-[520px]">
+                        <div className="h-[min(72dvh,42rem)] min-h-[440px] sm:min-h-[500px]">
                             {panelMode === 'chat' ? chatPane : planningPane}
                         </div>
                     </div>
@@ -716,7 +762,7 @@ export default function ProjectDetailClient({
 
 
                 {tabMode === 'ledger' ? (
-                    <div className="flex-1 min-h-[640px] pt-4 pb-6 px-4 overflow-y-auto w-full">
+                    <div data-testid="project-tab-ledger" className="flex-1 min-h-[640px] pt-4 pb-6 px-4 overflow-y-auto w-full">
                         <div className="max-w-3xl mx-auto">
                             <ProjectLedgerPanel projectId={project.id} />
                         </div>
@@ -724,7 +770,7 @@ export default function ProjectDetailClient({
                 ) : null}
 
                 {tabMode === 'analytics' ? (
-                    <div className="flex-1 min-h-[640px] pt-4 pb-6 px-4 overflow-y-auto w-full">
+                    <div data-testid="project-tab-analytics" className="flex-1 min-h-[640px] pt-4 pb-6 px-4 overflow-y-auto w-full">
                         <div className="max-w-3xl mx-auto">
                             <ProjectAnalyticsPanel projectId={project.id} />
                         </div>
@@ -732,7 +778,7 @@ export default function ProjectDetailClient({
                 ) : null}
 
                 {tabMode === 'settings' ? (
-                    <div className="flex-1 min-h-[640px] pt-4 pb-6 px-4 overflow-y-auto w-full">
+                    <div data-testid="project-tab-settings" className="flex-1 min-h-[640px] pt-4 pb-6 px-4 overflow-y-auto w-full">
                         <div className="max-w-3xl mx-auto">
                             <ProjectSettingsPanel
                                 project={project}

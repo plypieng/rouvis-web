@@ -5,21 +5,19 @@ import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import {
     format,
-    addWeeks,
-    subWeeks,
-    startOfWeek,
-    endOfWeek,
     addDays,
     subDays,
     isSameDay,
-    isToday
+    isToday,
+    Locale as DateFnsLocale
 } from 'date-fns';
-import { ja } from 'date-fns/locale';
+import { enUS, ja } from 'date-fns/locale';
 
 interface Task {
     id: string;
     title: string;
     dueAt: string; // ISO string
+    projectId?: string;
     projectName?: string;
     status: string;
 }
@@ -38,11 +36,9 @@ interface DashboardCalendarProps {
 }
 
 export default function DashboardCalendar({ tasks, locale, weatherForecast = [] }: DashboardCalendarProps) {
-    // Localization helper
-    // Assuming 'dashboard' namespace or 'common'
-    // For simplicity, hardcode labels or rely on simple date formatting
-
+    const t = useTranslations('calendar');
     const [currentDate, setCurrentDate] = useState(new Date());
+    const dateLocale: DateFnsLocale = locale === 'ja' ? ja : enUS;
 
     const handlePrev = () => setCurrentDate(prev => subDays(prev, 7));
     const handleNext = () => setCurrentDate(prev => addDays(prev, 7));
@@ -52,60 +48,62 @@ export default function DashboardCalendar({ tasks, locale, weatherForecast = [] 
     const days = Array.from({ length: 7 }, (_, i) => addDays(currentDate, i));
 
     return (
-        <div className="bg-card rounded-sm rounded-bl-none rounded-br-none border-2 border-gray-400 p-4 h-full">
+        <div data-testid="dashboard-mini-calendar" className="h-full rounded-2xl border border-border bg-card p-3 sm:p-4">
             {/* Header */}
-            <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                    <h2 className="flex items-center gap-2 text-base font-semibold text-foreground sm:text-lg">
                         <span className="material-symbols-outlined text-primary">calendar_month</span>
-                        {/* Show range month if spans months? Simple: Show Start Month */}
-                        {format(currentDate, 'yyyy年 M月', { locale: ja })}
+                        {format(currentDate, locale === 'ja' ? 'yyyy年 M月' : 'MMMM yyyy', { locale: dateLocale })}
                     </h2>
-                    <div className="flex bg-secondary rounded-lg p-0.5 ml-2">
-                        <button onClick={handlePrev} className="p-1 hover:bg-background rounded-md transition-colors text-muted-foreground hover:text-foreground">
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <div className="flex rounded-lg bg-secondary p-0.5">
+                            <button onClick={handlePrev} className="rounded-md p-1 transition-colors text-muted-foreground hover:bg-background hover:text-foreground">
                             <span className="material-symbols-outlined text-lg">chevron_left</span>
-                        </button>
-                        <button onClick={handleNext} className="p-1 hover:bg-background rounded-md transition-colors text-muted-foreground hover:text-foreground">
-                            <span className="material-symbols-outlined text-lg">chevron_right</span>
+                            </button>
+                            <button onClick={handleNext} className="rounded-md p-1 transition-colors text-muted-foreground hover:bg-background hover:text-foreground">
+                                <span className="material-symbols-outlined text-lg">chevron_right</span>
+                            </button>
+                        </div>
+                        <button onClick={handleToday} className="rounded-full border border-border bg-secondary px-3 py-1.5 text-xs font-semibold text-secondary-foreground transition-colors hover:bg-secondary/75 sm:text-sm">
+                            {t('today')}
                         </button>
                     </div>
-                    <button onClick={handleToday} className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors ml-2">
-                        今日からの予定
-                    </button>
                 </div>
 
                 <Link
                     href={`/${locale}/calendar`}
-                    className="text-sm text-primary hover:underline flex items-center gap-1"
+                    className="inline-flex min-h-[40px] items-center gap-1 self-start rounded-lg border border-border bg-secondary px-3 py-2 text-sm font-semibold text-foreground transition hover:bg-secondary/75"
                 >
-                    月表示へ <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                    {t('view_full_calendar')} <span className="material-symbols-outlined text-sm">arrow_forward</span>
                 </Link>
             </div>
 
             {/* Week Grid */}
-            <div className="grid grid-cols-7 gap-2">
+            <div data-testid="dashboard-mini-calendar-scroll" className="-mx-3 overflow-x-auto px-3 pb-1 sm:mx-0 sm:px-0">
+                <div className="grid min-w-[42rem] grid-flow-col auto-cols-[minmax(5.5rem,1fr)] gap-2 sm:min-w-0 sm:grid-cols-7 sm:grid-flow-row sm:auto-cols-auto">
                 {/* Days */}
                 {days.map((day) => {
                     const dayTasks = tasks.filter(t => isSameDay(new Date(t.dueAt), day));
                     const isDayToday = isToday(day);
                     const weather = weatherForecast.find(w => isSameDay(new Date(w.date), day));
-                    const dayName = format(day, 'E', { locale: ja });
+                    const dayName = format(day, locale === 'ja' ? 'E' : 'EEE', { locale: dateLocale });
 
                     return (
                         <div
                             key={day.toISOString()}
-                            className={`min-h-[80px] rounded-lg border p-1 flex flex-col gap-0.5 transition-colors ${isDayToday
-                                ? 'bg-primary/5 border-2 border-primary'
+                            className={`flex min-h-[8.5rem] flex-col gap-1 rounded-xl border p-2 transition-colors ${isDayToday
+                                ? 'border-primary bg-primary/5'
                                 : 'bg-background border-border hover:border-primary/60'
                                 }`}
                         >
                             {/* Date Header + Weather */}
-                            <div className="text-center mb-0.5 flex flex-col items-center">
-                                <div className="text-[9px] font-medium text-muted-foreground">{dayName}</div>
+                            <div className="mb-0.5 flex flex-col items-center text-center">
+                                <div className="text-[10px] font-medium text-muted-foreground">{dayName}</div>
 
                                 <div className="flex items-center gap-1">
                                     <span className={`
-                                inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-medium
+                                inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-medium
                                 ${isDayToday ? 'bg-primary text-primary-foreground' : 'text-foreground'}
                             `}>
                                         {format(day, 'd')}
@@ -114,13 +112,13 @@ export default function DashboardCalendar({ tasks, locale, weatherForecast = [] 
 
                                 {/* Weather Info */}
                                 {weather ? (
-                                    <div className="flex flex-col items-center text-[9px] text-muted-foreground mt-0.5 leading-none">
+                                    <div className="mt-0.5 flex flex-col items-center text-[10px] leading-none text-muted-foreground">
                                         <img
                                             src={`https://openweathermap.org/img/wn/${weather.icon}.png`}
                                             alt={weather.condition}
-                                            className="w-5 h-5 -my-1"
+                                            className="h-5 w-5 -my-1"
                                         />
-                                        <div className="scale-90 origin-top">
+                                        <div className="origin-top scale-90">
                                             <span className="text-orange-500 font-medium">{Math.round(weather.temperature.max)}°</span>
                                             <span className="text-gray-300 mx-0.5">/</span>
                                             <span className="text-blue-500">{Math.round(weather.temperature.min)}°</span>
@@ -128,28 +126,45 @@ export default function DashboardCalendar({ tasks, locale, weatherForecast = [] 
                                     </div>
                                 ) : (
                                     // Placeholder if no weather data (past or far future)
-                                    <div className="h-6"></div>
+                                    <div className="h-6" />
                                 )}
                             </div>
 
-                            <div className="flex-1 space-y-0.5 overflow-y-auto max-h-[80px] scrollbar-thin mt-0.5">
+                            <div className="mt-0.5 flex-1 space-y-1 overflow-y-auto pr-0.5 scrollbar-thin">
                                 {dayTasks.map(task => (
-                                    <Link
-                                        key={task.id}
-                                        href={`/${locale}/projects/${task.id}`}
-                                        className={`block text-[10px] p-1 rounded border border-l-2 truncate transition-colors leading-tight ${task.status === 'completed'
-                                            ? 'bg-secondary text-muted-foreground border-l-gray-400 opacity-70 line-through'
-                                            : 'bg-white hover:bg-gray-50 text-foreground border-l-primary shadow-sm'
-                                            }`}
-                                        title={`${task.title} (${task.projectName || 'Project'})`}
-                                    >
-                                        {task.title}
-                                    </Link>
+                                    task.projectId ? (
+                                        <Link
+                                            key={task.id}
+                                            href={`/${locale}/projects/${task.projectId}`}
+                                            className={`block truncate rounded-lg border border-l-2 p-1.5 text-[11px] leading-tight transition-colors ${task.status === 'completed'
+                                                ? 'border-l-gray-400 bg-secondary text-muted-foreground opacity-70 line-through'
+                                                : 'border-l-primary bg-white text-foreground shadow-sm hover:bg-gray-50'
+                                                }`}
+                                            title={`${task.title} (${task.projectName || 'Project'})`}
+                                        >
+                                            {task.title}
+                                        </Link>
+                                    ) : (
+                                        <div
+                                            key={task.id}
+                                            className={`truncate rounded-lg border border-l-2 p-1.5 text-[11px] leading-tight ${task.status === 'completed'
+                                                ? 'border-l-gray-400 bg-secondary text-muted-foreground opacity-70 line-through'
+                                                : 'border-l-primary bg-white text-foreground shadow-sm'
+                                                }`}
+                                            title={task.title}
+                                        >
+                                            {task.title}
+                                        </div>
+                                    )
                                 ))}
+                                {dayTasks.length === 0 ? (
+                                    <p className="pt-1 text-center text-[11px] text-muted-foreground">{t('no_work_scheduled')}</p>
+                                ) : null}
                             </div>
                         </div>
                     );
                 })}
+                </div>
             </div>
         </div>
     );

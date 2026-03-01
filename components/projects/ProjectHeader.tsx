@@ -202,100 +202,124 @@ export default function ProjectHeader({ project, compact, onReplanSchedule }: Pr
     };
 
     const stage = getCurrentStage(progress, stages);
+    const stageLabel = stages.find((s) => s.key === stage)?.label || stage;
+    const cropLabel = `${project.crop}${project.variety ? ` (${project.variety})` : ''}`;
+
+    const headerActions = (
+        <div className="flex items-center gap-2 shrink-0">
+            <button
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="rounded-full p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-900"
+                aria-expanded={isExpanded}
+            >
+                <span className="material-symbols-outlined text-[20px]">
+                    {isExpanded ? 'expand_less' : 'expand_more'}
+                </span>
+            </button>
+
+            <div className="relative border-l border-gray-200 pl-2">
+                <button
+                    onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
+                    className="rounded-full p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-900"
+                    data-testid="project-header-menu"
+                >
+                    <span className="material-symbols-outlined text-[20px]">more_vert</span>
+                </button>
+                {showMenu && (
+                    <div className="absolute right-0 top-full z-50 mt-1 w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                        {onReplanSchedule && (
+                            <button
+                                onClick={() => { setShowMenu(false); onReplanSchedule(); }}
+                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                                data-testid="project-header-replan"
+                            >
+                                {t('replan_schedule')}
+                            </button>
+                        )}
+                        <button
+                            onClick={() => { setShowMenu(false); setShowEditModal(true); }}
+                            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                            {t('edit_project')}
+                        </button>
+                        <button
+                            onClick={() => { setShowMenu(false); setShowArchiveDialog(true); }}
+                            className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                        >
+                            {t('confirm_archive_title')}
+                        </button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
 
     if (compact) {
         return (
             <>
-                <div className={`transition-all duration-300 ease-in-out bg-white border border-gray-200 shadow-sm ${isExpanded ? 'rounded-2xl p-4 w-full' : 'rounded-full px-4 py-2 flex items-center gap-4'}`}>
-
-                    {/* Header Top Row (Always visible or adapted) */}
-                    <div className={`flex items-center justify-between ${isExpanded ? 'mb-4' : 'w-full gap-4'}`}>
-
-                        {/* Left: Title & Back */}
-                        <div className="flex items-center gap-3 min-w-0 shrink-0">
-                            <h1 className="text-sm font-bold text-gray-900 whitespace-nowrap">{project.name}</h1>
-                            {!isExpanded && (
-                                <span className="text-xs text-gray-500 hidden lg:inline-block">
-                                    {project.crop}
-                                </span>
-                            )}
-                        </div>
-
-                        {/* Middle: Compact Progress (Spans entirely) */}
-                        {!isExpanded && (
-                            <div className="flex-1 flex items-center gap-3 min-w-0 px-4">
-                                <div className="flex items-center gap-1.5 text-xs font-medium text-gray-700 shrink-0">
-                                    <span className="text-lg leading-none">{getStageIcon(stage)}</span>
-                                    <span className="hidden sm:inline">{stages.find(s => s.key === stage)?.label || stage}</span>
+                <div className={`w-full border border-gray-200 bg-white shadow-sm transition-all duration-300 ease-in-out ${isExpanded ? 'rounded-2xl p-4' : 'rounded-2xl p-3 sm:rounded-full sm:px-4 sm:py-2'}`}>
+                    {!isExpanded ? (
+                        <>
+                            <div className="flex items-start justify-between gap-3 sm:hidden">
+                                <div className="min-w-0">
+                                    <h1 className="line-clamp-2 text-sm font-bold text-gray-900">{project.name}</h1>
+                                    <p className="mt-1 text-xs text-gray-500">{cropLabel}</p>
                                 </div>
-                                <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                                {headerActions}
+                            </div>
+
+                            <div className="mt-3 flex items-center gap-3 sm:hidden">
+                                <div className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700">
+                                    <span className="text-lg leading-none">{getStageIcon(stage)}</span>
+                                    <span className="max-w-[8rem] truncate">{stageLabel}</span>
+                                </div>
+                                <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-100">
                                     <div
                                         className="h-full bg-green-500 transition-all duration-500"
                                         style={{ width: `${Math.min(100, progress)}%` }}
                                     />
                                 </div>
+                                <span className="text-[11px] font-semibold text-gray-500">{Math.round(progress)}%</span>
                             </div>
-                        )}
 
-                        {/* Right: Actions */}
-                        <div className="flex items-center gap-2 shrink-0 ml-auto">
-                            {/* Expand Toggle */}
-                            <button
-                                onClick={() => setIsExpanded(!isExpanded)}
-                                className="p-1 text-gray-400 hover:text-gray-900 rounded-full hover:bg-gray-100 transition-colors"
-                            >
-                                <span className="material-symbols-outlined text-[20px]">
-                                    {isExpanded ? 'expand_less' : 'expand_more'}
-                                </span>
-                            </button>
-
-                            {/* Menu Trigger */}
-                            <div className="relative border-l border-gray-200 pl-2 ml-1">
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
-                                    className="p-1 text-gray-400 hover:text-gray-900 rounded-full hover:bg-gray-100 transition-colors"
-                                    data-testid="project-header-menu"
-                                >
-                                    <span className="material-symbols-outlined text-[20px]">more_vert</span>
-                                </button>
-                                {showMenu && (
-                                    <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-lg border border-gray-200 shadow-lg py-1 z-50">
-                                        {onReplanSchedule && (
-                                            <button
-                                                onClick={() => { setShowMenu(false); onReplanSchedule(); }}
-                                                className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                                                data-testid="project-header-replan"
-                                            >
-                                                {t('replan_schedule')}
-                                            </button>
-                                        )}
-                                        <button
-                                            onClick={() => { setShowMenu(false); setShowEditModal(true); }}
-                                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                                        >
-                                            {t('edit_project')}
-                                        </button>
-                                        <button
-                                            onClick={() => { setShowMenu(false); setShowArchiveDialog(true); }}
-                                            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                                        >
-                                            {t('confirm_archive_title')}
-                                        </button>
+                            <div className="hidden w-full items-center gap-4 sm:flex">
+                                <div className="min-w-0 shrink-0">
+                                    <h1 className="max-w-[14rem] truncate text-sm font-bold text-gray-900">{project.name}</h1>
+                                </div>
+                                <div className="flex min-w-0 flex-1 items-center gap-3 px-2">
+                                    <div className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-gray-700">
+                                        <span className="text-lg leading-none">{getStageIcon(stage)}</span>
+                                        <span className="hidden md:inline">{stageLabel}</span>
                                     </div>
-                                )}
+                                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-100">
+                                        <div
+                                            className="h-full bg-green-500 transition-all duration-500"
+                                            style={{ width: `${Math.min(100, progress)}%` }}
+                                        />
+                                    </div>
+                                </div>
+                                {headerActions}
                             </div>
-                        </div>
-                    </div>
+                        </>
+                    ) : null}
 
                     {/* Expanded Content (Full Analysis) */}
                     {isExpanded && (
                         <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                            <div className="flex items-center justify-between text-xs mb-2 mt-2">
-                                <span className="text-gray-500">
-                                    {dayCount}日目 {totalDays ? `/ ${totalDays}日` : ''} · {project.crop} {project.variety && `(${project.variety})`}
-                                </span>
+                            <div className="mb-3 flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <h1 className="line-clamp-2 text-base font-bold text-gray-900">{project.name}</h1>
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        {dayCount}日目 {totalDays ? `/ ${totalDays}日` : ''} · {cropLabel}
+                                    </p>
+                                </div>
+                                {headerActions}
+                            </div>
+
+                            <div className="mb-2 flex items-center justify-between text-xs">
+                                <span className="text-gray-500">{cropLabel}</span>
                                 <span className="text-green-600 font-medium text-sm flex items-center gap-1">
-                                    {getStageIcon(stage)} {stages.find(s => s.key === stage)?.label || stage}
+                                    {getStageIcon(stage)} {stageLabel}
                                 </span>
                             </div>
 

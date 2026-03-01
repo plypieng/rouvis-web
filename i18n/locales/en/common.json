@@ -294,6 +294,7 @@
     "schedule_activity": "Schedule Activity",
     "add_activity": "Add Activity",
     "today": "Today",
+    "no_work_scheduled": "No work scheduled",
     "month": "Month",
     "week": "Week"
   },
@@ -1501,6 +1502,9 @@
     },
     "archive_success": "Project archived successfully.",
     "archive_failed": "Failed to archive the project.",
+    "open_project_short": "Open",
+    "ask_ai_short": "Ask AI",
+    "mobile_section_switcher": "Switch project sections",
     "replan_schedule": "Replan schedule",
     "schedule_empty_badge": "No Schedule",
     "schedule_empty_title": "This project has no schedule yet",

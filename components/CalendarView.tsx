@@ -984,7 +984,7 @@ export function CalendarView({
           </span>
         </div>
 
-        <div className="mt-4 grid gap-2 sm:grid-cols-3">
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
           <div className="surface-base p-3">
             <p className="text-xs text-muted-foreground">{t('ops_overdue')}</p>
             <p className="mt-1 text-lg font-semibold text-foreground">{opsSnapshot.overdueCount}</p>
@@ -993,7 +993,7 @@ export function CalendarView({
             <p className="text-xs text-muted-foreground">{t('ops_today')}</p>
             <p className="mt-1 text-lg font-semibold text-foreground">{opsSnapshot.dueTodayCount}</p>
           </div>
-          <div className="surface-base p-3">
+          <div className="surface-base col-span-2 p-3 sm:col-span-1">
             <p className="text-xs text-muted-foreground">{t('ops_next_48h')}</p>
             <p className="mt-1 text-lg font-semibold text-foreground">{opsSnapshot.dueNext48hCount}</p>
           </div>
@@ -1081,31 +1081,36 @@ export function CalendarView({
           </button>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          {FILTER_KEYS.map((filterKey) => (
-            <button
-              key={filterKey}
-              type="button"
-              aria-pressed={activeFilter === filterKey}
-              onClick={() => setActiveFilter(filterKey)}
-              className={`touch-target rounded-full border px-3 py-1.5 text-xs font-semibold transition ${activeFilter === filterKey
-                ? 'border-brand-waterline/60 bg-brand-waterline/15 text-foreground'
-                : 'border-border bg-card text-muted-foreground hover:text-foreground'
-                }`}
-            >
-              {t(`filter_${filterKey}`)} ({filterCounts[filterKey]})
-            </button>
-          ))}
+        <div className="mt-3 flex flex-col gap-3">
+          <div data-testid="calendar-filter-scroll" className="-mx-3 overflow-x-auto px-3 sm:mx-0 sm:px-0">
+            <div className="flex min-w-max items-center gap-2">
+              {FILTER_KEYS.map((filterKey) => (
+                <button
+                  key={filterKey}
+                  type="button"
+                  aria-pressed={activeFilter === filterKey}
+                  onClick={() => setActiveFilter(filterKey)}
+                  className={`touch-target whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold transition ${activeFilter === filterKey
+                    ? 'border-brand-waterline/60 bg-brand-waterline/15 text-foreground'
+                    : 'border-border bg-card text-muted-foreground hover:text-foreground'
+                    }`}
+                >
+                  {t(`filter_${filterKey}`)} ({filterCounts[filterKey]})
+                </button>
+              ))}
+            </div>
+          </div>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="flex flex-col gap-2 sm:ml-auto sm:flex-row sm:items-center">
             <label htmlFor="calendar-project-filter" className="text-xs font-medium text-muted-foreground">
               {t('project_filter_label')}
             </label>
             <select
+              data-testid="calendar-project-filter"
               id="calendar-project-filter"
               value={projectFilter}
               onChange={(event) => setProjectFilter(event.target.value)}
-              className="control-inset h-9 rounded-lg px-3 text-xs font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="control-inset h-10 w-full rounded-lg px-3 text-xs font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-auto sm:min-w-[14rem]"
             >
               <option value="all">{t('project_filter_all')}</option>
               {projectOptions.map((option) => (
@@ -1190,38 +1195,42 @@ export function CalendarView({
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}>
         <div className="grid min-h-0 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(340px,1fr)]">
           <section className="surface-raised min-h-[560px] overflow-hidden">
-            <div className="grid grid-cols-7 border-b border-border bg-secondary/45">
-              {weekdayLabels.map((label, index) => (
-                <p
-                  key={label}
-                  className={`py-2 text-center text-[11px] font-semibold ${index === 0 ? 'text-risk-critical' : index === 6 ? 'text-brand-waterline' : 'text-muted-foreground'
-                    }`}
-                >
-                  {label}
-                </p>
-              ))}
-            </div>
+            <div data-testid="calendar-grid-scroll" className="overflow-x-auto">
+              <div className="min-w-[44rem] lg:min-w-0">
+                <div className="grid grid-cols-7 border-b border-border bg-secondary/45">
+                  {weekdayLabels.map((label, index) => (
+                    <p
+                      key={label}
+                      className={`py-2 text-center text-[11px] font-semibold ${index === 0 ? 'text-risk-critical' : index === 6 ? 'text-brand-waterline' : 'text-muted-foreground'
+                        }`}
+                    >
+                      {label}
+                    </p>
+                  ))}
+                </div>
 
-            <div className="grid grid-cols-7 auto-rows-fr">
-              {days.map((day) => {
-                const dayKey = dateKey(day);
-                const dayTasks = tasksByDay.get(dayKey) || [];
-                return (
-                  <DayCell
-                    key={day.toISOString()}
-                    day={day}
-                    currentMonth={currentDate}
-                    selectedDate={selectedDate}
-                    onSelectDate={handleDaySelect}
-                    dayTasks={dayTasks}
-                    weatherDay={weatherTimeline[dayKey]}
-                    activeDragTaskId={activeDragTaskId}
-                    downstreamIds={downstreamIds}
-                    maxChips={mode === 'veteran_farmer' ? 3 : 2}
-                    t={t}
-                  />
-                );
-              })}
+                <div className="grid grid-cols-7 auto-rows-fr">
+                  {days.map((day) => {
+                    const dayKey = dateKey(day);
+                    const dayTasks = tasksByDay.get(dayKey) || [];
+                    return (
+                      <DayCell
+                        key={day.toISOString()}
+                        day={day}
+                        currentMonth={currentDate}
+                        selectedDate={selectedDate}
+                        onSelectDate={handleDaySelect}
+                        dayTasks={dayTasks}
+                        weatherDay={weatherTimeline[dayKey]}
+                        activeDragTaskId={activeDragTaskId}
+                        downstreamIds={downstreamIds}
+                        maxChips={mode === 'veteran_farmer' ? 3 : 2}
+                        t={t}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </section>
 
@@ -1239,15 +1248,22 @@ export function CalendarView({
       </DndContext>
 
       <button
+        data-testid="calendar-mobile-sheet-open"
         type="button"
         onClick={() => setSheetOpen(true)}
-        className="mobile-btn-secondary lg:hidden"
+        className="mobile-btn-secondary w-full lg:hidden"
       >
         {t('mobile_sheet_open')}
       </button>
 
       {sheetOpen ? (
-        <div className="fixed inset-0 z-50 flex items-end lg:hidden" role="dialog" aria-modal="true" aria-label={t('mobile_sheet_title')}>
+        <div
+          data-testid="calendar-mobile-sheet"
+          className="fixed inset-0 z-50 flex items-end lg:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t('mobile_sheet_title')}
+        >
           <button
             type="button"
             onClick={() => setSheetOpen(false)}
@@ -1258,6 +1274,7 @@ export function CalendarView({
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <p className="text-sm font-semibold text-foreground">{t('mobile_sheet_title')}</p>
               <button
+                data-testid="calendar-mobile-sheet-close"
                 type="button"
                 onClick={() => setSheetOpen(false)}
                 className="touch-target rounded-full p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"

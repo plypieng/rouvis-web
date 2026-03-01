@@ -231,14 +231,15 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
                     </div>
                 </div>
             )}
-            <div className="flex justify-between items-center mb-6">
+            <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h1 className="text-2xl font-bold text-gray-900">{t('list_title')}</h1>
-                <div className="flex items-center gap-3">
+                <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
                     {/* Archive Toggle */}
                     {archivedProjects.length > 0 && (
                         <button
                             onClick={() => setShowArchived(!showArchived)}
-                            className={`px-3 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 ${showArchived
+                            data-testid="projects-show-archived-toggle"
+                            className={`flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition sm:w-auto ${showArchived
                                 ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                                 }`}
@@ -252,7 +253,8 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
 
                     <Link
                         href={`/${locale}/projects/create`}
-                        className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition shadow-sm flex items-center gap-2"
+                        data-testid="projects-create-link"
+                        className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-white shadow-sm transition hover:bg-green-700 sm:w-auto"
                     >
                         <span className="material-symbols-outlined text-sm">add</span>
                         {t('create_new')}
@@ -280,12 +282,12 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
                             }}
                             className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100"
                         >
-                            AIに相談
+                            {t('ask_ai_short')}
                         </Link>
                     </div>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 lg:gap-6">
                     {displayProjects.map((project) => {
                         const isArchived = project.status === 'archived';
                         const projectChatHref = `/${locale}/chat?${new URLSearchParams({
@@ -294,10 +296,13 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
                             prompt: `${project.name}の今週の優先作業を整理して`,
                         }).toString()}`;
                         return (
-                            <div key={project.id} className="relative h-full">
-                                <Link href={`/${locale}/projects/${project.id}`} className="block group h-full">
-                                    <div className={`border rounded-xl p-5 hover:shadow-md transition bg-white h-full flex flex-col border-gray-200 group-hover:border-green-200 ${isArchived ? 'opacity-60' : ''
-                                        }`}>
+                            <article key={project.id} data-testid={`project-card-${project.id}`} className="relative h-full">
+                                <div className={`group flex h-full flex-col overflow-hidden rounded-xl border border-gray-200 bg-white transition hover:shadow-md ${isArchived ? 'opacity-60' : ''
+                                    }`}>
+                                    <Link
+                                        href={`/${locale}/projects/${project.id}`}
+                                        className="block flex-1 p-5"
+                                    >
                                         <div className="flex justify-between items-start mb-3">
                                             <h2 className="text-lg font-semibold text-gray-900 group-hover:text-green-700 transition">
                                                 {project.name}
@@ -320,14 +325,60 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
                                                 <span>{new Date(project.startDate || Date.now()).toLocaleDateString(locale)}</span>
                                             </div>
                                         </div>
+                                    </Link>
+
+                                    <div
+                                        data-testid={`project-card-actions-${project.id}`}
+                                        className="flex flex-wrap gap-2 border-t border-gray-100 px-4 py-3 sm:hidden"
+                                    >
+                                        <Link
+                                            href={`/${locale}/projects/${project.id}`}
+                                            data-testid={`project-open-link-${project.id}-mobile`}
+                                            className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg bg-green-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-green-700"
+                                        >
+                                            {t('open_project_short')}
+                                        </Link>
+                                        <Link
+                                            href={projectChatHref}
+                                            data-testid={`project-ai-link-${project.id}-mobile`}
+                                            onClick={() => {
+                                                void trackUXEvent('projects_context_chat_clicked', {
+                                                    surface: 'project_card_mobile',
+                                                    projectId: project.id,
+                                                });
+                                            }}
+                                            className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100"
+                                        >
+                                            {t('ask_ai_short')}
+                                        </Link>
+                                        {isArchived ? (
+                                            <button
+                                                onClick={(e) => handleUnarchive(project.id, e)}
+                                                data-testid={`project-unarchive-button-${project.id}-mobile`}
+                                                className="inline-flex min-h-[44px] items-center justify-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+                                            >
+                                                <span className="material-symbols-outlined text-base">unarchive</span>
+                                                {t('unarchive')}
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={(e) => handleDelete(project, e)}
+                                                data-testid={`project-delete-button-${project.id}-mobile`}
+                                                className="inline-flex min-h-[44px] items-center justify-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100"
+                                                title={t('delete')}
+                                            >
+                                                <span className="material-symbols-outlined text-base">delete</span>
+                                                {t('delete')}
+                                            </button>
+                                        )}
                                     </div>
-                                </Link>
+                                </div>
 
                                 {/* Unarchive Button for Archived Projects */}
                                 {isArchived && (
                                     <button
                                         onClick={(e) => handleUnarchive(project.id, e)}
-                                        className="absolute top-3 right-3 z-10 p-2 bg-white rounded-lg shadow-sm border border-gray-200 hover:bg-blue-50 hover:border-blue-300 transition flex items-center gap-1 text-xs font-medium text-blue-600"
+                                        className="absolute right-3 top-3 z-10 hidden items-center gap-1 rounded-lg border border-gray-200 bg-white p-2 text-xs font-medium text-blue-600 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 sm:flex"
                                     >
                                         <span className="material-symbols-outlined text-base">unarchive</span>
                                         {t('unarchive')}
@@ -337,7 +388,7 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
                                 {/* Delete Button */}
                                 <button
                                     onClick={(e) => handleDelete(project, e)}
-                                    className="absolute bottom-3 right-3 z-10 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition"
+                                    className="absolute bottom-3 right-3 z-10 hidden rounded-full p-2 text-gray-400 transition hover:bg-red-50 hover:text-red-600 sm:block"
                                     title={t('delete')}
                                 >
                                     <span className="material-symbols-outlined text-xl">delete</span>
@@ -346,18 +397,17 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
                                 <Link
                                     href={projectChatHref}
                                     data-testid={`project-ai-link-${project.id}`}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
+                                    onClick={() => {
                                         void trackUXEvent('projects_context_chat_clicked', {
                                             surface: 'project_card',
                                             projectId: project.id,
                                         });
                                     }}
-                                    className="absolute bottom-3 left-3 z-10 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
+                                    className="absolute bottom-3 left-3 z-10 hidden rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 sm:inline-flex"
                                 >
-                                    AIに相談
+                                    {t('ask_ai_short')}
                                 </Link>
-                            </div>
+                            </article>
                         );
                     })}
                 </div>

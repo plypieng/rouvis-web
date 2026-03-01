@@ -27,6 +27,7 @@ interface Task {
   title: string;
   dueAt: string;
   status: string;
+  projectId?: string;
   projectName?: string;
   priority?: string;
 }

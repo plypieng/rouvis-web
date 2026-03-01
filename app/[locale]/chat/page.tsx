@@ -511,6 +511,7 @@ export default function ChatPage() {
                   aria-label={isSidebarOpen ? t('cockpit.standalone.close_log') : t('cockpit.standalone.open_log')}
                   aria-expanded={isSidebarOpen}
                   aria-controls="chat-command-log"
+                  data-testid="chat-command-log-toggle"
                 >
                   <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
                     {isSidebarOpen ? 'left_panel_close' : 'left_panel_open'}
@@ -546,15 +547,20 @@ export default function ChatPage() {
                 className="fixed inset-0 z-20 bg-black/20 backdrop-blur-[1px] lg:hidden"
                 onClick={() => setIsSidebarOpen(false)}
                 aria-label={t('cockpit.standalone.close_log')}
+                data-testid="chat-command-log-overlay"
               />
             ) : null}
 
             <div className="grid h-full min-h-0 gap-3 lg:grid-cols-[340px_minmax(0,1fr)]">
               <aside
                 id="chat-command-log"
-                className={`surface-raised fixed inset-x-4 bottom-4 top-[124px] z-30 flex min-h-0 flex-col overflow-hidden transition-all duration-200 lg:static lg:inset-auto lg:z-auto ${isSidebarOpen ? 'translate-x-0 opacity-100' : '-translate-x-[108%] opacity-0 pointer-events-none'} lg:pointer-events-auto lg:translate-x-0 lg:opacity-100`}
+                className={`surface-raised fixed inset-x-0 bottom-0 z-30 flex h-[min(78dvh,46rem)] min-h-[24rem] flex-col overflow-hidden rounded-t-[28px] border-x-0 border-b-0 transition-all duration-200 lg:static lg:inset-auto lg:z-auto lg:h-auto lg:min-h-0 lg:rounded-2xl lg:border-x lg:border-b ${isSidebarOpen ? 'translate-y-0 opacity-100' : 'translate-y-[104%] opacity-0 pointer-events-none'} lg:pointer-events-auto lg:translate-y-0 lg:opacity-100`}
                 data-testid="command-log-rail"
               >
+                <div className="flex justify-center pt-2 lg:hidden">
+                  <span className="h-1.5 w-12 rounded-full bg-border/80" aria-hidden="true" />
+                </div>
+
                 <div className="border-b border-border/80 px-3 py-3">
                   <div className="mb-2 flex items-center justify-between gap-2">
                     <div>
@@ -590,7 +596,35 @@ export default function ChatPage() {
                     />
                   </div>
 
-                  <div className="mt-2 rounded-lg border border-border/70 bg-card/60 p-2">
+                  <details className="mt-2 rounded-lg border border-border/70 bg-card/60 p-2 lg:hidden">
+                    <summary className="cursor-pointer list-none text-[11px] font-semibold text-foreground">
+                      {t('cockpit.standalone.intent_health_title')}
+                    </summary>
+                    <div className="mt-2">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1">
+                          {(['1h', '24h', '7d'] as IntentMetricsWindow[]).map((windowKey) => (
+                            <button
+                              key={windowKey}
+                              type="button"
+                              onClick={() => setMetricsWindow(windowKey)}
+                              className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${metricsWindow === windowKey ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground'}`}
+                            >
+                              {windowKey}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1 text-[10px] text-muted-foreground">
+                        <span>{t('cockpit.standalone.metrics.misroute', { value: misrouteRatePercent })}</span>
+                        <span>{t('cockpit.standalone.metrics.clarify', { value: clarificationRatePercent })}</span>
+                        <span>{t('cockpit.standalone.metrics.detected', { count: intentMetrics?.totals?.detected || 0 })}</span>
+                        <span>{t('cockpit.standalone.metrics.workflow_p95', { value: typeof workflowP95Latency === 'number' ? `${workflowP95Latency}ms` : '-' })}</span>
+                      </div>
+                    </div>
+                  </details>
+
+                  <div className="mt-2 hidden rounded-lg border border-border/70 bg-card/60 p-2 lg:block">
                     <div className="mb-2 flex items-center justify-between gap-2">
                       <p className="text-[11px] font-semibold text-foreground">{t('cockpit.standalone.intent_health_title')}</p>
                       <div className="flex items-center gap-1">
@@ -632,7 +666,7 @@ export default function ChatPage() {
                           key={thread.id}
                           type="button"
                           onClick={() => handleThreadSelect(thread.id)}
-                          className={`w-full rounded-lg border px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${isSelected ? 'border-brand-seedling/40 bg-secondary/70 shadow-lift1' : 'border-border/80 bg-card hover:bg-secondary/45'}`}
+                          className={`w-full rounded-xl border px-3 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${isSelected ? 'border-brand-seedling/40 bg-secondary/70 shadow-lift1' : 'border-border/80 bg-card hover:bg-secondary/45'}`}
                           data-testid="chat-thread-item"
                         >
                           <div className="flex items-start justify-between gap-2">

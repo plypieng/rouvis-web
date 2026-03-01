@@ -271,7 +271,7 @@ export default function TodayCommandCenter({
   return (
     <section data-testid="today-command-center" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div data-testid={modeTestId}>
-        <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-base font-bold text-slate-900">{t('command_center.title')}</h2>
           {mode === 'veteran_farmer' ? (
             <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
@@ -343,7 +343,7 @@ export default function TodayCommandCenter({
               </p>
             ) : null}
 
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
               <TrackedEventLink
                 href={nextBestAction.primary.href}
                 eventName="dashboard_next_best_action_primary_clicked"
@@ -358,7 +358,7 @@ export default function TodayCommandCenter({
                   weatherAlertCount: nextBestAction.weatherAlertCount,
                 }}
                 data-testid="dashboard-next-best-action-primary"
-                className="inline-flex min-h-[40px] items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
+                className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 sm:w-auto"
               >
                 {nextBestAction.primary.label}
               </TrackedEventLink>
@@ -374,7 +374,7 @@ export default function TodayCommandCenter({
                     kpi: nextBestAction.kpi,
                   }}
                   data-testid="dashboard-next-best-action-secondary"
-                  className="inline-flex min-h-[40px] items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                  className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 sm:w-auto"
                 >
                   {nextBestAction.secondary.label}
                 </TrackedEventLink>
@@ -387,7 +387,7 @@ export default function TodayCommandCenter({
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
             {t('command_center.quick_actions_title')}
           </p>
-          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-4">
+          <div data-testid="today-command-center-quick-actions" className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <button
               type="button"
               onClick={() => {
@@ -452,7 +452,7 @@ export default function TodayCommandCenter({
                   {toDueLabel(recommendedTask, locale, t('overdue'), t('project_ops.date_unknown'))}
                 </p>
 
-                <div className="mt-3 flex flex-wrap items-center gap-2">
+                <div className="mt-3 grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
                   <button
                     type="button"
                     onClick={() => {
@@ -460,7 +460,7 @@ export default function TodayCommandCenter({
                     }}
                     disabled={completingTaskId === recommendedTask.id}
                     data-testid="today-command-center-primary-complete"
-                    className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-emerald-300 bg-emerald-100 px-3 py-2 text-sm font-semibold text-emerald-900 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex min-h-[44px] w-full items-center justify-center rounded-xl border border-emerald-300 bg-emerald-100 px-3 py-2 text-sm font-semibold text-emerald-900 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                   >
                     {completingTaskId === recommendedTask.id
                       ? t('command_center.completing')
@@ -469,7 +469,7 @@ export default function TodayCommandCenter({
                   {recommendedTask.projectId && (
                     <Link
                       href={`/${locale}/projects/${recommendedTask.projectId}`}
-                      className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                      className="inline-flex min-h-[44px] w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 sm:w-auto"
                     >
                       {t('command_center.open_project')}
                     </Link>
@@ -506,7 +506,7 @@ export default function TodayCommandCenter({
           </>
         ) : (
           <>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-2">
                 <p className="text-[11px] text-slate-500">{t('command_center.veteran.remaining')}</p>
                 <p className="mt-1 text-lg font-bold text-slate-900">{tasks.length}</p>
@@ -515,7 +515,7 @@ export default function TodayCommandCenter({
                 <p className="text-[11px] text-slate-500">{t('command_center.veteran.overdue')}</p>
                 <p className="mt-1 text-lg font-bold text-slate-900">{overdueCount}</p>
               </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-2">
+              <div className="col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-2 sm:col-span-1">
                 <p className="text-[11px] text-slate-500">{t('command_center.veteran.done')}</p>
                 <p className="mt-1 text-lg font-bold text-slate-900">{todayProgressDone}</p>
               </div>
@@ -532,7 +532,7 @@ export default function TodayCommandCenter({
             <TrackedEventLink
               href={veteranPrimaryAction.href}
               eventName={veteranPrimaryAction.eventName}
-              className={`mt-2 inline-flex min-h-[44px] items-center justify-center rounded-xl border px-3 py-2 text-sm font-semibold transition ${veteranPrimaryAction.className}`}
+              className={`mt-2 inline-flex min-h-[44px] w-full items-center justify-center rounded-xl border px-3 py-2 text-sm font-semibold transition sm:w-auto ${veteranPrimaryAction.className}`}
             >
               {veteranPrimaryAction.label}
             </TrackedEventLink>
@@ -543,7 +543,8 @@ export default function TodayCommandCenter({
                   {t('command_center.veteran.queue_title')}
                 </p>
                 {queueTasks.map((task) => (
-                  <div key={task.id} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2">
+                  <div key={task.id} className="rounded-lg border border-slate-200 px-3 py-3">
+                    <div className="flex items-start gap-2">
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-slate-900">{task.title}</p>
                       <p className="truncate text-xs text-slate-600">
@@ -552,24 +553,27 @@ export default function TodayCommandCenter({
                         {toDueLabel(task, locale, t('overdue'), t('project_ops.date_unknown'))}
                       </p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void completeTask(task, 'queue');
-                      }}
-                      disabled={completingTaskId === task.id}
-                      className="inline-flex min-h-[40px] items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {completingTaskId === task.id ? t('command_center.completing') : t('command_center.complete_short')}
-                    </button>
-                    {task.projectId && (
-                      <Link
-                        href={`/${locale}/projects/${task.projectId}`}
-                        className="inline-flex min-h-[40px] items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void completeTask(task, 'queue');
+                        }}
+                        disabled={completingTaskId === task.id}
+                        className="inline-flex min-h-[40px] items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        {t('command_center.open_project_short')}
-                      </Link>
-                    )}
+                        {completingTaskId === task.id ? t('command_center.completing') : t('command_center.complete_short')}
+                      </button>
+                      {task.projectId && (
+                        <Link
+                          href={`/${locale}/projects/${task.projectId}`}
+                          className="inline-flex min-h-[40px] items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                        >
+                          {t('command_center.open_project_short')}
+                        </Link>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
