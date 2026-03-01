@@ -627,6 +627,7 @@ export default function ProjectDetailClient({
                             <button
                                 type="button"
                                 onClick={() => updateTabQuery('cockpit')}
+                                data-testid="project-desktop-tab-cockpit"
                                 className={`whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium transition ${tabMode === 'cockpit'
                                     ? 'border-primary text-primary'
                                     : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
@@ -637,6 +638,7 @@ export default function ProjectDetailClient({
                             <button
                                 type="button"
                                 onClick={() => updateTabQuery('ledger')}
+                                data-testid="project-desktop-tab-ledger"
                                 className={`whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium transition ${tabMode === 'ledger'
                                     ? 'border-primary text-primary'
                                     : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
@@ -647,6 +649,7 @@ export default function ProjectDetailClient({
                             <button
                                 type="button"
                                 onClick={() => updateTabQuery('analytics')}
+                                data-testid="project-desktop-tab-analytics"
                                 className={`whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium transition ${tabMode === 'analytics'
                                     ? 'border-primary text-primary'
                                     : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
@@ -657,6 +660,7 @@ export default function ProjectDetailClient({
                             <button
                                 type="button"
                                 onClick={() => updateTabQuery('settings')}
+                                data-testid="project-desktop-tab-settings"
                                 className={`whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium transition ${tabMode === 'settings'
                                     ? 'border-primary text-primary'
                                     : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'

@@ -378,6 +378,7 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
                                 {isArchived && (
                                     <button
                                         onClick={(e) => handleUnarchive(project.id, e)}
+                                        data-testid={`project-unarchive-button-${project.id}-desktop`}
                                         className="absolute right-3 top-3 z-10 hidden items-center gap-1 rounded-lg border border-gray-200 bg-white p-2 text-xs font-medium text-blue-600 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 sm:flex"
                                     >
                                         <span className="material-symbols-outlined text-base">unarchive</span>
@@ -388,6 +389,7 @@ export default function ProjectsPage(props: { params: Promise<{ locale: string }
                                 {/* Delete Button */}
                                 <button
                                     onClick={(e) => handleDelete(project, e)}
+                                    data-testid={`project-delete-button-${project.id}-desktop`}
                                     className="absolute bottom-3 right-3 z-10 hidden rounded-full p-2 text-gray-400 transition hover:bg-red-50 hover:text-red-600 sm:block"
                                     title={t('delete')}
                                 >

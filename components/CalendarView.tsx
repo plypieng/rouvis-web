@@ -1234,7 +1234,7 @@ export function CalendarView({
             </div>
           </section>
 
-          <aside className="surface-raised hidden min-h-[560px] lg:block">
+          <aside data-testid="calendar-desktop-panel" className="surface-raised hidden min-h-[560px] lg:block">
             <DayTaskPanel
               locale={locale}
               selectedDate={selectedDate}

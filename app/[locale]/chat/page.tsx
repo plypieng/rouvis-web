@@ -695,7 +695,7 @@ export default function ChatPage() {
                 </div>
               </aside>
 
-              <section className="surface-raised min-h-0 overflow-hidden">
+              <section data-testid="chat-main-pane" className="surface-raised min-h-0 overflow-hidden">
                 <RouvisChatKit
                   ref={chatKitRef}
                   key={`${selectedThreadId || 'new'}:${contextProjectId || 'none'}:${contextEntryKey}`}
