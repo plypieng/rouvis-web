@@ -234,6 +234,33 @@ describe('/api/chatkit POST', () => {
     const body = await response.text();
     expect(body).toContain(`e:${JSON.stringify(reasoningEvent)}`);
   });
+
+  it('forwards client-provided idempotency keys and gateway_status events', async () => {
+    const ssePayload = `data: {"type":"gateway_status","data":{"state":"understanding"}}\n\n`;
+    fetchMock.mockResolvedValueOnce(new Response(ssePayload, {
+      status: 200,
+      headers: {
+        'content-type': 'text/event-stream',
+        'x-request-id': 'upstream-req-stream-3',
+      },
+    }));
+
+    const response = await POST(makeRequest('req-chatkit-stream-3', {
+      idempotencyKey: 'client-turn-123',
+      messages: [{ role: 'user', content: 'hello again' }],
+    }));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://backend.local/api/v1/agents/run',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.stringContaining('"idempotencyKey":"client-turn-123"'),
+      }),
+    );
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toContain('e:{"type":"gateway_status","data":{"state":"understanding"}}');
+  });
 });
 
 describe('/api/chatkit GET', () => {

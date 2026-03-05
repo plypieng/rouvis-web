@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const query = request.nextUrl.search || '';
-    const res = await fetch(`${BACKEND_URL}/api/v1/agents/background-workers/runs${query}`, {
+    const res = await fetch(`${BACKEND_URL}/api/v1/agents/subagents/status${query}`, {
       headers: {
         'Content-Type': 'application/json',
         ...auth.headers,
@@ -35,11 +35,11 @@ export async function GET(request: NextRequest) {
 
     return toProxyJsonResponse(res, requestId);
   } catch (error) {
-    console.error('Background worker runs proxy error:', error);
+    console.error('Subagent status proxy error:', error);
     return toApiErrorResponse({
       status: 500,
       code: 'INTERNAL_ERROR',
-      message: 'Failed to fetch background worker runs',
+      message: 'Failed to fetch subagent status',
       requestId,
     });
   }

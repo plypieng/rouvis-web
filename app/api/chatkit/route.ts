@@ -288,6 +288,7 @@ export async function POST(req: NextRequest) {
                   data.type === 'citation' ||
                   data.type === 'custom_ui' ||
                   data.type === 'action_confirmation' ||
+                  data.type === 'gateway_status' ||
                   data.type === 'reasoning_trace' ||
                   data.type === 'intent_policy' ||
                   data.type === 'diagnosis_result' ||

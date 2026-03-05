@@ -245,17 +245,18 @@ test.describe('Chat Interface with /api/chatkit', () => {
     await expect(actionCard.getByRole('button', { name: /取り消す|Undo/ })).toBeVisible();
   });
 
-  test('shows queued background worker artifacts and pending job panel', async ({ page }) => {
-    await page.route('**/api/v1/agents/background-workers/runs**', async (route) => {
+  test('shows queued subagent artifacts and pending run panel', async ({ page }) => {
+    await page.route('**/api/v1/agents/subagents/status**', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
           runs: [
             {
-              id: 'bg-run-12345678',
+              id: 'sub-run-12345678',
               intent: 'run_reschedule_planner',
               state: 'queued',
+              threadId: 'thread-1',
               queuedAt: '2026-02-23T08:00:00.000Z',
             },
           ],
@@ -269,30 +270,37 @@ test.describe('Chat Interface with /api/chatkit', () => {
     await mockChatkit(page, {
       streamForPrompt: () => createStream([
         `e:${JSON.stringify({
-          type: 'tool_call_delta',
-          delta: {
-            tool: 'spawn_background_worker',
-            status: 'running',
-            message: 'Queueing long-running task...',
+          type: 'gateway_status',
+          data: {
+            state: 'queued',
           },
         })}`,
         `e:${JSON.stringify({
           type: 'tool_call_delta',
           delta: {
-            tool: 'spawn_background_worker',
+            tool: 'spawn_subagent_run',
+            status: 'running',
+            message: 'Queueing delegated run...',
+          },
+        })}`,
+        `e:${JSON.stringify({
+          type: 'tool_call_delta',
+          delta: {
+            tool: 'spawn_subagent_run',
             status: 'completed',
-            message: 'Queued as bg-run-12345678',
+            message: 'Queued as sub-run-12345678',
           },
         })}`,
         `e:${JSON.stringify({
           type: 'custom_ui',
           data: {
-            type: 'background_worker_queued',
-            runId: 'bg-run-12345678',
+            type: 'subagent_run_queued',
+            runId: 'sub-run-12345678',
             intent: 'run_reschedule_planner',
+            mode: 'run',
           },
         })}`,
-        `0:${JSON.stringify('重い処理をバックグラウンドで開始しました。完了後に通知します。')}`,
+        `0:${JSON.stringify('重い処理をサブエージェントに委譲しました。完了後に通知します。')}`,
       ]),
     });
 
@@ -300,10 +308,10 @@ test.describe('Chat Interface with /api/chatkit', () => {
     await sendPrompt(page, '10年分の気象データで今季スケジュールを再計算して');
 
     await expect(page.getByTestId('command-artifact-queue').first()).toBeVisible();
-    const pendingPanel = page.getByTestId('pending-background-jobs');
+    const pendingPanel = page.getByTestId('pending-subagent-runs');
     await expect(pendingPanel).toBeVisible();
     await expect(pendingPanel).toContainText('run_reschedule_planner');
-    await expect(page.getByTestId('pending-background-job').first()).toContainText('bg-run-1');
+    await expect(page.getByTestId('pending-subagent-run').first()).toContainText('sub-run-');
   });
 
   test('shows loading indicator while waiting for stream response', async ({ page }) => {
@@ -718,10 +726,10 @@ test.describe('Chat Interface with /api/chatkit', () => {
     await expect(assistantMessage).toContainText('セルトレイは苗を育てるための穴あき容器です。');
   });
 
-  test('shows global background completion toast outside chat and deep-links into thread', async ({ page }) => {
+  test('shows global subagent completion toast outside chat and deep-links into thread', async ({ page }) => {
     let runPollCount = 0;
 
-    await page.route('**/api/v1/agents/background-workers/runs**', async (route) => {
+    await page.route('**/api/v1/agents/subagents/status**', async (route) => {
       runPollCount += 1;
       const state = runPollCount >= 2 ? 'succeeded' : 'running';
       const now = new Date().toISOString();
@@ -732,17 +740,12 @@ test.describe('Chat Interface with /api/chatkit', () => {
         body: JSON.stringify({
           runs: [
             {
-              id: 'bg-run-1',
+              id: 'sub-run-1',
               state,
-              title: 'Background schedule replan',
-              summary: state === 'succeeded' ? 'Background schedule replan completed.' : 'Running in the background.',
-              errorMessage: null,
+              intent: 'run_reschedule_planner',
+              summary: state === 'succeeded' ? 'Delegated schedule replan completed.' : 'Delegated run is in progress.',
+              error: null,
               threadId: 'thread-bg-1',
-              projectId: null,
-              source: 'schedule_generation',
-              createdAt: now,
-              startedAt: now,
-              completedAt: state === 'succeeded' ? now : null,
             },
           ],
           total: 1,
@@ -825,7 +828,7 @@ test.describe('Chat Interface with /api/chatkit', () => {
     await expect.poll(() => runPollCount, { timeout: 25_000 }).toBeGreaterThanOrEqual(2);
 
     const toast = page.getByRole('status').filter({
-      hasText: /Background schedule replan|バックグラウンド|完了しました|completed/i,
+      hasText: /Delegated schedule replan|サブエージェント|完了しました|completed/i,
     }).last();
     await expect(toast).toBeVisible({ timeout: 15_000 });
 

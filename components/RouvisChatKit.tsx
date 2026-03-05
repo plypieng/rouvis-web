@@ -71,10 +71,24 @@ interface AgentYieldState {
   requiresConfirmation?: boolean;
 }
 
-type BackgroundWorkerRun = {
+type GatewayStatusState =
+  | 'understanding'
+  | 'retrieving_context'
+  | 'awaiting_confirmation'
+  | 'queued'
+  | 'running_subagent'
+  | 'completed'
+  | 'failed';
+
+type SubagentRun = {
   id: string;
   intent: string;
   state: 'queued' | 'running' | 'succeeded' | 'failed';
+  mode?: 'run' | 'session';
+  summary?: string;
+  error?: string;
+  childSessionKey?: string;
+  threadId?: string;
   queuedAt?: string;
 };
 
@@ -83,6 +97,7 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   imageUrl?: string;
+  requestIdempotencyKey?: string;
   reasoningSteps?: ReasoningTraceStep[];
   reasoningStartTime?: number;
   reasoningEndTime?: number;
@@ -143,6 +158,8 @@ const FRIENDLY_STATUS_KEYS: Record<string, string> = {
   'activities.log': 'cockpit.status.activity_log',
   'activities.analyzer': 'cockpit.status.activity_log',
   'run_activity_analyzer': 'cockpit.status.activity_agent',
+  'spawn_subagent_run': 'cockpit.status.processing',
+  'steer_subagent_session': 'cockpit.status.processing',
   'get_project_summary': 'cockpit.status.project_summary',
   'get_field_status': 'cockpit.status.field_status',
   'search_activities': 'cockpit.status.activity_search',
@@ -150,6 +167,31 @@ const FRIENDLY_STATUS_KEYS: Record<string, string> = {
   'web_search': 'cockpit.status.web_search',
 };
 const TRACE_EXPANDED_MAX_STEPS = 5;
+
+function buildGatewayStatusLabel(
+  state: GatewayStatusState,
+  assistantLanguage: AssistantLanguage,
+  detail?: string
+): string {
+  if (detail?.trim()) return detail.trim();
+  if (assistantLanguage === 'ja') {
+    if (state === 'understanding') return '依頼内容を整理しています...';
+    if (state === 'retrieving_context') return '関連データと文脈を確認しています...';
+    if (state === 'awaiting_confirmation') return '確認待ちです...';
+    if (state === 'queued') return 'サブエージェント実行をキューに入れました...';
+    if (state === 'running_subagent') return 'サブエージェントが処理中です...';
+    if (state === 'completed') return '完了しました。';
+    return '処理に失敗しました。';
+  }
+
+  if (state === 'understanding') return 'Understanding your request...';
+  if (state === 'retrieving_context') return 'Retrieving relevant context...';
+  if (state === 'awaiting_confirmation') return 'Waiting for your confirmation...';
+  if (state === 'queued') return 'Queued delegated work...';
+  if (state === 'running_subagent') return 'Delegated work is running...';
+  if (state === 'completed') return 'Completed.';
+  return 'The request failed.';
+}
 
 const MODE_CONFIG: Record<ChatMode, { color: string; bg: string; border: string }> = {
   default: { color: '', bg: '', border: '' },
@@ -394,7 +436,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   const [assistantVerbosity, setAssistantVerbosity] = useState<AssistantVerbosity>('balanced');
   const [pendingMutationApproval, setPendingMutationApproval] = useState<PendingMutationApproval | null>(null);
   const [streamTokenSeq, setStreamTokenSeq] = useState(0);
-  const [pendingBackgroundRuns, setPendingBackgroundRuns] = useState<BackgroundWorkerRun[]>([]);
+  const [pendingSubagentRuns, setPendingSubagentRuns] = useState<SubagentRun[]>([]);
 
   const [threadList, setThreadList] = useState<ThreadInfo[]>([]);
   const [isThreadListOpen, setIsThreadListOpen] = useState(false);
@@ -542,30 +584,30 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     }
   }, [isAuthenticated, projectId]);
 
-  const refreshBackgroundWorkerRuns = useCallback(async (options?: { refresh?: boolean }) => {
-    if (!isAuthenticated || !threadId) {
-      setPendingBackgroundRuns([]);
+  const refreshSubagentRuns = useCallback(async (options?: { refresh?: boolean; threadId?: string }) => {
+    const effectiveThreadId = options?.threadId || threadId;
+    if (!isAuthenticated || !effectiveThreadId) {
+      setPendingSubagentRuns([]);
       return;
     }
 
     try {
       const params = new URLSearchParams();
-      params.set('threadId', threadId);
-      params.set('limit', '6');
+      params.set('limit', '24');
       if (options?.refresh) {
         params.set('refresh', '1');
       }
 
-      const res = await fetch(`/api/v1/agents/background-workers/runs?${params.toString()}`);
+      const res = await fetch(`/api/v1/agents/subagents/status?${params.toString()}`);
       if (!res.ok) return;
 
-      const data = await res.json().catch(() => ({})) as { runs?: BackgroundWorkerRun[] };
+      const data = await res.json().catch(() => ({})) as { runs?: SubagentRun[] };
       const runs = Array.isArray(data.runs) ? data.runs : [];
-      setPendingBackgroundRuns(
-        runs.filter((run) => run.state === 'queued' || run.state === 'running')
-      );
+      const activeRuns = runs.filter((run) => run.state === 'queued' || run.state === 'running');
+      const threadScopedRuns = activeRuns.filter((run) => run.threadId === effectiveThreadId);
+      setPendingSubagentRuns((threadScopedRuns.length > 0 ? threadScopedRuns : activeRuns).slice(0, 6));
     } catch (error) {
-      console.warn('Failed to fetch background worker runs:', error);
+      console.warn('Failed to fetch subagent runs:', error);
     }
   }, [isAuthenticated, threadId]);
 
@@ -598,19 +640,19 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
 
   useEffect(() => {
     if (!isAuthenticated || !threadId) {
-      setPendingBackgroundRuns([]);
+      setPendingSubagentRuns([]);
       return;
     }
 
-    void refreshBackgroundWorkerRuns();
+    void refreshSubagentRuns();
     const timer = window.setInterval(() => {
-      void refreshBackgroundWorkerRuns({ refresh: true });
+      void refreshSubagentRuns({ refresh: true });
     }, 15000);
 
     return () => {
       window.clearInterval(timer);
     };
-  }, [isAuthenticated, refreshBackgroundWorkerRuns, threadId]);
+  }, [isAuthenticated, refreshSubagentRuns, threadId]);
 
   // Load chat history on mount
   useEffect(() => {
@@ -773,12 +815,14 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
       skipUserMessage?: boolean;
       yieldToken?: string;
       yieldAnswer?: string;
+      idempotencyKey?: string;
+      forceSend?: boolean;
     }
   ) => {
     const trimmedContent = content.trim();
     const hasApprovalPayload = Boolean(options?.mutationApprovalToken);
     const shouldAttachImage = !options?.skipUserMessage && Boolean(selectedImageFile);
-    if ((!trimmedContent && !shouldAttachImage && !hasApprovalPayload && !options?.yieldToken) || isLoading) return;
+    if ((!trimmedContent && !shouldAttachImage && !hasApprovalPayload && !options?.yieldToken && !options?.forceSend) || isLoading) return;
     let assistantRawContent = '';
     let assistantFailed = false;
     lastAssistantRawRef.current = '';
@@ -811,12 +855,23 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
 
     const userMessage: Message | null = options?.skipUserMessage
       ? null
-      : {
-        id: `user-${Date.now()}`,
-        role: 'user',
-        content: trimmedContent,
-        imageUrl: uploadedImageUrl,
-      };
+      : (() => {
+        const userMessageId = `user-${Date.now()}`;
+        return {
+          id: userMessageId,
+          role: 'user' as const,
+          content: trimmedContent,
+          imageUrl: uploadedImageUrl,
+          requestIdempotencyKey: options?.idempotencyKey || `chat-turn:${userMessageId}`,
+        };
+      })();
+    const requestIdempotencyKey = options?.idempotencyKey
+      || userMessage?.requestIdempotencyKey
+      || (options?.yieldToken
+        ? `chat-yield:${options.yieldToken}`
+        : options?.mutationApprovalToken
+          ? `chat-approval:${options.mutationApprovalToken}`
+          : `chat-control:${Date.now()}`);
 
     // Build API messages array BEFORE clearing state.
     const outboundMessages = userMessage ? [...messages, userMessage] : messages;
@@ -853,9 +908,11 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     activeAssistantIdRef.current = assistantId;
     hasFirstAssistantTokenRef.current = false;
     setMessages(prev => [...prev, newAssistantMessage]);
+    let resolvedThreadIdForTurn = threadId;
 
     try {
       const resolvedThreadId = threadId || await ensureThreadId();
+      resolvedThreadIdForTurn = resolvedThreadId;
       const resolvedMode = options?.skipUserMessage ? undefined : (overrideMode || chatMode);
       const response = await fetch('/api/chatkit', {
         method: 'POST',
@@ -879,6 +936,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
           allowMutations: options?.allowMutations === true,
           yieldToken: options?.yieldToken,
           yieldAnswer: options?.yieldAnswer,
+          idempotencyKey: requestIdempotencyKey,
         }),
       });
 
@@ -990,6 +1048,14 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
                 primaryIntent: event.data.primaryIntent || 'unknown',
                 clarificationRequired: Boolean(event.data.clarificationRequired),
               });
+            }
+
+            if (event.type === 'gateway_status' && typeof event.data?.state === 'string') {
+              setCurrentStatus(buildGatewayStatusLabel(
+                event.data.state as GatewayStatusState,
+                assistantLanguage,
+                typeof event.data.detail === 'string' ? event.data.detail : undefined,
+              ));
             }
 
             // Simple status update (no complex thinking UI)
@@ -1141,8 +1207,12 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
                   },
                 ]);
               }
-              if (event.data.type === 'background_worker_queued') {
-                void refreshBackgroundWorkerRuns();
+              if (event.data.type === 'subagent_run_queued' || event.data.type === 'subagent_session_steered') {
+                setCurrentStatus(buildGatewayStatusLabel(
+                  event.data.type === 'subagent_session_steered' ? 'running_subagent' : 'queued',
+                  assistantLanguage,
+                ));
+                void refreshSubagentRuns({ threadId: resolvedThreadIdForTurn });
               }
               if (event.data.type === 'refresh_tasks') {
                 onTaskUpdate?.();
@@ -1198,7 +1268,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
       hasFirstAssistantTokenRef.current = false;
       lastAssistantRawRef.current = assistantRawContent;
       lastAssistantFailedRef.current = assistantFailed;
-      void refreshBackgroundWorkerRuns();
+      void refreshSubagentRuns({ threadId: resolvedThreadIdForTurn });
       setIsLoading(false);
       setTraceExpanded(false);
       setCurrentStatus('');
@@ -1224,7 +1294,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     onTaskUpdate,
     onDiagnosisComplete,
     onDraftCreate,
-    refreshBackgroundWorkerRuns,
+    refreshSubagentRuns,
     chatMode,
     publishHandshake,
     pushArtifact,
@@ -1309,7 +1379,13 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     });
     setTimeout(() => {
       const lastUser = messages.findLast(m => m.role === 'user');
-      if (lastUser) sendMessage(lastUser.content);
+      if (lastUser) {
+        void sendMessage('', undefined, {
+          skipUserMessage: true,
+          forceSend: true,
+          idempotencyKey: lastUser.requestIdempotencyKey,
+        });
+      }
     }, 100);
   }, [messages, sendMessage]);
 
@@ -1646,25 +1722,25 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
           </p>
         )}
 
-        {pendingBackgroundRuns.length > 0 && (
+        {pendingSubagentRuns.length > 0 && (
           <section
             className="rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-900"
-            data-testid="pending-background-jobs"
+            data-testid="pending-subagent-runs"
           >
             <div className="flex items-center justify-between gap-2">
               <p className="font-semibold">
-                {assistantLanguage === 'ja' ? '保留中ジョブ' : 'Pending jobs'}
+                {assistantLanguage === 'ja' ? '進行中のサブエージェント' : 'Active delegated runs'}
               </p>
               <p className="text-[11px] font-semibold">
-                {pendingBackgroundRuns.length}
+                {pendingSubagentRuns.length}
               </p>
             </div>
             <div className="mt-2 space-y-1.5">
-              {pendingBackgroundRuns.slice(0, 3).map((run) => (
+              {pendingSubagentRuns.slice(0, 3).map((run) => (
                 <div
                   key={run.id}
                   className="rounded-md border border-amber-200/80 bg-white/70 px-2 py-1.5"
-                  data-testid="pending-background-job"
+                  data-testid="pending-subagent-run"
                 >
                   <p className="font-medium">{run.intent}</p>
                   <p className="text-[11px] opacity-85">

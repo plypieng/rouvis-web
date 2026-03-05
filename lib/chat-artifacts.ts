@@ -47,6 +47,7 @@ export type ChatkitEvent = {
   result?: unknown;
   data?: {
     type?: string;
+    state?: string;
     options?: Array<{ label?: string; value?: string }>;
     token?: string;
     summary?: string;
@@ -61,6 +62,11 @@ export type ChatkitEvent = {
     confidence?: number;
     clarificationRequired?: boolean;
     reason?: string;
+    detail?: string;
+    intent?: string;
+    mode?: string;
+    runId?: string;
+    childSessionKey?: string;
   };
   stepId?: string;
   phase?: ReasoningTracePhase;
@@ -338,7 +344,8 @@ export function createArtifactFromStreamEvent(event: ChatkitEvent): CommandArtif
 
   if (eventType === 'tool_call_delta' && event.delta?.tool) {
     const isQueue = event.delta.tool === 'scheduler.queue'
-      || event.delta.tool === 'spawn_background_worker';
+      || event.delta.tool === 'spawn_subagent_run'
+      || event.delta.tool === 'steer_subagent_session';
     const status = event.delta.status || 'running';
     const tone: CommandRiskTone = status === 'error'
       ? 'critical'
@@ -406,6 +413,26 @@ export function createArtifactFromStreamEvent(event: ChatkitEvent): CommandArtif
     };
   }
 
+  if (
+    eventType === 'custom_ui'
+    && (event.data?.type === 'subagent_run_queued' || event.data?.type === 'subagent_session_steered')
+  ) {
+    return {
+      id: buildId('artifact'),
+      kind: 'queue',
+      title: event.data.type === 'subagent_session_steered' ? 'Subagent Follow-up' : 'Subagent Queued',
+      description: event.data.intent || event.data.type,
+      detail: event.data.mode || event.data.childSessionKey,
+      tone: 'watch',
+      createdAt: new Date().toISOString(),
+      metadata: {
+        runId: event.data.runId,
+        childSessionKey: event.data.childSessionKey,
+        mode: event.data.mode,
+      },
+    };
+  }
+
   if (eventType === 'intent_policy' && event.data?.responsePolicy) {
     const tone: CommandRiskTone = event.data.responsePolicy === 'workflow' || event.data.responsePolicy === 'deep'
       ? 'watch'
@@ -421,6 +448,28 @@ export function createArtifactFromStreamEvent(event: ChatkitEvent): CommandArtif
       metadata: {
         confidence: event.data.confidence,
         clarificationRequired: event.data.clarificationRequired,
+      },
+    };
+  }
+
+  if (eventType === 'gateway_status' && typeof event.data?.state === 'string') {
+    const tone: CommandRiskTone = event.data.state === 'failed'
+      ? 'critical'
+      : event.data.state === 'completed'
+        ? 'safe'
+        : 'watch';
+    return {
+      id: buildId('artifact'),
+      kind: 'status',
+      title: 'Gateway Status',
+      description: event.data.state,
+      detail: event.data.detail || event.data.reason,
+      tone,
+      createdAt: new Date().toISOString(),
+      metadata: {
+        intent: event.data.intent,
+        mode: event.data.mode,
+        runId: event.data.runId,
       },
     };
   }
