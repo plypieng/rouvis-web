@@ -1,19 +1,20 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-import { captureException } from '@/lib/sentry';
+import { captureRouteHandlerException } from '@/lib/sentry-route';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   if (process.env.NODE_ENV === 'production') {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
   const error = new Error('Web telemetry validation error');
-  await captureException(error, {
-    tags: {
-      source: 'telemetry.validation.web',
-    },
+  await captureRouteHandlerException(error, request, {
+    source: 'telemetry.validation.web',
     extra: {
       validation: true,
+      email: 'farmer@example.com',
+      authorization: 'Bearer validation-token',
+      api_key: 'web-validation-key',
     },
   });
 

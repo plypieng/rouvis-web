@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { authPrisma } from '@/lib/prisma';
 import { getServerSessionFromToken } from '@/lib/server-auth';
-import { captureException } from '@/lib/sentry';
+import { captureRouteHandlerException } from '@/lib/sentry-route';
 import {
   type PrimitiveValue,
   type TelemetryProperties,
@@ -81,11 +81,10 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error) {
-    await captureException(error, {
+    await captureRouteHandlerException(error, req, {
       level: 'warning',
-      tags: {
-        source: 'telemetry.events.route',
-      },
+      source: 'telemetry.events.route',
+      user: userId ? { id: userId } : undefined,
       extra: {
         event,
         userId,
