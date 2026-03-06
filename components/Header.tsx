@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
 import { useTranslations } from 'next-intl';
@@ -46,10 +46,21 @@ interface HeaderProps {
   kpis?: KPIs;
 }
 
-function useTheme(): [ThemeMode, (m: ThemeMode) => void] {
-  const [mode, setMode] = useState<ThemeMode>('system');
+function readStoredTheme(): ThemeMode {
+  if (typeof window === 'undefined') return 'system';
 
-  const apply = (value: ThemeMode) => {
+  try {
+    const saved = window.localStorage.getItem('theme');
+    return saved === 'light' || saved === 'dark' || saved === 'system' ? saved : 'system';
+  } catch {
+    return 'system';
+  }
+}
+
+function useTheme(): [ThemeMode, (m: ThemeMode) => void] {
+  const [mode, setMode] = useState<ThemeMode>(() => readStoredTheme());
+
+  const apply = useCallback((value: ThemeMode) => {
     try {
       localStorage.setItem('theme', value);
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -58,21 +69,14 @@ function useTheme(): [ThemeMode, (m: ThemeMode) => void] {
     } catch {
       // noop
     }
-  };
+  }, []);
 
   useEffect(() => {
-    try {
-      const saved = (localStorage.getItem('theme') as ThemeMode) || 'system';
-      setMode(saved);
-      apply(saved);
-    } catch {
-      // noop
-    }
-  }, []);
+    apply(mode);
+  }, [apply, mode]);
 
   return [mode, (value) => {
     setMode(value);
-    apply(value);
   }];
 }
 
@@ -124,6 +128,7 @@ export default function Header({ locale, user = null, alerts = [], kpis }: Heade
   const [theme, setTheme] = useTheme();
   const [liveWarnings, setLiveWarnings] = useState<LiveWeatherAlert[]>([]);
   const { data: session, status: sessionStatus } = useSession();
+  const lastPathnameRef = useRef(pathname);
 
   const currentUser = session?.user || user;
   const isSessionLoading = sessionStatus === 'loading';
@@ -141,8 +146,17 @@ export default function Header({ locale, user = null, alerts = [], kpis }: Heade
   );
 
   useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
+    const previousPathname = lastPathnameRef.current;
+    lastPathnameRef.current = pathname;
+
+    if (!mobileOpen || previousPathname === pathname) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      setMobileOpen(false);
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [mobileOpen, pathname]);
 
   useEffect(() => {
     if (!mobileOpen) return;

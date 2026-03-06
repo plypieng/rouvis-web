@@ -454,18 +454,18 @@ export default async function DashboardProjectList({
         || activitiesResult.hasError
         || profileResult.hasError;
 
-    const retryHref = `/${locale}?retry=${Date.now().toString()}`;
+    const now = new Date();
+    const nowEpoch = now.getTime();
+    const retryHref = `/${locale}?retry=${nowEpoch.toString()}`;
     const emptyProjectsChatHref = `/${locale}/chat?${new URLSearchParams({
         intent: 'project',
         prompt: t('chat_prompts.first_project'),
     }).toString()}`;
 
-    const now = new Date();
     const todayStart = new Date(now);
     todayStart.setHours(0, 0, 0, 0);
     const todayEnd = new Date(now);
     todayEnd.setHours(23, 59, 59, 999);
-    const nowEpoch = now.getTime();
     const todayStartEpoch = todayStart.getTime();
     const todayEndEpoch = todayEnd.getTime();
     const window48hEndEpoch = nowEpoch + (48 * 60 * 60 * 1000);
@@ -536,7 +536,7 @@ export default async function DashboardProjectList({
 
     const createdAt = profile?.createdAt ? new Date(profile.createdAt) : null;
     const daysSinceSignup = createdAt
-        ? Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24))
+        ? Math.floor((nowEpoch - createdAt.getTime()) / (1000 * 60 * 60 * 24))
         : null;
     const withinFirstWeek = daysSinceSignup === null || daysSinceSignup <= 7;
 

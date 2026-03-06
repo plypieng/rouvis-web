@@ -23,11 +23,32 @@ interface FieldMapViewProps {
   fields: Field[];
 }
 
+function getNormalizedCoord(coord: google.maps.Point, zoom: number) {
+  const y = coord.y;
+  const x = coord.x;
+
+  const tileRange = 1 << zoom;
+  if (x < 0 || x >= tileRange) {
+    return null;
+  }
+
+  if (y < 0 || y >= tileRange) {
+    return null;
+  }
+
+  return { x, y };
+}
+
 export function FieldMapView({ fields }: FieldMapViewProps) {
   const t = useTranslations();
   const mapRef = useRef<HTMLDivElement>(null);
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const [mapLoaded, setMapLoaded] = useState(false);
-  const [mapError, setMapError] = useState<string | null>(null);
+  const [mapError, setMapError] = useState<string | null>(() =>
+    apiKey
+      ? null
+      : 'Google Maps API key is not configured. Please add NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to your environment variables.'
+  );
   const [selectedField, setSelectedField] = useState<Field | null>(null);
 
   const isPolygonGeoJson = (value: unknown): value is PolygonGeoJson => {
@@ -42,11 +63,7 @@ export function FieldMapView({ fields }: FieldMapViewProps) {
     let mapInstance: google.maps.Map | null = null;
     const mapElements: (google.maps.Polygon | google.maps.Marker)[] = [];
 
-    // Get API key from environment variables
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-
     if (!apiKey) {
-      setMapError('Google Maps API key is not configured. Please add NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to your environment variables.');
       return;
     }
 
@@ -170,31 +187,12 @@ export function FieldMapView({ fields }: FieldMapViewProps) {
       });
 
       // Let React properly manage the DOM
-      if (mapRef.current && mapInstance) {
+      if (mapInstance) {
         // Allow React to handle the DOM cleanup
         mapInstance = null;
       }
     };
   }, [fields]);
-
-  // Normalize coordinates for GSI tiles
-  function getNormalizedCoord(coord: google.maps.Point, zoom: number) {
-    const y = coord.y;
-    const x = coord.x;
-
-    // Repeat x coordinates
-    const tileRange = 1 << zoom;
-    if (x < 0 || x >= tileRange) {
-      return null;
-    }
-
-    // Don't repeat y coordinates
-    if (y < 0 || y >= tileRange) {
-      return null;
-    }
-
-    return { x, y };
-  }
 
   return (
     <div className="relative h-64 sm:h-96 w-full">

@@ -40,10 +40,7 @@ export function GuestSignInButton({
   const [traceStepIndex, setTraceStepIndex] = useState(0);
 
   useEffect(() => {
-    if (!isLoading) {
-      setTraceStepIndex(0);
-      return;
-    }
+    if (!isLoading) return;
 
     const finalStepIndex = 2;
     const timer = window.setInterval(() => {
@@ -55,6 +52,7 @@ export function GuestSignInButton({
 
   const handleSignIn = async () => {
     try {
+      setTraceStepIndex(0);
       setIsLoading(true);
       setError(null);
       // Let loading UI paint before NextAuth redirects/navigation starts.

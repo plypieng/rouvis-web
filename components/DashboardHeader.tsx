@@ -50,6 +50,7 @@ export default async function DashboardHeader({
   // Find today's priority task
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
+  const currentYearStart = new Date(today.getFullYear(), 0, 1);
   const priorityTask = tasks.find(t => {
     const taskDate = new Date(t.dueAt).toISOString().split('T')[0];
     return taskDate === todayStr && t.status !== 'completed';
@@ -64,7 +65,7 @@ export default async function DashboardHeader({
   else if ((weather.alerts?.length || 0) >= 1 || overdueCount > 0) riskTone = 'warning';
   else if (dueSoonCount > 3) riskTone = 'watch';
 
-  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 1).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  const dayOfYear = Math.floor((today.getTime() - currentYearStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
   const completedTodayRatio = Math.round(((tasks.length - dueSoonCount) / Math.max(tasks.length, 1)) * 100);
   const seasonState = buildSeasonRailState({
     stage: overdueCount > 0 ? 'flowering' : 'vegetative',

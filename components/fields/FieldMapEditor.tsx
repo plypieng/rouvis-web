@@ -38,8 +38,9 @@ export default function FieldMapEditor({ onFieldChange, initialPolygon }: FieldM
     const mapRef = useRef<HTMLDivElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
     const [map, setMap] = useState<google.maps.Map | null>(null);
-    const [drawingManager, setDrawingManager] = useState<google.maps.drawing.DrawingManager | null>(null);
-    const [currentPolygon, setCurrentPolygon] = useState<google.maps.Polygon | null>(null);
+    const drawingManagerRef = useRef<google.maps.drawing.DrawingManager | null>(null);
+    const currentPolygonRef = useRef<google.maps.Polygon | null>(null);
+    const currentPolygonCleanupRef = useRef<(() => void) | null>(null);
 
     useEffect(() => {
         const initMap = async () => {
@@ -63,6 +64,43 @@ export default function FieldMapEditor({ onFieldChange, initialPolygon }: FieldM
 
         void initMap();
     }, []);
+
+    const updateFieldData = useCallback((polygon: google.maps.Polygon) => {
+        const path = polygon.getPath();
+        const areaM2 = google.maps.geometry.spherical.computeArea(path);
+        const areaHa = areaM2 / 10000;
+
+        const coordinates = path.getArray().map((point) => ({ lat: point.lat(), lng: point.lng() }));
+
+        const bounds = new google.maps.LatLngBounds();
+        path.forEach((point) => bounds.extend(point));
+        const center = bounds.getCenter();
+
+        onFieldChange({
+            area: Number(areaHa.toFixed(2)),
+            polygon: coordinates,
+            location: center ? { lat: center.lat(), lng: center.lng() } : null,
+        });
+    }, [onFieldChange]);
+
+    const attachPathListeners = useCallback((polygon: google.maps.Polygon) => {
+        const path = polygon.getPath();
+        const handlePathChange = () => updateFieldData(polygon);
+        const setAtListener = path.addListener('set_at', handlePathChange);
+        const insertAtListener = path.addListener('insert_at', handlePathChange);
+
+        return () => {
+            google.maps.event.removeListener(setAtListener);
+            google.maps.event.removeListener(insertAtListener);
+        };
+    }, [updateFieldData]);
+
+    const bindPolygon = useCallback((polygon: google.maps.Polygon) => {
+        currentPolygonCleanupRef.current?.();
+        currentPolygonCleanupRef.current = attachPathListeners(polygon);
+        currentPolygonRef.current = polygon;
+        updateFieldData(polygon);
+    }, [attachPathListeners, updateFieldData]);
 
     useEffect(() => {
         if (!map) return;
@@ -102,15 +140,27 @@ export default function FieldMapEditor({ onFieldChange, initialPolygon }: FieldM
         });
 
         manager.setMap(map);
-        setDrawingManager(manager);
+        drawingManagerRef.current = manager;
+
+        const handlePolygonComplete = (polygon: google.maps.Polygon) => {
+            currentPolygonRef.current?.setMap(null);
+            bindPolygon(polygon);
+            manager.setDrawingMode(null);
+        };
+
+        const listener = google.maps.event.addListener(manager, 'polygoncomplete', handlePolygonComplete);
 
         return () => {
+            google.maps.event.removeListener(listener);
             manager.setMap(null);
+            if (drawingManagerRef.current === manager) {
+                drawingManagerRef.current = null;
+            }
         };
-    }, [map]);
+    }, [bindPolygon, map]);
 
     useEffect(() => {
-        if (!map || currentPolygon || !initialPolygon) return;
+        if (!map || currentPolygonRef.current || !initialPolygon) return;
 
         const points = parseInitialPolygon(initialPolygon);
         if (!points.length) return;
@@ -129,70 +179,27 @@ export default function FieldMapEditor({ onFieldChange, initialPolygon }: FieldM
         const bounds = new google.maps.LatLngBounds();
         points.forEach((point) => bounds.extend(point));
         map.fitBounds(bounds);
-        setCurrentPolygon(polygon);
-    }, [map, initialPolygon, currentPolygon]);
-
-    useEffect(() => {
-        if (!drawingManager) return;
-
-        const updateFieldData = (polygon: google.maps.Polygon) => {
-            const path = polygon.getPath();
-            const areaM2 = google.maps.geometry.spherical.computeArea(path);
-            const areaHa = areaM2 / 10000;
-
-            const coordinates = path.getArray().map((point) => ({ lat: point.lat(), lng: point.lng() }));
-
-            const bounds = new google.maps.LatLngBounds();
-            path.forEach((point) => bounds.extend(point));
-            const center = bounds.getCenter();
-
-            onFieldChange({
-                area: Number(areaHa.toFixed(2)),
-                polygon: coordinates,
-                location: center ? { lat: center.lat(), lng: center.lng() } : null,
-            });
-        };
-
-        const attachPathListeners = (polygon: google.maps.Polygon) => {
-            polygon.getPath().addListener('set_at', () => updateFieldData(polygon));
-            polygon.getPath().addListener('insert_at', () => updateFieldData(polygon));
-        };
-
-        const handlePolygonComplete = (polygon: google.maps.Polygon) => {
-            if (currentPolygon) {
-                currentPolygon.setMap(null);
-            }
-
-            setCurrentPolygon(polygon);
-            drawingManager.setDrawingMode(null);
-            updateFieldData(polygon);
-            attachPathListeners(polygon);
-        };
-
-        const listener = google.maps.event.addListener(drawingManager, 'polygoncomplete', handlePolygonComplete);
-
-        if (currentPolygon) {
-            updateFieldData(currentPolygon);
-            attachPathListeners(currentPolygon);
-        }
-
-        return () => {
-            google.maps.event.removeListener(listener);
-        };
-    }, [drawingManager, currentPolygon, onFieldChange]);
+        bindPolygon(polygon);
+    }, [bindPolygon, map, initialPolygon]);
 
     useEffect(() => {
         return () => {
-            if (currentPolygon) currentPolygon.setMap(null);
+            currentPolygonCleanupRef.current?.();
+            currentPolygonCleanupRef.current = null;
+            currentPolygonRef.current?.setMap(null);
+            currentPolygonRef.current = null;
         };
-    }, [currentPolygon]);
+    }, []);
 
     const clearMap = () => {
+        const currentPolygon = currentPolygonRef.current;
         if (!currentPolygon) return;
 
+        currentPolygonCleanupRef.current?.();
+        currentPolygonCleanupRef.current = null;
         currentPolygon.setMap(null);
-        setCurrentPolygon(null);
-        if (drawingManager) drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+        currentPolygonRef.current = null;
+        drawingManagerRef.current?.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
         onFieldChange({ area: 0, polygon: null, location: null });
     };
 

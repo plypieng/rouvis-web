@@ -277,13 +277,25 @@ function ReasoningAccordion({
   t: any;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [tickTime, setTickTime] = useState<number>(() => message.reasoningStartTime || 0);
   const steps = message.reasoningSteps || [];
+
+  useEffect(() => {
+    if (!isLoading || !message.reasoningStartTime || message.reasoningEndTime) return;
+
+    const interval = window.setInterval(() => {
+      setTickTime(Date.now());
+    }, 1000);
+
+    return () => window.clearInterval(interval);
+  }, [isLoading, message.reasoningEndTime, message.reasoningStartTime]);
+
   if (steps.length === 0 && !isLoading) return null;
 
   const durationSec = message.reasoningStartTime && message.reasoningEndTime
     ? Math.round((message.reasoningEndTime - message.reasoningStartTime) / 1000)
     : message.reasoningStartTime && isLoading
-      ? Math.round((Date.now() - message.reasoningStartTime) / 1000)
+      ? Math.round((tickTime - message.reasoningStartTime) / 1000)
       : 0;
 
   const title = (isLoading && !message.reasoningEndTime)

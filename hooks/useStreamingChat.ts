@@ -55,6 +55,8 @@ export function useStreamingChat(
   const eventSourceRef = useRef<EventSource | null>(null);
   const currentMessageRef = useRef<string>('');
   const lastUserMessageRef = useRef<string>('');
+  const agentStatusRef = useRef<AgentStatus | null>(null);
+  const citationsRef = useRef<Citation[]>([]);
 
   // Parse SSE event
   const parseStreamEvent = useCallback((data: string): StreamEvent | null => {
@@ -73,6 +75,7 @@ export function useStreamingChat(
       thinking: data.reason || `Switching to ${data.to}...`,
       timestamp: new Date(),
     };
+    agentStatusRef.current = newStatus;
     setAgentStatus(newStatus);
     onAgentChange?.(newStatus);
   }, [onAgentChange]);
@@ -85,6 +88,7 @@ export function useStreamingChat(
       progress: data.progress,
       timestamp: new Date(),
     };
+    agentStatusRef.current = status;
     setAgentStatus(status);
     setLoadingState({
       isLoading: true,
@@ -106,7 +110,11 @@ export function useStreamingChat(
       url: data.url,
       metadata: data.metadata,
     };
-    setCitations(prev => [...prev, citation]);
+    setCitations(prev => {
+      const next = [...prev, citation];
+      citationsRef.current = next;
+      return next;
+    });
     onCitation?.(citation);
   }, [onCitation]);
 
@@ -124,8 +132,8 @@ export function useStreamingChat(
       role: 'assistant' as MessageRole,
       content: data.content || currentMessageRef.current,
       timestamp: new Date(),
-      citations: [...citations],
-      agentType: agentStatus?.current,
+      citations: [...citationsRef.current],
+      agentType: agentStatusRef.current?.current,
       confidence: data.confidence,
       metadata: data.metadata,
     };
@@ -135,8 +143,9 @@ export function useStreamingChat(
     
     // Reset current message
     currentMessageRef.current = '';
+    citationsRef.current = [];
     setCitations([]);
-  }, [citations, agentStatus, onMessage]);
+  }, [onMessage]);
 
   // Handle error event
   const handleError = useCallback((data: any) => {
@@ -248,6 +257,8 @@ export function useStreamingChat(
     setAgentStatus(null);
     setError(null);
     currentMessageRef.current = '';
+    citationsRef.current = [];
+    agentStatusRef.current = null;
   }, []);
 
   // Retry last message

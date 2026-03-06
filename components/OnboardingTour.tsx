@@ -43,8 +43,8 @@ export default function OnboardingTour() {
     // Only show tour on the main projects list page
     const shouldShowTour = pathname?.endsWith('/projects');
 
-    const highlightCurrentStep = useCallback(() => {
-        const step = TOUR_STEPS[currentStep];
+    const focusStep = useCallback((stepIndex: number) => {
+        const step = TOUR_STEPS[stepIndex];
         if (!step) return;
 
         const element = document.querySelector(step.target);
@@ -53,7 +53,7 @@ export default function OnboardingTour() {
             setTargetRect(rect);
             element.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
-    }, [currentStep]);
+    }, []);
 
     // Check if tour should show
     useEffect(() => {
@@ -64,21 +64,17 @@ export default function OnboardingTour() {
             // Delay tour start for page to load
             const timer = setTimeout(() => {
                 setIsVisible(true);
-                highlightCurrentStep();
+                window.requestAnimationFrame(() => focusStep(0));
             }, 1000);
             return () => clearTimeout(timer);
         }
-    }, [highlightCurrentStep, shouldShowTour]);
-
-    useEffect(() => {
-        if (isVisible) {
-            highlightCurrentStep();
-        }
-    }, [currentStep, isVisible, highlightCurrentStep]);
+    }, [focusStep, shouldShowTour]);
 
     const handleNext = () => {
         if (currentStep < TOUR_STEPS.length - 1) {
-            setCurrentStep(currentStep + 1);
+            const nextStep = currentStep + 1;
+            setCurrentStep(nextStep);
+            window.requestAnimationFrame(() => focusStep(nextStep));
         } else {
             handleComplete();
         }

@@ -55,12 +55,10 @@ export default function AIProcessingOverlay({
     }, [mode]);
 
     const shouldRotateMessages = !statusMessage && messages.length > 1;
+    const activeMessageIndex = shouldRotateMessages ? currentMessageIndex % messages.length : 0;
 
     useEffect(() => {
-        if (!shouldRotateMessages) {
-            setCurrentMessageIndex(0);
-            return;
-        }
+        if (!shouldRotateMessages) return;
 
         const interval = setInterval(() => {
             setCurrentMessageIndex((prev) => (prev + 1) % messages.length);
@@ -69,7 +67,7 @@ export default function AIProcessingOverlay({
         return () => clearInterval(interval);
     }, [messages.length, shouldRotateMessages]);
 
-    const displayMessage = statusMessage || messages[currentMessageIndex] || '処理中...';
+    const displayMessage = statusMessage || messages[activeMessageIndex] || '処理中...';
     const normalizedProgress = clampProgress(progress);
     const showProgress = mode === 'schedule' || normalizedProgress !== null;
     const icon = mode === 'schedule' ? 'event_upcoming' : 'auto_awesome';

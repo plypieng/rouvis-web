@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { MapPin, Search, Check, X } from 'lucide-react';
 
 interface Field {
@@ -33,19 +33,31 @@ export function FieldSelector({
   const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
 
+  const loadFields = useCallback(async () => {
+    if (!onFetchFields) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const nextFields = await onFetchFields();
+      setFields(nextFields);
+    } catch (err) {
+      console.error('Failed to fetch fields:', err);
+      setError('圃場の読み込みに失敗しました');
+    } finally {
+      setLoading(false);
+    }
+  }, [onFetchFields]);
+
   useEffect(() => {
     if (isOpen && !initialFields && onFetchFields) {
-      setLoading(true);
-      setError(null);
-      onFetchFields()
-        .then(setFields)
-        .catch((err) => {
-          console.error('Failed to fetch fields:', err);
-          setError('圃場の読み込みに失敗しました');
-        })
-        .finally(() => setLoading(false));
+      const timer = window.setTimeout(() => {
+        void loadFields();
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
-  }, [isOpen, initialFields, onFetchFields]);
+  }, [isOpen, initialFields, onFetchFields, loadFields]);
 
   const filteredFields = fields.filter((field) =>
     field.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -100,15 +112,7 @@ export function FieldSelector({
               <div className="text-red-600 mb-2">⚠️ {error}</div>
               <button
                 onClick={() => {
-                  setLoading(true);
-                  setError(null);
-                  onFetchFields?.()
-                    .then(setFields)
-                    .catch((err) => {
-                      console.error('Failed to fetch fields:', err);
-                      setError('圃場の読み込みに失敗しました');
-                    })
-                    .finally(() => setLoading(false));
+                  void loadFields();
                 }}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
               >
