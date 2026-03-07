@@ -835,4 +835,24 @@ test.describe('Chat Interface with /api/chatkit', () => {
     await page.getByRole('button', { name: /チャットを開く|Open chat/ }).click();
     await expect(page).toHaveURL(/\/ja\/chat\?threadId=thread-bg-1/);
   });
+
+  test('navigates the user to a specific page via client_navigate tool', async ({ page }) => {
+    await mockChatkit(page, {
+      streamForPrompt: () => createStream([
+        `e:${JSON.stringify({
+          type: 'custom_ui',
+          data: {
+            type: 'navigate',
+            path: '/ja/calendar'
+          }
+        })}`,
+        `0:${JSON.stringify('カレンダーページに移動します。')}`
+      ])
+    });
+
+    await openChat(page);
+    await sendPrompt(page, 'カレンダーを見せて');
+
+    await expect(page).toHaveURL(/\/ja\/calendar/);
+  });
 });

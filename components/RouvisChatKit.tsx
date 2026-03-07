@@ -5,6 +5,7 @@ import { Send, Loader2, RefreshCw, Undo2, Paperclip, X, ArrowRight, Plus, Chevro
 import ReactMarkdown from 'react-markdown';
 import { useLocale, useTranslations } from 'next-intl';
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { upload } from '@vercel/blob/client';
 import { toastError } from '@/lib/feedback';
 import { trackUXEvent } from '@/lib/analytics';
@@ -423,6 +424,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   const locale = useLocale();
   const t = useTranslations('chat');
   const { status: sessionStatus, data: sessionData } = useSession();
+  const router = useRouter();
   const isAuthenticated = sessionStatus === 'authenticated';
   const sessionUserId = resolveSessionUserId(sessionData);
   const defaultAssistantLanguage = inferAssistantLanguage(locale);
@@ -1174,8 +1176,11 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
               onDraftCreate?.((event as any).draft);
             }
 
-            // Custom UI Events (Choices, Refreshes)
+            // Custom UI Events (Choices, Refreshes, Navigations)
             if (event.type === 'custom_ui' && event.data) {
+              if (event.data.type === 'navigate' && event.data.path) {
+                router.push(event.data.path);
+              }
               if (event.data.type === 'choice' && event.data.options) {
                 const mappedOptions = event.data.options.map(opt => ({
                   label: opt.label || t('cockpit.choice.default_label'),
