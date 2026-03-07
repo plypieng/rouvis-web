@@ -1417,6 +1417,18 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
     setMessages(prev => prev.map(m =>
       m.yieldState && m.yieldState.token === token ? { ...m, yieldState: undefined } : m
     ));
+    
+    // Add optimistic user response
+    setMessages(prev => [
+      ...prev,
+      {
+        id: `optimistic-${Date.now()}`,
+        role: 'user',
+        content: assistantLanguage === 'ja' && answer === 'Confirm' ? '確定しました' : answer,
+        createdAt: new Date().toISOString(),
+      }
+    ]);
+
     // Send the response back to the agent
     await sendMessage('', undefined, {
       skipUserMessage: true, // This is an agent response, not a new user message
@@ -1424,7 +1436,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
       yieldAnswer: answer,
       allowMutations: true,
     });
-  }, [sendMessage]);
+  }, [sendMessage, assistantLanguage]);
 
   const runRescheduleQuickApply = useCallback(async (
     options: { prompt: string; confirmMessage?: string }

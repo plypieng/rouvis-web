@@ -881,4 +881,42 @@ test.describe('Chat Interface with /api/chatkit', () => {
     await expect(micButton).toBeVisible();
     await expect(micButton).toBeEnabled();
   });
+
+  test('displays optimistic UI when confirming an agent yield', async ({ page }) => {
+    let yieldTokenReceived = false;
+    await mockChatkit(page, {
+      streamForPrompt: () => {
+        if (!yieldTokenReceived) {
+          yieldTokenReceived = true;
+          return createStream([
+            `e:${JSON.stringify({
+              type: 'custom_ui',
+              data: {
+                type: 'agent_yield',
+                token: 'mock-yield-token',
+                question: 'タスクを作成しますか？',
+                options: ['Confirm', 'Cancel'],
+                requiresConfirmation: true
+              }
+            })}`,
+            `0:${JSON.stringify('確認待ちです...')}`
+          ]);
+        }
+        return createStream([
+          `0:${JSON.stringify('タスクを作成しました。')}`
+        ]);
+      }
+    });
+
+    await openChat(page);
+    await sendPrompt(page, '明日のタスクを作って');
+    
+    const confirmButton = page.getByRole('button', { name: /確定する|Confirm/i }).first();
+    await expect(confirmButton).toBeVisible();
+    
+    await confirmButton.click();
+    
+    // Optimistic UI check
+    await expect(page.getByText('確定しました')).toBeVisible();
+  });
 });
