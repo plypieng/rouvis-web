@@ -870,4 +870,15 @@ test.describe('Chat Interface with /api/chatkit', () => {
     // Now mock the router to a specific route, or visit a route if ChatKit is globally mounted
     // We will just verify the default path logic works since chat is /chat
   });
+
+  test('renders voice dictation button in the composer', async ({ page }) => {
+    await mockChatkit(page);
+    await openChat(page);
+
+    const composer = page.locator('form').filter({ has: page.locator('button[type="submit"]') }).last();
+    const micButton = composer.locator('button[title="Voice input"], button[aria-label="Voice input"]');
+    
+    await expect(micButton).toBeVisible();
+    await expect(micButton).toBeEnabled();
+  });
 });

@@ -1,7 +1,7 @@
 'use client';
 
 import { forwardRef, useImperativeHandle, useRef, useEffect, useState, useCallback } from 'react';
-import { Send, Loader2, RefreshCw, Undo2, Paperclip, X, ArrowRight, Plus, ChevronDown, ChevronUp, MessageSquarePlus, Clock, Brain } from 'lucide-react';
+import { Send, Loader2, RefreshCw, Undo2, Paperclip, X, ArrowRight, Plus, ChevronDown, ChevronUp, MessageSquarePlus, Clock, Brain, Mic } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useLocale, useTranslations } from 'next-intl';
 import { useSession } from 'next-auth/react';
@@ -431,6 +431,62 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   const defaultAssistantLanguage = inferAssistantLanguage(locale);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState(initialInput || '');
+  const [isRecording, setIsRecording] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  const toggleRecording = useCallback(() => {
+    if (isRecording) {
+      recognitionRef.current?.stop();
+      setIsRecording(false);
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toastError(t('cockpit.voice_not_supported') || 'Voice input is not supported in this browser.');
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = locale === 'ja' ? 'ja-JP' : 'en-US';
+    recognition.continuous = false;
+    recognition.interimResults = true;
+
+    recognition.onstart = () => {
+      setIsRecording(true);
+    };
+
+    recognition.onresult = (event: any) => {
+      let finalTranscript = '';
+      let interimTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
+        } else {
+          interimTranscript += event.results[i][0].transcript;
+        }
+      }
+      
+      if (finalTranscript) {
+        setInput((prev) => prev ? `${prev} ${finalTranscript}` : finalTranscript);
+      } else if (interimTranscript && !finalTranscript) {
+        // Optionally handle interim updates if we wanted live preview
+      }
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error', event.error);
+      setIsRecording(false);
+    };
+
+    recognition.onend = () => {
+      setIsRecording(false);
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  }, [isRecording, locale, t]);
+
   const [isLoading, setIsLoading] = useState(false);
   const [threadId, setThreadId] = useState<string | undefined>(initialThreadId);
   const [currentStatus, setCurrentStatus] = useState<string>('');
@@ -2042,6 +2098,20 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
               aria-label={t('cockpit.attach_image')}
             >
               <Paperclip className="w-5 h-5" />
+            </button>
+            <button
+              type="button"
+              onClick={toggleRecording}
+              className={`p-2 mr-1 rounded-full transition-colors ${
+                isRecording
+                  ? 'bg-red-100 text-red-600 animate-pulse'
+                  : 'text-muted-foreground hover:text-primary hover:bg-primary/10'
+              }`}
+              disabled={isLoading}
+              aria-label="Voice input"
+              title="Voice input"
+            >
+              <Mic className="w-5 h-5" />
             </button>
             <input
               type="text"
