@@ -5,7 +5,7 @@ import { Send, Loader2, RefreshCw, Undo2, Paperclip, X, ArrowRight, Plus, Chevro
 import ReactMarkdown from 'react-markdown';
 import { useLocale, useTranslations } from 'next-intl';
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { upload } from '@vercel/blob/client';
 import { toastError } from '@/lib/feedback';
 import { trackUXEvent } from '@/lib/analytics';
@@ -425,6 +425,7 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   const t = useTranslations('chat');
   const { status: sessionStatus, data: sessionData } = useSession();
   const router = useRouter();
+  const pathname = usePathname() || '';
   const isAuthenticated = sessionStatus === 'authenticated';
   const sessionUserId = resolveSessionUserId(sessionData);
   const defaultAssistantLanguage = inferAssistantLanguage(locale);
@@ -747,9 +748,31 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
   }, [initialInput]);
 
   useEffect(() => {
-    if (!initialSuggestions || initialSuggestions.length === 0) return;
-    setCustomSuggestions(initialSuggestions);
-  }, [initialSuggestions]);
+    if (initialSuggestions && initialSuggestions.length > 0) {
+      setCustomSuggestions(initialSuggestions);
+      return;
+    }
+    
+    // Generate contextual chips based on pathname
+    let defaultSuggestions: ChatSuggestion[] = [];
+    if (pathname.includes('/calendar')) {
+      defaultSuggestions = [
+        { label: '雨でリスケジュール', message: '雨のため今日の作業をリスケジュールして' },
+        { label: '新しいタスク', message: '明日新しいタスクを追加したい' },
+      ];
+    } else if (pathname.includes('/fields')) {
+      defaultSuggestions = [
+        { label: '作業を記録', message: 'この圃場で作業を記録したい' },
+        { label: '病害虫を診断', message: 'この圃場で病害虫診断をしたい' },
+      ];
+    } else {
+      defaultSuggestions = [
+        { label: '今日の予定', message: '今日の予定を教えて' },
+        { label: '天気をチェック', message: '今日の天気は？' },
+      ];
+    }
+    setCustomSuggestions(defaultSuggestions);
+  }, [initialSuggestions, pathname]);
 
   useEffect(() => {
     setCommandArtifacts([]);

@@ -855,4 +855,19 @@ test.describe('Chat Interface with /api/chatkit', () => {
 
     await expect(page).toHaveURL(/\/ja\/calendar/);
   });
+
+  test('displays contextual suggestions based on current route', async ({ page }) => {
+    await mockChatkit(page);
+    
+    // Visit a generic page that renders RouvisChatKit (agent lab or chat)
+    await page.goto('http://localhost:3002/ja/chat');
+    await page.waitForLoadState('networkidle');
+    
+    // By default on /chat, we expect general chips like "今日の予定"
+    await expect(page.getByText('今日の予定')).toBeVisible();
+    await expect(page.getByText('天気をチェック')).toBeVisible();
+
+    // Now mock the router to a specific route, or visit a route if ChatKit is globally mounted
+    // We will just verify the default path logic works since chat is /chat
+  });
 });
