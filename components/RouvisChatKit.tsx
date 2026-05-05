@@ -1257,7 +1257,11 @@ export const RouvisChatKit = forwardRef<RouvisChatKitRef, RouvisChatKitProps>(({
 
             // Custom UI Events (Choices, Refreshes, Navigations)
             if (event.type === 'custom_ui' && event.data) {
-              if (event.data.type === 'navigate' && event.data.path) {
+              if (
+                event.data.type === 'navigate' &&
+                'path' in event.data &&
+                typeof event.data.path === 'string'
+              ) {
                 router.push(event.data.path);
               }
               if (event.data.type === 'choice' && event.data.options) {
