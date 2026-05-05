@@ -48,6 +48,10 @@ const DEFAULT_REPLAY_ON_ERROR_SAMPLE_RATE = {
 
 type RuntimeKind = 'browser' | 'server' | 'edge';
 type SentryInitOptions = NonNullable<Parameters<typeof Sentry.init>[0]>;
+type SentryBrowserInitOptions = SentryInitOptions & {
+  replaysSessionSampleRate?: number;
+  replaysOnErrorSampleRate?: number;
+};
 type BeforeSendHandler = NonNullable<SentryInitOptions['beforeSend']>;
 
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [k: string]: JsonValue };
@@ -243,7 +247,7 @@ function createBaseConfig(runtime: RuntimeKind, dsn: string | undefined): Sentry
   };
 }
 
-export function getSentryBrowserInitConfig(): SentryInitOptions {
+export function getSentryBrowserInitConfig(): SentryBrowserInitOptions {
   const environment = getEnvironment();
 
   return {
