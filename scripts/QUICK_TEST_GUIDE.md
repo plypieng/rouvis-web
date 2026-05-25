@@ -147,4 +147,4 @@ For detailed test procedures, see:
 1. Check `TEST_AUTH_INTEGRATION.md` for detailed troubleshooting
 2. Review backend logs in `D:\rouvis\backend\logs\`
 3. Check Prisma Studio for database state
-4. Review CLAUDE.md for architecture context
+4. Review `AGENT_CONTEXT.md` for architecture context

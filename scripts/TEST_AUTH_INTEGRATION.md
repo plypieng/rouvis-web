@@ -846,7 +846,7 @@ For issues or questions:
 1. Check troubleshooting guide above
 2. Review backend logs: `D:\rouvis\backend\logs\*`
 3. Check Prisma Studio: `npm run prisma:studio`
-4. Review CLAUDE.md and PLAN.md for architecture details
+4. Review `AGENT_CONTEXT.md` and `PROJECT_DOCUMENTATION.md` for architecture and command context
 
 **Test Suite Maintainer:** Fullstack Integration Tester Agent
 **Last Updated:** 2026-02-12
