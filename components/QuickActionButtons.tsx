@@ -1,7 +1,10 @@
 'use client';
 
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { Droplets, Camera, HelpCircle, Calendar } from 'lucide-react';
+import { useLocale } from 'next-intl';
+import { Droplets, Camera, HelpCircle, Calendar, Mic } from 'lucide-react';
+import { buildQuickActionTargets } from '@/lib/quick-actions';
 
 /**
  * Quick Action Buttons - Large touch targets for field use
@@ -14,6 +17,8 @@ import { Droplets, Camera, HelpCircle, Calendar } from 'lucide-react';
  */
 export function QuickActionButtons() {
   const t = useTranslations();
+  const locale = useLocale();
+  const targets = buildQuickActionTargets(locale);
 
   const actions = [
     {
@@ -21,40 +26,28 @@ export function QuickActionButtons() {
       label: t('quick_actions.log_activity'),
       icon: Droplets,
       color: 'bg-blue-500 hover:bg-blue-600 border-blue-600',
-      action: () => {
-        // TODO: Open chat with pre-filled "水やり 20L をA圃場に記録"
-        console.log('Log activity');
-      },
+      href: targets.logActivity,
     },
     {
       id: 'ask-question',
       label: t('quick_actions.ask'),
       icon: HelpCircle,
       color: 'bg-green-500 hover:bg-green-600 border-green-600',
-      action: () => {
-        // TODO: Focus chat input
-        console.log('Ask question');
-      },
+      href: targets.askQuestion,
     },
     {
       id: 'take-photo',
       label: t('quick_actions.take_photo'),
       icon: Camera,
       color: 'bg-purple-500 hover:bg-purple-600 border-purple-600',
-      action: () => {
-        // TODO: Open camera/file picker
-        console.log('Take photo');
-      },
+      href: targets.takePhoto,
     },
     {
       id: 'week-plan',
       label: t('quick_actions.week_plan'),
       icon: Calendar,
       color: 'bg-orange-500 hover:bg-orange-600 border-orange-600',
-      action: () => {
-        // TODO: Navigate to week view or open calendar
-        console.log('Show week plan');
-      },
+      href: targets.weekPlan,
     },
   ];
 
@@ -65,9 +58,10 @@ export function QuickActionButtons() {
         {actions.map((action) => {
           const Icon = action.icon;
           return (
-            <button
+            <Link
               key={action.id}
-              onClick={action.action}
+              href={action.href}
+              data-testid={`quick-action-${action.id}`}
               className={`
                 ${action.color}
                 text-white rounded-lg mobile-spacing
@@ -82,13 +76,15 @@ export function QuickActionButtons() {
               <span className="text-mobile-sm font-medium text-center leading-tight">
                 {action.label}
               </span>
-            </button>
+            </Link>
           );
         })}
       </div>
 
       {/* Voice Input Button - Prominent for field use - Mobile optimized */}
-      <button
+      <Link
+        href={targets.voiceInput}
+        data-testid="quick-action-voice-input"
         className="
           w-full mt-4 bg-gradient-to-r from-green-500 to-green-600
           hover:from-green-600 hover:to-green-700
@@ -98,22 +94,11 @@ export function QuickActionButtons() {
           border-2 border-green-600 shadow-md hover:shadow-lg
           min-h-[56px]
         "
-        onClick={() => {
-          // TODO: Start voice input
-          console.log('Start voice input');
-        }}
         aria-label={t('quick_actions.voice_input')}
       >
-        <svg className="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
-          />
-        </svg>
+        <Mic className="w-6 h-6 flex-shrink-0" strokeWidth={2} />
         <span className="font-semibold text-mobile-base">{t('quick_actions.voice_input')}</span>
-      </button>
+      </Link>
 
       <p className="text-mobile-sm text-gray-500 text-center mt-3">
         {t('quick_actions.voice_help')}
